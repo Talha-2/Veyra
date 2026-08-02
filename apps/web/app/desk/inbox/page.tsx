@@ -398,6 +398,50 @@ export default function InboxPage() {
   const [noteDraft, setNoteDraft] = useState("");
   const [reminderDraft, setReminderDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [smsDraft, setSmsDraft] = useState("");
+  const [smsSending, setSmsSending] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeTo, setComposeTo] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [composeSending, setComposeSending] = useState(false);
+
+  // Start a brand new thread from the Desk: first text creates the conversation.
+  const startConversation = async () => {
+    const to = composeTo.trim();
+    if (!to || !composeBody.trim() || composeSending) return;
+    setComposeSending(true);
+    try {
+      await api.post("/api/telephony/messages", { to, body: composeBody.trim() });
+      setComposeOpen(false);
+      setComposeTo("");
+      setComposeBody("");
+      setReloadKey((k) => k + 1);
+      setActive(to);
+      toast.success("Sent", { description: `Conversation started with ${to}.` });
+    } catch (e: any) {
+      toast.error("Could not send", { description: e?.message || "Check the carrier settings in Studio Telephony." });
+    } finally {
+      setComposeSending(false);
+    }
+  };
+
+  // Send a text from the Desk — the CRM owns the conversation; Studio
+  // Telephony is only the phone infrastructure underneath.
+  const sendSms = async () => {
+    if (!active || !smsDraft.trim() || smsSending) return;
+    setSmsSending(true);
+    try {
+      await api.post("/api/telephony/messages", { to: active, body: smsDraft.trim() });
+      setSmsDraft("");
+      const d = await api.get(`/api/desk/inbox/${encodeURIComponent(active)}`);
+      setThread(d);
+      setReloadKey((k) => k + 1);
+    } catch (e: any) {
+      toast.error("Could not send", { description: e?.message || "Check the carrier settings in Studio Telephony." });
+    } finally {
+      setSmsSending(false);
+    }
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const toggle = (k: SectionKey) => setOpen((s) => ({ ...s, [k]: !s[k] }));
@@ -601,7 +645,45 @@ export default function InboxPage() {
               <Inbox size={16} strokeWidth={2} style={{ color: "var(--accent-text)" }} />
               <span className="text-[14px] font-semibold">Inbox</span>
               <span className="badge badge-mono ml-auto">{list.length}</span>
+              <button
+                className="btn btn-ghost btn-icon btn-sm"
+                onClick={() => setComposeOpen((o) => !o)}
+                aria-label="New conversation"
+                title="New conversation"
+              >
+                <Plus size={15} />
+              </button>
             </div>
+
+            {composeOpen && (
+              <div
+                className="mt-3 flex flex-col gap-2 rounded-[10px] p-2.5"
+                style={{ background: "var(--surface-sunken)", border: "1px solid var(--border)" }}
+              >
+                <input
+                  className="input mono"
+                  value={composeTo}
+                  onChange={(e) => setComposeTo(e.target.value)}
+                  placeholder="+14155552671"
+                  aria-label="To"
+                />
+                <textarea
+                  className="input"
+                  rows={2}
+                  value={composeBody}
+                  onChange={(e) => setComposeBody(e.target.value)}
+                  placeholder="First message…"
+                  style={{ resize: "none", height: "auto", minHeight: 56 }}
+                />
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={startConversation}
+                  disabled={composeSending || !composeTo.trim() || !composeBody.trim()}
+                >
+                  {composeSending ? <Spinner size={14} /> : <ArrowUpRight size={14} />} Send text
+                </button>
+              </div>
+            )}
 
             {/* scope: All / Mine / Unassigned */}
             <div
@@ -876,19 +958,33 @@ export default function InboxPage() {
                 className="shrink-0 px-5 py-3.5"
                 style={{ borderTop: "1px solid var(--border)" }}
               >
-                <input
-                  className="input"
-                  readOnly
-                  value=""
-                  placeholder="Replies are handled in Studio Telephony"
-                  style={{
-                    background: "var(--surface-sunken)",
-                    color: "var(--text-tertiary)",
-                    cursor: "not-allowed",
-                  }}
-                />
+                <div className="flex items-end gap-2">
+                  <textarea
+                    className="input flex-1"
+                    rows={1}
+                    value={smsDraft}
+                    onChange={(e) => setSmsDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendSms();
+                      }
+                    }}
+                    placeholder="Text this contact…"
+                    style={{ resize: "none", minHeight: 38, height: "auto" }}
+                  />
+                  <button
+                    className="btn btn-primary btn-icon"
+                    onClick={sendSms}
+                    disabled={smsSending || !smsDraft.trim()}
+                    aria-label="Send text"
+                    title="Send text"
+                  >
+                    {smsSending ? <Spinner size={15} /> : <ArrowUpRight size={15} />}
+                  </button>
+                </div>
                 <p className="hint mt-1.5 text-[11px]">
-                  Replies are handled in Studio Telephony.
+                  Sends as SMS from your business number. Enter to send, Shift Enter for a new line.
                 </p>
               </div>
             </>

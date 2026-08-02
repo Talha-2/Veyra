@@ -1,12 +1,8 @@
 import Link from "next/link";
-import {
-  ArrowRight, Bot, Check, MessageSquare, Phone, Sparkles, ShieldCheck, Zap,
-} from "lucide-react";
-import Reveal from "@/components/Reveal";
+import { ArrowRight, Check } from "lucide-react";
 
-/* Pricing — inner content only. The shared (site) layout owns the nav,
-   the fixed aurora background, and the footer, so this page returns a
-   fragment and lets the one continuous surface show through. */
+/* Pricing — three Carbon plans on hairlines, usage passed through at cost,
+   questions as list rows. */
 
 type Plan = {
   name: string;
@@ -14,9 +10,8 @@ type Plan = {
   unit?: string;
   blurb: string;
   featured?: boolean;
-  badge?: string;
   features: string[];
-  cta: { href: string; label: string; cls: string };
+  cta: { href: string; label: string; ember?: boolean };
 };
 
 const PLANS: Plan[] = [
@@ -31,7 +26,7 @@ const PLANS: Plan[] = [
       "The live demo playground",
       "Community support",
     ],
-    cta: { href: "/signup", label: "Start free", cls: "btn-secondary" },
+    cta: { href: "/signup", label: "Start free" },
   },
   {
     name: "Growth",
@@ -39,7 +34,6 @@ const PLANS: Plan[] = [
     unit: "per month",
     blurb: "For teams putting Vera on real conversations",
     featured: true,
-    badge: "Most popular",
     features: [
       "Everything in Starter, plus",
       "The deep agent builder",
@@ -48,7 +42,7 @@ const PLANS: Plan[] = [
       "Evals and simulated callers",
       "Email support",
     ],
-    cta: { href: "/signup", label: "Start building", cls: "btn-gradient" },
+    cta: { href: "/signup", label: "Start building", ember: true },
   },
   {
     name: "Scale",
@@ -62,7 +56,7 @@ const PLANS: Plan[] = [
       "Custom voices and models",
       "A dedicated success contact",
     ],
-    cta: { href: "/contact", label: "Contact sales", cls: "btn-secondary" },
+    cta: { href: "/contact", label: "Contact sales" },
   },
 ];
 
@@ -81,11 +75,11 @@ const FAQS: [string, string][] = [
   ],
   [
     "What languages are supported?",
-    "Vera handles 42 plus languages with streaming speech to text that follows callers in real time, including code switching mid sentence. No configuration change is needed when a caller switches languages.",
+    "Vera handles 42+ languages with streaming speech-to-text that follows callers in real time, including code-switching mid-sentence. No configuration change is needed when a caller switches languages.",
   ],
   [
-    "Can I self host or bring my own models?",
-    "On Scale you can bring your own models and custom voices and route to your preferred providers. Talk to us about self hosting and data residency options for regulated teams.",
+    "Can I self-host or bring my own models?",
+    "On Scale you can bring your own models and custom voices and route to your preferred providers. Talk to us about self-hosting and data-residency options for regulated teams.",
   ],
   [
     "How does the deep agent work?",
@@ -97,162 +91,118 @@ export default function PricingPage() {
   return (
     <>
       {/* ── hero ── */}
-      <section className="band" style={{ paddingTop: "clamp(4rem, 9vw, 7rem)", paddingBottom: "1.5rem" }}>
+      <section className="band" style={{ paddingTop: "clamp(4rem, 8vw, 6.5rem)" }}>
         <div className="wrap text-center">
-          <Reveal>
-            <span className="eyebrow mb-6 justify-center"><Sparkles size={13} /> Pricing</span>
-          </Reveal>
-          <Reveal delay={80}>
-            <h1 className="display-hero mx-auto max-w-4xl" style={{ fontSize: "clamp(2.4rem, 5.2vw, 3.9rem)" }}>
-              Simple pricing that scales with{" "}
-              <span className="text-gradient">your conversations.</span>
-            </h1>
-          </Reveal>
-          <Reveal delay={160}>
-            <p className="lead mx-auto mt-6 max-w-2xl">
-              One flat platform fee, plus usage at cost. Start free and pay only when Vera is
-              placing calls, answering chats, and closing for you.
-            </p>
-          </Reveal>
-          <Reveal delay={240}>
-            <p className="text-tertiary mt-5 text-[13px]">
-              No credit card to start. Upgrade the moment Vera goes live.
-            </p>
-          </Reveal>
+          <h1 className="display-hero mx-auto max-w-[44rem]" style={{ textWrap: "balance" }}>
+            Simple pricing that scales with your conversations.
+          </h1>
+          <p className="lead-lg mx-auto mt-6 max-w-[50ch]">
+            One flat platform fee, plus usage at provider cost. Start free and pay only when Vera
+            is answering your calls.
+          </p>
+          <p className="mono-tag mono-tag--dim mt-6">No credit card to start</p>
         </div>
       </section>
 
       {/* ── plans ── */}
-      <section className="band-sm">
+      <section className="band-sm band--line">
         <div className="wrap">
-          <div className="price-grid">
-            {PLANS.map((plan, i) => (
-              <Reveal key={plan.name} delay={i * 80}>
-                <div className={`price-card ${plan.featured ? "featured" : ""}`}>
-                  {plan.badge && (
-                    <span
-                      className="chip"
-                      style={{
-                        position: "absolute",
-                        top: -13,
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        background: "var(--gradient-brand)",
-                        color: "var(--text-on-accent)",
-                        borderColor: "transparent",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      <Sparkles size={12} /> {plan.badge}
+          <div className="grid gap-4 md:grid-cols-3">
+            {PLANS.map((plan) => (
+              <div key={plan.name} className={`plan ${plan.featured ? "plan--featured" : ""}`}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="mono-tag">{plan.name}</span>
+                  {plan.featured && (
+                    <span className="mono-tag" style={{ color: "var(--accent)" }}>
+                      Most popular
                     </span>
                   )}
-
-                  <div className="eyebrow mb-5">{plan.name}</div>
-
-                  <div className="flex items-end gap-2">
-                    <span className="price-amt">{plan.amount}</span>
-                    {plan.unit && (
-                      <span className="text-tertiary pb-1.5 text-[13px]">{plan.unit}</span>
-                    )}
-                  </div>
-                  <p className="text-tertiary mt-3 text-[13.5px] leading-relaxed">{plan.blurb}</p>
-
-                  <div className="my-6" style={{ height: 1, background: "var(--border)" }} />
-
-                  <div className="mb-7">
-                    {plan.features.map((feat) => (
-                      <div key={feat} className="price-feat">
-                        <Check size={16} strokeWidth={2.2} />
-                        <span>{feat}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Link href={plan.cta.href} className={`btn ${plan.cta.cls} w-full`}>
-                    {plan.cta.label} <ArrowRight size={15} />
-                  </Link>
                 </div>
-              </Reveal>
+                <div className="mt-5 flex items-end gap-2">
+                  <span className="plan__price">{plan.amount}</span>
+                  {plan.unit && (
+                    <span className="mono-tag mono-tag--dim pb-1">{plan.unit}</span>
+                  )}
+                </div>
+                <p className="mt-3 text-[13.5px] leading-relaxed" style={{ color: "var(--text-tertiary)" }}>
+                  {plan.blurb}
+                </p>
+                <div className="plan__feats mt-5 mb-7">
+                  {plan.features.map((feat) => (
+                    <div key={feat} className="plan__feat">
+                      <span className="check-sq" style={{ marginTop: 1 }}>
+                        <Check strokeWidth={2.6} />
+                      </span>
+                      <span>{feat}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-auto">
+                  {plan.cta.ember ? (
+                    <Link href={plan.cta.href} className="btn-ember w-full">
+                      {plan.cta.label} <ArrowRight />
+                    </Link>
+                  ) : (
+                    <Link href={plan.cta.href} className="btn-mint w-full">
+                      {plan.cta.label}
+                    </Link>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* ── usage note ── */}
-      <section className="band-sm">
-        <div className="wrap-tight">
-          <Reveal variant="scale">
-            <div className="glass-card text-center" style={{ padding: "26px 30px" }}>
-              <span
-                className="mx-auto mb-4 inline-flex items-center justify-center"
-                style={{
-                  width: 40, height: 40, borderRadius: 12,
-                  background: "color-mix(in srgb, var(--accent) 15%, transparent)",
-                  color: "var(--accent-text)",
-                }}
-              >
-                <Zap size={20} strokeWidth={1.8} />
-              </span>
-              <p className="lead" style={{ color: "var(--text-secondary)" }}>
-                Voice minutes, phone numbers, and SMS are billed at provider cost, passed straight
-                through with no markup. You only pay for what you use, and you can watch usage in
-                real time from your dashboard.
+          <div className="console mt-10">
+            <div className="console__bar">
+              <span className="console__dot" />
+              usage — passed through at cost
+            </div>
+            <div className="console__body">
+              <p className="lead" style={{ maxWidth: "70ch" }}>
+                Voice minutes, phone numbers, and SMS are billed at provider cost with no markup.
+                You only pay for what you use, and you can watch usage in real time from your
+                dashboard.
               </p>
             </div>
-          </Reveal>
+          </div>
         </div>
       </section>
 
       {/* ── FAQ ── */}
-      <section className="band">
+      <section className="band band--line">
         <div className="wrap-tight">
-          <Reveal>
-            <h2 className="section-title mb-10 text-center">Questions, answered.</h2>
-          </Reveal>
-          <div className="flex flex-col gap-8">
-            {FAQS.map(([q, a], i) => (
-              <Reveal key={q} delay={(i % 2) * 70}>
-                <div>
-                  <h3 className="text-[17px] font-semibold">{q}</h3>
-                  <p className="text-secondary mt-2 text-[15px] leading-relaxed">{a}</p>
-                </div>
-              </Reveal>
+          <h2 className="section-title">Questions, answered.</h2>
+          <div className="rows mt-10">
+            {FAQS.map(([q, a]) => (
+              <div key={q} className="row" style={{ gridTemplateColumns: "1fr" }}>
+                <span>
+                  <span className="row__title">{q}</span>
+                  <span className="row__body block" style={{ maxWidth: "75ch" }}>{a}</span>
+                </span>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── closing CTA ── */}
-      <section className="band">
+      {/* ── close ── */}
+      <section className="band band--line">
         <div className="wrap-tight text-center">
-          <Reveal>
-            <div className="mb-6 flex items-center justify-center gap-3 text-tertiary">
-              <Phone size={18} strokeWidth={1.6} />
-              <MessageSquare size={18} strokeWidth={1.6} />
-              <Bot size={18} strokeWidth={1.6} />
-              <ShieldCheck size={18} strokeWidth={1.6} />
-            </div>
-            <h2 className="section-title" style={{ fontSize: "clamp(2rem, 4.4vw, 3.1rem)" }}>
-              Start free. Upgrade when Vera is{" "}
-              <span className="text-gradient">answering your calls.</span>
-            </h2>
-          </Reveal>
-          <Reveal delay={100}>
-            <p className="lead mx-auto mt-5 max-w-xl">
-              Build voice and chat agents, provision real numbers, and wire your tools. Move to a
-              paid plan the moment Vera is live and earning its keep.
-            </p>
-          </Reveal>
-          <Reveal delay={180}>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/signup" className="btn btn-gradient btn-lg">
-                Start free <ArrowRight />
-              </Link>
-              <Link href="/contact" className="btn btn-secondary btn-lg">
-                Contact sales
-              </Link>
-            </div>
-          </Reveal>
+          <h2 className="section-title mx-auto max-w-[22ch]">
+            Start free. Upgrade when Vera is answering your calls.
+          </h2>
+          <p className="lead mx-auto mt-5 max-w-[46ch]">
+            Build voice and chat agents, provision real numbers, and wire your tools. Move up the
+            moment Vera is live and earning its keep.
+          </p>
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/contact" className="btn-ember">
+              Contact sales <ArrowRight />
+            </Link>
+            <Link href="/signup" className="btn-mint">
+              Start free
+            </Link>
+          </div>
         </div>
       </section>
     </>

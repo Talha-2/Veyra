@@ -1,99 +1,92 @@
-/* The site's "images": self-contained SVG + styled-DOM graphics that read as
-   real product UI. No external assets — everything is on-brand, theme-aware, and
-   animated, so the page feels alive and interactive without hotlinking stock. */
+/* The site's "images": code-drawn product consoles in the system's own
+   grammar — Carbon panels, Iron hairlines, mono labels, 5.6px corners.
+   No stock assets, no chrome frames; every graphic reads as the product
+   working. The six-color spectrogram lives ONLY in <Spectro />. */
 
-import {
-  ArrowRight,
-  Bot,
-  Check,
-  GitBranch,
-  Mail,
-  MessageSquare,
-  Phone,
-  ShieldCheck,
-  Sparkles,
-  Wrench,
-} from "lucide-react";
-
-// animated voice waveform — a row of bouncing bars
-export function VoiceWaveform({ bars = 28 }: { bars?: number }) {
+// ── the signature: full-bleed six-color voice spectrogram ──
+export function Spectro({ bars = 96 }: { bars?: number }) {
   return (
-    <div className="wave" aria-hidden>
+    <div className="spectro" aria-hidden>
       {Array.from({ length: bars }).map((_, i) => (
-        <i key={i} style={{ animationDelay: `${(i % 9) * 0.09}s` }} />
+        <i key={i} />
       ))}
     </div>
   );
 }
 
-// deep-agent console: a browser frame with a live build in progress
+// ── ember amplitude bars used inside consoles ──
+export function VoiceWaveform({ bars = 26, live = true }: { bars?: number; live?: boolean }) {
+  return (
+    <div className={`gwave ${live ? "live" : ""}`} aria-hidden>
+      {Array.from({ length: bars }).map((_, i) => (
+        <span
+          key={i}
+          style={{
+            animationDelay: `${(i % 9) * 0.09}s`,
+            height: `${18 + ((i * 37) % 61)}%`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── deep agent: the build console, mid-run ──
 export function ConsoleMock() {
   return (
-    <div className="mock" style={{ maxWidth: 480 }}>
-      <div className="mock__bar">
-        <span className="mock__dot r" />
-        <span className="mock__dot y" />
-        <span className="mock__dot g" />
-        <span className="mock__addr">vera.studio / deep agent</span>
+    <div className="console" style={{ width: "100%", maxWidth: 520 }}>
+      <div className="console__bar">
+        <span className="console__dot" />
+        vera.studio — deep agent
+        <span className="spacer" />
+        live
       </div>
-      <div className="mock__body">
-        <div className="mk-line me">
-          <span className="mk-av" style={{ background: "color-mix(in srgb, var(--voice-caller) 18%, transparent)", color: "var(--voice-caller)" }}>You</span>
-          <div className="mk-bubble">Build a booking flow, wire my calendar, and deploy it.</div>
+      <div className="console__body">
+        <div
+          className="log-line"
+          style={{ marginBottom: 14, color: "var(--text-primary)", fontWeight: 500 }}
+        >
+          <span className="t">you</span>
+          <span>&ldquo;Answer our phones, book jobs into the calendar, and text back missed calls.&rdquo;</span>
         </div>
-        <div className="mk-line">
-          <span className="mk-av"><Bot size={13} /></span>
-          <div className="mk-bubble">
-            On it. Reading your tools, then delegating to the Workflow Builder.
-          </div>
+        <div className="log">
+          <div className="log-line"><span className="t">00:01</span><span className="ok">done</span><span>read business profile and connected tools</span></div>
+          <div className="log-line"><span className="t">00:04</span><span className="ok">done</span><span>draft booking workflow — 6 steps, 2 branches</span></div>
+          <div className="log-line"><span className="t">00:09</span><span className="ok">done</span><span>ground knowledge base on your site</span></div>
+          <div className="log-line"><span className="t">00:12</span><span className="act">run</span><span>wire google calendar · managed oauth</span></div>
+          <div className="log-line"><span className="t">—</span><span className="warn">hold</span><span>publish — waiting for your approval</span></div>
         </div>
-        <div className="da-preview" style={{ marginTop: 4 }}>
-          <div className="da-preview__plan" style={{ marginBottom: 10 }}>
-            <div className="da-preview__task done">Read connected tools</div>
-            <div className="da-preview__task done">Draft the booking flow</div>
-            <div className="da-preview__task run">Wire Google Calendar</div>
-            <div className="da-preview__task">Publish once approved</div>
-          </div>
-          <div className="da-preview__handoff">
-            Main <ArrowRight size={12} /> <b>Workflow Builder</b>
-          </div>
-        </div>
-      </div>
-      <div className="mock-float" style={{ right: -14, bottom: 40 }}>
-        <ShieldCheck size={15} /> Approve to deploy
       </div>
     </div>
   );
 }
 
-// visual workflow / pathway graph
+// ── workflows: a compiled pathway as a node rail ──
 export function WorkflowMock() {
-  const nodes: [any, string, string, boolean?][] = [
-    [Sparkles, "Start", "caller intent detected"],
-    [MessageSquare, "Ask", "what date works for you?"],
-    [Wrench, "Act", "create calendar event", true],
-    [GitBranch, "Branch", "booked / needs a human"],
-    [Check, "End", "confirm and wrap up"],
+  const nodes: [string, string, string, boolean?][] = [
+    ["trigger", "Inbound call", "caller intent detected"],
+    ["ask", "Collect the time", "“what date works for you?”"],
+    ["act", "Create calendar event", "google calendar · booked", true],
+    ["branch", "Confirmed?", "yes → confirm · no → human"],
+    ["end", "Wrap up", "summary posted to vera desk"],
   ];
   return (
-    <div className="mock" style={{ maxWidth: 380 }}>
-      <div className="mock__bar">
-        <span className="mock__dot r" />
-        <span className="mock__dot y" />
-        <span className="mock__dot g" />
-        <span className="mock__addr">workflow builder</span>
+    <div className="console" style={{ width: "100%", maxWidth: 440 }}>
+      <div className="console__bar">
+        <span className="console__dot" style={{ background: "var(--info)" }} />
+        workflow — booking_flow
+        <span className="spacer" />
+        compiled
       </div>
-      <div className="mock__body">
-        <div className="mk-flow">
-          {nodes.map(([Ic, title, sub, accent], i) => (
-            <div key={title}>
-              <div className={`mk-node ${accent ? "accent" : ""}`}>
-                <span className="mk-node__ic"><Ic size={14} /></span>
-                <div>
-                  <b>{title}</b> <span>· {sub}</span>
-                </div>
-              </div>
-              {i < nodes.length - 1 && <div className="mk-wire" />}
+      <div className="console__body" style={{ paddingBlock: 14 }}>
+        <div className="nodes">
+          {nodes.map(([tag, label, sub, act]) => (
+            <div key={label} className={`node ${act ? "node--act" : ""}`}>
+              <span className="node__tag">{tag}</span>
+              <span>
+                <span className="node__label">{label}</span>{" "}
+                <span className="node__sub">· {sub}</span>
+              </span>
             </div>
           ))}
         </div>
@@ -102,122 +95,164 @@ export function WorkflowMock() {
   );
 }
 
-// telephony phone: a live inbound call
+// ── telephony: a live inbound call card ──
 export function TelephonyMock() {
   return (
-    <div style={{ position: "relative" }}>
-      <div className="mk-phone">
-        <div className="mk-phone__screen">
-          <div className="mk-ring">
-            <Phone size={30} />
-          </div>
-          <div>
-            <div style={{ fontSize: 13, color: "var(--stage-text-muted)" }}>Incoming call</div>
-            <div className="mono" style={{ fontSize: 17, fontWeight: 600, marginTop: 4 }}>+1 415 555 0142</div>
-          </div>
-          <VoiceWaveform bars={18} />
-          <div style={{ fontSize: 12, color: "var(--stage-text-muted)" }}>Vera is answering…</div>
+    <div className="console" style={{ width: "100%", maxWidth: 400 }}>
+      <div className="console__bar">
+        <span className="console__dot" />
+        telephony — inbound
+        <span className="spacer" />
+        00:41
+      </div>
+      <div className="console__body">
+        <div className="mono-tag mono-tag--dim">Incoming call</div>
+        <div
+          className="mono"
+          style={{ fontSize: 22, fontWeight: 500, color: "var(--text-primary)", marginTop: 8, letterSpacing: "0.02em" }}
+        >
+          +1 415 555 0142
         </div>
-      </div>
-      <div className="mock-float" style={{ left: -10, top: 30 }}>
-        <Phone size={14} /> 100+ countries
-      </div>
-      <div className="mock-float" style={{ right: -6, bottom: 44 }}>
-        <MessageSquare size={14} /> SMS in one thread
+        <div style={{ margin: "16px 0" }}>
+          <VoiceWaveform bars={32} />
+        </div>
+        <div className="log">
+          <div className="log-line"><span className="ok">0.9s</span><span>answered — &ldquo;Thanks for calling, how can I help?&rdquo;</span></div>
+          <div className="log-line"><span className="act">sms</span><span>confirmation text queued to the same thread</span></div>
+          <div className="log-line"><span className="dim">esc</span><span className="dim">warm transfer armed · front desk</span></div>
+        </div>
       </div>
     </div>
   );
 }
 
-// CRM unified inbox
+// ── vera desk: every channel in one inbox ──
 export function InboxMock() {
   const rows: [string, string, string, string][] = [
-    ["call", "Dana Okafor", "Missed call · 2m", "new lead"],
-    ["sms", "Marcus Lee", "Can we reschedule to Fri?", "open"],
+    ["call", "Dana Okafor", "Missed call · called back in 40s", "new lead"],
+    ["sms", "Marcus Lee", "“Can we reschedule to Friday?”", "open"],
     ["mail", "Priya N.", "Re: quote for 20 seats", "quoted"],
-    ["call", "Sam Rivera", "Voicemail · booking", "won"],
+    ["call", "Sam Rivera", "Voicemail · booking request", "won"],
   ];
-  const cls: Record<string, any> = { call: Phone, sms: MessageSquare, mail: Mail };
   return (
-    <div className="mock" style={{ maxWidth: 420 }}>
-      <div className="mock__bar">
-        <span className="mock__dot r" />
-        <span className="mock__dot y" />
-        <span className="mock__dot g" />
-        <span className="mock__addr">vera desk / inbox</span>
+    <div className="console" style={{ width: "100%", maxWidth: 480 }}>
+      <div className="console__bar">
+        <span className="console__dot" />
+        vera desk — inbox
+        <span className="spacer" />
+        4 open
       </div>
-      <div className="mock__body">
-        <div className="mk-inbox">
-          {rows.map(([ch, name, prev, tag]) => {
-            const Ic = cls[ch];
-            return (
-              <div key={name} className="mk-thread">
-                <span className={`mk-thread__ch ${ch}`}><Ic size={13} /></span>
-                <div className="mk-thread__t">
-                  <b>{name}</b>
-                  <p>{prev}</p>
-                </div>
-                <span className="mk-tag">{tag}</span>
-              </div>
-            );
-          })}
+      <div>
+        {rows.map(([ch, name, prev, tag], i) => (
+          <div
+            key={name}
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: 12,
+              padding: "12px 16px",
+              borderTop: i === 0 ? "none" : "1px solid var(--border)",
+            }}
+          >
+            <span className="node__tag" style={{ width: 34 }}>{ch}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>{name}</span>
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 12.5,
+                  color: "var(--text-tertiary)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {prev}
+              </span>
+            </span>
+            <span className="chip chip--mono" style={{ flexShrink: 0 }}>{tag}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── integrations: the catalog as a quiet tag wall ──
+const TOOLS = [
+  "Slack", "Google Calendar", "HubSpot", "Stripe", "Gmail", "Sheets",
+  "Notion", "Zendesk", "Salesforce", "WhatsApp", "Airtable",
+];
+export function IntegrationGrid() {
+  return (
+    <div className="console" style={{ width: "100%", maxWidth: 480 }}>
+      <div className="console__bar">
+        <span className="console__dot" />
+        integrations — connected
+        <span className="spacer" />
+        managed oauth
+      </div>
+      <div className="console__body">
+        <div className="chips">
+          {TOOLS.map((t) => (
+            <span key={t} className="chip">{t}</span>
+          ))}
+          <span className="chip chip--mono" style={{ color: "var(--accent)", borderColor: "color-mix(in srgb, var(--accent) 40%, var(--border))" }}>
+            +989 more
+          </span>
+        </div>
+        <p style={{ marginTop: 16, fontSize: 12.5, lineHeight: 1.55, color: "var(--text-tertiary)" }}>
+          Connect once. The agent reads each tool, fills the parameters itself, and takes the
+          action live on the call.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── voice: a live transcript with the turn readout ──
+export function TranscriptMock() {
+  const lines: [string, string][] = [
+    ["agent", "Thanks for calling Vera. How can I help you today?"],
+    ["caller", "Hi — do you have any openings this Friday afternoon?"],
+    ["agent", "We do. There’s a 2:30 and a 4 o’clock. Want me to book one?"],
+  ];
+  return (
+    <div className="console" style={{ width: "100%", maxWidth: 460 }}>
+      <div className="console__bar">
+        <span className="console__dot" />
+        live call — deepgram → agent → cartesia
+        <span className="spacer" />
+        0.94s
+      </div>
+      <div className="console__body">
+        <div className="log" style={{ gap: 12 }}>
+          {lines.map(([who, text], i) => (
+            <div key={i} className="log-line" style={{ alignItems: "baseline" }}>
+              <span className="t" style={{ width: 46, flexShrink: 0, color: who === "agent" ? "var(--accent)" : "var(--text-tertiary)" }}>
+                {who}
+              </span>
+              <span style={{ color: "var(--text-primary)", fontFamily: "var(--font-sans), sans-serif", fontSize: 13.5 }}>
+                {text}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginTop: 16,
+            paddingTop: 12,
+            borderTop: "1px solid var(--border)",
+          }}
+        >
+          <span className="mono-tag mono-tag--dim">booking flow · collecting time</span>
+          <VoiceWaveform bars={14} />
         </div>
       </div>
     </div>
-  );
-}
-
-// integration orbits — tools floating around the Vera core
-const ORBIT_CHIPS = ["Slack", "GCal", "HubSpot", "Stripe", "Gmail", "Sheets", "Notion", "Zoom"];
-export function IntegrationOrbits() {
-  return (
-    <div className="orbit" aria-hidden>
-      <div className="orbit__ring" style={{ animation: "spin-slow 40s linear infinite" }} />
-      <div className="orbit__ring r2" style={{ animation: "spin-slow 30s linear infinite reverse" }} />
-      <div className="orbit__ring r3" />
-      {ORBIT_CHIPS.map((label, i) => {
-        const angle = (i / ORBIT_CHIPS.length) * Math.PI * 2;
-        const radius = i % 2 === 0 ? 46 : 33; // alternate between two rings, as %
-        const top = 50 + Math.sin(angle) * radius;
-        const left = 50 + Math.cos(angle) * radius;
-        return (
-          <div
-            key={label}
-            className="orbit__chip float"
-            style={{ top: `${top}%`, left: `${left}%`, animationDelay: `${(i % 5) * 0.6}s` }}
-          >
-            {label.slice(0, 2)}
-          </div>
-        );
-      })}
-      <div className="orbit__core">
-        <Sparkles size={30} />
-      </div>
-    </div>
-  );
-}
-
-// abstract signal arcs — connection reaching out, used as a hero flourish
-export function SignalArcs({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 400 200" className={className} aria-hidden fill="none">
-      <defs>
-        <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="var(--accent)" />
-          <stop offset="1" stopColor="var(--accent-2)" />
-        </linearGradient>
-      </defs>
-      {[0, 1, 2, 3].map((i) => (
-        <path
-          key={i}
-          d={`M20 ${180 - i * 6} Q 200 ${20 + i * 30} 380 ${180 - i * 6}`}
-          stroke="url(#sg)"
-          strokeWidth="1.5"
-          opacity={0.5 - i * 0.08}
-        />
-      ))}
-      <circle cx="20" cy="180" r="5" fill="var(--accent)" />
-      <circle cx="380" cy="180" r="5" fill="var(--accent-2)" />
-    </svg>
   );
 }

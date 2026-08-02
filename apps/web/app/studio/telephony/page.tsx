@@ -198,7 +198,6 @@ function Copyable({ value }: { value: string }) {
 // ── page ─────────────────────────────────────────────────────────────────────
 const TABS = [
   ["numbers", "Numbers", Phone],
-  ["messages", "Messages", MessageSquare],
   ["calls", "Calls", PhoneCall],
   ["settings", "Settings", Settings2],
 ] as const;
@@ -222,7 +221,7 @@ export default function TelephonyPage() {
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Telephony"
-        description="Give Vera a real phone number. Take inbound calls, place outbound calls to any country, and send or receive text messages, all answered by the same agent you tuned for voice."
+        description="The phone infrastructure: buy numbers, route inbound calls, set up the IVR and transfers, and connect your carrier. Conversations with customers live in Vera Desk."
         actions={
           <span className={`badge ${configured ? "badge-success" : ""}`}>
             <span className={`dot ${configured ? "dot-pulse" : ""}`} />
@@ -261,7 +260,6 @@ export default function TelephonyPage() {
           goSettings={() => setTab("settings")}
         />
       )}
-      {tab === "messages" && <MessagesTab numbers={numbers} configured={configured} />}
       {tab === "calls" && <CallsTab numbers={numbers} settings={settings} />}
       {tab === "settings" && (
         <SettingsTab
@@ -738,234 +736,6 @@ function RoutingModal({
 }
 
 // ── messages ─────────────────────────────────────────────────────────────────
-function MessagesTab({ numbers, configured }: { numbers: Num[]; configured: boolean }) {
-  const [threads, setThreads] = useState<Thread[]>([]);
-  const [active, setActive] = useState<string | null>(null);
-  const [msgs, setMsgs] = useState<Msg[]>([]);
-  const [body, setBody] = useState("");
-  const [sending, setSending] = useState(false);
-  const [composeTo, setComposeTo] = useState("");
-  const [fromId, setFromId] = useState("");
-  const [newThread, setNewThread] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
-
-  const smsNumbers = numbers.filter((n) => n.capabilities.sms);
-
-  const loadThreads = () => api.get("/api/telephony/messages/threads").then(setThreads).catch(() => {});
-  const loadThread = (cp: string) =>
-    api.get(`/api/telephony/messages/threads/${encodeURIComponent(cp)}`).then(setMsgs).catch(() => {});
-
-  useEffect(() => {
-    loadThreads();
-  }, []);
-  useEffect(() => {
-    if (active) loadThread(active);
-  }, [active]);
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs]);
-  useEffect(() => {
-    if (!fromId && smsNumbers.length) setFromId(smsNumbers[0].id);
-  }, [smsNumbers, fromId]);
-
-  const send = async (to: string) => {
-    if (!body.trim() || !to.trim()) return;
-    setSending(true);
-    try {
-      await api.post("/api/telephony/messages", { to, body, from_number_id: fromId });
-      setBody("");
-      setActive(to);
-      setNewThread(false);
-      setComposeTo("");
-      loadThreads();
-      loadThread(to);
-    } catch (e: any) {
-      toast.error("Could not send", { description: e.message });
-    } finally {
-      setSending(false);
-    }
-  };
-
-  if (!configured) {
-    return (
-      <SectionCard>
-        <EmptyState
-          icon={MessageSquare}
-          title="Messaging is off"
-          body="Connect a provider and buy a number with SMS in Settings, then your text conversations show up here."
-        />
-      </SectionCard>
-    );
-  }
-
-  return (
-    <div className="card grid min-h-[520px] grid-cols-1 overflow-hidden md:grid-cols-[300px_1fr]" style={{ padding: 0 }}>
-      {/* thread list */}
-      <div className="flex flex-col border-b md:border-b-0 md:border-r" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-          <span className="text-[13px] font-semibold">Conversations</span>
-          <button className="btn btn-ghost btn-icon btn-sm" onClick={() => { setNewThread(true); setActive(null); }} title="New message">
-            <Plus size={15} />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {threads.length === 0 ? (
-            <p className="text-tertiary px-4 py-8 text-center text-[13px]">No messages yet.</p>
-          ) : (
-            threads.map((t) => (
-              <button
-                key={t.counterparty}
-                onClick={() => { setActive(t.counterparty); setNewThread(false); }}
-                className="flex w-full flex-col gap-0.5 px-4 py-3 text-left transition-colors"
-                style={{
-                  background: active === t.counterparty ? "var(--surface-sunken)" : "transparent",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="mono truncate text-[13px] font-medium">{t.counterparty}</span>
-                  <span className="text-tertiary shrink-0 text-[11px]">{timeAgo(t.last_at)}</span>
-                </div>
-                <span className="text-tertiary truncate text-[12px]">
-                  {t.last_direction === "outbound" ? "You: " : ""}
-                  {t.last_body}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* conversation */}
-      <div className="flex min-h-0 flex-col">
-        {newThread ? (
-          <div className="flex flex-1 flex-col p-4">
-            <label className="label">To</label>
-            <input
-              className="input mono mb-3"
-              value={composeTo}
-              onChange={(e) => setComposeTo(e.target.value)}
-              placeholder="+14155552671"
-            />
-            <div className="flex-1" />
-            <Composer
-              body={body}
-              setBody={setBody}
-              onSend={() => send(composeTo)}
-              sending={sending}
-              fromId={fromId}
-              setFromId={setFromId}
-              numbers={smsNumbers}
-              disabled={!composeTo.trim()}
-            />
-          </div>
-        ) : active ? (
-          <>
-            <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-              <span className="mono text-[14px] font-semibold">{active}</span>
-            </div>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
-              {msgs.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex flex-col"
-                  style={{ alignItems: m.direction === "outbound" ? "flex-end" : "flex-start" }}
-                >
-                  <div
-                    className="max-w-[80%] rounded-2xl px-3.5 py-2 text-[13px] leading-relaxed"
-                    style={
-                      m.direction === "outbound"
-                        ? { background: "var(--accent)", color: "var(--accent-contrast, #fff)" }
-                        : { background: "var(--surface-sunken)", border: "1px solid var(--border)" }
-                    }
-                  >
-                    {m.body}
-                  </div>
-                  <span className="text-tertiary mt-1 text-[11px]">
-                    {fmtStatus(m.status)} · {timeAgo(m.created_at)}
-                  </span>
-                </div>
-              ))}
-              <div ref={endRef} />
-            </div>
-            <Composer
-              body={body}
-              setBody={setBody}
-              onSend={() => send(active)}
-              sending={sending}
-              fromId={fromId}
-              setFromId={setFromId}
-              numbers={smsNumbers}
-            />
-          </>
-        ) : (
-          <div className="flex flex-1 items-center justify-center">
-            <EmptyState
-              icon={MessageSquare}
-              title="Pick a conversation"
-              body="Select a thread on the left, or start a new message."
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Composer({
-  body,
-  setBody,
-  onSend,
-  sending,
-  fromId,
-  setFromId,
-  numbers,
-  disabled,
-}: {
-  body: string;
-  setBody: (s: string) => void;
-  onSend: () => void;
-  sending: boolean;
-  fromId: string;
-  setFromId: (s: string) => void;
-  numbers: Num[];
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-2 p-3" style={{ borderTop: "1px solid var(--border)" }}>
-      {numbers.length > 1 && (
-        <select className="input" style={{ height: 32 }} value={fromId} onChange={(e) => setFromId(e.target.value)}>
-          {numbers.map((n) => (
-            <option key={n.id} value={n.id}>
-              From {n.e164}
-            </option>
-          ))}
-        </select>
-      )}
-      <div className="flex items-end gap-2">
-        <textarea
-          className="input flex-1"
-          rows={1}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              onSend();
-            }
-          }}
-          placeholder="Write a message…"
-          style={{ resize: "none", minHeight: 38 }}
-        />
-        <button className="btn btn-primary btn-icon" onClick={onSend} disabled={sending || disabled || !body.trim()}>
-          {sending ? <Spinner size={15} /> : <Send size={15} />}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── calls ────────────────────────────────────────────────────────────────────
 function CallsTab({ numbers, settings }: { numbers: Num[]; settings: Settings | null }) {
   const [calls, setCalls] = useState<Call[]>([]);
   const [to, setTo] = useState("");

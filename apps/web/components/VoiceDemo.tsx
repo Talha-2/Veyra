@@ -60,7 +60,7 @@ export default function VoiceDemo() {
               </>
             )}
             <button
-              className="call-orb glow-pulse"
+              className="call-orb"
               onClick={start}
               disabled={connecting}
               aria-label="Start a live call with the agent"
@@ -71,7 +71,7 @@ export default function VoiceDemo() {
           </div>
 
           <div>
-            <h3 className="serif" style={{ fontSize: 27, color: "var(--stage-text)" }}>
+            <h3 style={{ fontSize: 26, fontWeight: 300, letterSpacing: "-0.02em", color: "var(--stage-text)" }}>
               Talk to the agent, live.
             </h3>
             <p
@@ -92,8 +92,8 @@ export default function VoiceDemo() {
             <span className="pipe-chip">Cartesia voice</span>
           </div>
 
-          <button className="btn btn-gradient btn-lg" onClick={start} disabled={connecting}>
-            <Phone size={16} /> {connecting ? "Connecting…" : "Start the call"}
+          <button className="btn-ember" onClick={start} disabled={connecting} style={connecting ? { opacity: 0.7 } : undefined}>
+            <Phone size={14} /> {connecting ? "Connecting…" : "Start the call"}
           </button>
 
           {error && (

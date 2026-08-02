@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Code2 } from "lucide-react";
-import { Logo } from "@/components/Logo";
+import { ArrowRight } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/contact";
@@ -11,13 +10,11 @@ const bookProps = CALENDAR_URL.startsWith("http")
 function Col({ head, links }: { head: string; links: [string, string][] }) {
   return (
     <div>
-      <div className="mono mb-4 text-[11px] uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
-        {head}
-      </div>
+      <div className="site-footer__head">{head}</div>
       <ul className="space-y-2.5">
         {links.map(([label, href]) => (
           <li key={label}>
-            <Link href={href} className="text-[14px] transition-colors" style={{ color: "var(--text-secondary)" }}>
+            <Link href={href} className="site-footer__link">
               {label}
             </Link>
           </li>
@@ -29,31 +26,22 @@ function Col({ head, links }: { head: string; links: [string, string][] }) {
 
 export default function SiteFooter() {
   return (
-    <footer className="relative" style={{ marginTop: "2rem" }}>
-      {/* a soft top wash instead of a hard divider — keeps the page one surface */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface) 60%, transparent))",
-        }}
-      />
-      <div className="wrap relative">
+    <footer className="site-footer">
+      <div className="wrap">
         <div className="grid gap-10 py-16 md:grid-cols-[1.5fr_1fr_1fr_1fr_1fr]">
           <div className="max-w-xs">
-            <Logo size={26} />
-            <p className="text-secondary mt-4 text-[14px] leading-relaxed">
-              AI agents that answer, call, and close. Voice and chat, grounded and sub-second, built for the
-              conversations that break everything else.
+            <div className="site-nav__word">Vera</div>
+            <p className="mt-4 text-[14px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+              AI agents that answer, call, and close. One grounded brain across voice, chat, phone,
+              and SMS.
             </p>
-            <div className="mt-5 flex items-center gap-2">
-              <Link href="/signup" className="btn btn-gradient btn-sm">
-                Get started <ArrowRight />
-              </Link>
-              <a href={CALENDAR_URL} {...bookProps} className="btn btn-secondary btn-sm">
-                <CalendarDays /> Book a demo
+            <div className="mt-6 flex items-center gap-3">
+              <a href={CALENDAR_URL} {...bookProps} className="btn-ember btn-ember--sm">
+                Request a demo <ArrowRight />
               </a>
+              <Link href="/signup" className="btn-mint btn-mint--sm">
+                Sign up
+              </Link>
             </div>
           </div>
           <Col
@@ -62,9 +50,9 @@ export default function SiteFooter() {
               ["Platform", "/platform"],
               ["Solutions", "/solutions"],
               ["Integrations", "/integrations"],
+              ["Pricing", "/pricing"],
               ["Voice agents", "/platform#voice"],
               ["Deep agent", "/platform#agent"],
-              ["Telephony", "/platform#telephony"],
               ["Vera Desk", "/platform#desk"],
             ]}
           />
@@ -73,7 +61,7 @@ export default function SiteFooter() {
             links={[
               ["Overview", "/studio/overview"],
               ["Workflows", "/studio/workflows"],
-              ["Knowledge Base", "/studio/knowledge"],
+              ["Knowledge base", "/studio/knowledge"],
               ["Telephony", "/studio/telephony"],
               ["Evals", "/studio/evals"],
             ]}
@@ -82,7 +70,6 @@ export default function SiteFooter() {
             head="Company"
             links={[
               ["About", "/company"],
-              ["Pricing", "/pricing"],
               ["Contact", "/contact"],
               ["Docs", "/studio/developers"],
             ]}
@@ -100,13 +87,10 @@ export default function SiteFooter() {
           className="flex flex-wrap items-center justify-between gap-4 py-6"
           style={{ borderTop: "1px solid var(--border)" }}
         >
-          <p className="text-tertiary text-[13px]">© 2026 Vera. All rights reserved.</p>
-          <div className="flex items-center gap-1">
-            <a href="/studio/developers" className="btn btn-ghost btn-icon" aria-label="Developers">
-              <Code2 />
-            </a>
-            <ThemeToggle />
-          </div>
+          <p className="mono-tag mono-tag--dim" style={{ textTransform: "none", letterSpacing: "0.04em" }}>
+            © 2026 Vera. All rights reserved.
+          </p>
+          <ThemeToggle />
         </div>
       </div>
     </footer>
