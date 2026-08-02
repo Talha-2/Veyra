@@ -1159,9 +1159,14 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
 
 // ── settings ─────────────────────────────────────────────────────────────────
 function SettingsTab({ settings, reload }: { settings: Settings | null; reload: () => void }) {
+  const [provider, setProvider] = useState("twilio");
   const [accountSid, setAccountSid] = useState("");
   const [authToken, setAuthToken] = useState("");
   const [messagingSid, setMessagingSid] = useState("");
+  // telnyx
+  const [telnyxKey, setTelnyxKey] = useState("");
+  const [telnyxProfile, setTelnyxProfile] = useState("");
+  const [telnyxConnection, setTelnyxConnection] = useState("");
   const [saving, setSaving] = useState(false);
   // sip connect
   const [sipDomain, setSipDomain] = useState("");
@@ -1172,8 +1177,11 @@ function SettingsTab({ settings, reload }: { settings: Settings | null; reload: 
 
   useEffect(() => {
     if (settings) {
+      setProvider(settings.provider || "twilio");
       setAccountSid(settings.config?.account_sid || "");
       setMessagingSid(settings.config?.messaging_service_sid || "");
+      setTelnyxProfile(settings.config?.messaging_profile_id || "");
+      setTelnyxConnection(settings.config?.connection_id || "");
       setSipHost(settings.livekit?.sip_host || "");
     }
   }, [settings]);
@@ -1181,18 +1189,23 @@ function SettingsTab({ settings, reload }: { settings: Settings | null; reload: 
   if (!settings) return <Spinner size={20} />;
 
   const tokenSet = settings.config?.auth_token?.set;
+  const telnyxKeySet = settings.config?.api_key?.set;
 
   const save = async () => {
     setSaving(true);
     try {
-      const config: Record<string, any> = {
-        account_sid: accountSid,
-        messaging_service_sid: messagingSid,
-      };
-      if (authToken) config.auth_token = authToken; // blank keeps the stored one
-      await api.put("/api/telephony/settings", { provider: "twilio", config });
+      let config: Record<string, any>;
+      if (provider === "telnyx") {
+        config = { messaging_profile_id: telnyxProfile, connection_id: telnyxConnection };
+        if (telnyxKey) config.api_key = telnyxKey; // blank keeps the stored one
+      } else {
+        config = { account_sid: accountSid, messaging_service_sid: messagingSid };
+        if (authToken) config.auth_token = authToken; // blank keeps the stored one
+      }
+      await api.put("/api/telephony/settings", { provider, config });
       setAuthToken("");
-      toast.success("Saved", { description: "Twilio credentials stored." });
+      setTelnyxKey("");
+      toast.success("Saved", { description: `${provider === "telnyx" ? "Telnyx" : "Twilio"} credentials stored.` });
       reload();
     } catch (e: any) {
       toast.error("Could not save", { description: e.message });
@@ -1224,38 +1237,101 @@ function SettingsTab({ settings, reload }: { settings: Settings | null; reload: 
   return (
     <div className="space-y-5">
       <SectionCard
-        title="Twilio credentials"
-        description="Paste your Account SID and Auth Token from the Twilio console. Stored on your server and never shown in the browser again."
+        title="Carrier credentials"
+        description="Pick your telephony provider and paste its credentials. Stored on your server and never shown in the browser again."
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label">Account SID</label>
-            <input className="input mono" value={accountSid} onChange={(e) => setAccountSid(e.target.value)} placeholder="AC…" />
-          </div>
-          <div>
-            <label className="label">
-              Auth Token {tokenSet && <span className="badge badge-success ml-1">set</span>}
-            </label>
-            <input
-              className="input mono"
-              type="password"
-              value={authToken}
-              onChange={(e) => setAuthToken(e.target.value)}
-              placeholder={tokenSet ? "•••••••• (leave blank to keep)" : "your auth token"}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="label">Messaging Service SID (optional)</label>
-            <input
-              className="input mono"
-              value={messagingSid}
-              onChange={(e) => setMessagingSid(e.target.value)}
-              placeholder="MG… — a sender pool for SMS, recommended for scale"
-            />
-          </div>
+        {/* provider picker */}
+        <div className="mb-5 flex gap-2">
+          {[["telnyx", "Telnyx"], ["twilio", "Twilio"]].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setProvider(value)}
+              className="btn btn-sm"
+              style={
+                provider === value
+                  ? { background: "var(--accent-subtle)", border: "1px solid var(--border-accent)", color: "var(--accent-text)" }
+                  : { background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)" }
+              }
+            >
+              {label}
+              {value === "telnyx" && <span className="text-tertiary ml-1 text-[11px]">free credit to start</span>}
+            </button>
+          ))}
         </div>
+
+        {provider === "telnyx" ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="label">
+                API Key (V2) {telnyxKeySet && <span className="badge badge-success ml-1">set</span>}
+              </label>
+              <input
+                className="input mono"
+                type="password"
+                value={telnyxKey}
+                onChange={(e) => setTelnyxKey(e.target.value)}
+                placeholder={telnyxKeySet ? "•••••••• (leave blank to keep)" : "KEY…  from portal.telnyx.com, Auth, API Keys"}
+              />
+            </div>
+            <div>
+              <label className="label">Messaging Profile ID (for SMS)</label>
+              <input
+                className="input mono"
+                value={telnyxProfile}
+                onChange={(e) => setTelnyxProfile(e.target.value)}
+                placeholder="from Messaging, Programmable Messaging"
+              />
+            </div>
+            <div>
+              <label className="label">SIP Connection or TeXML App ID (for calls)</label>
+              <input
+                className="input mono"
+                value={telnyxConnection}
+                onChange={(e) => setTelnyxConnection(e.target.value)}
+                placeholder="from Voice, SIP Trunking or TeXML"
+              />
+            </div>
+            <p className="hint sm:col-span-2">
+              Numbers you buy are assigned to this profile and connection automatically, and the
+              messaging webhook is pointed at Vera for you.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Account SID</label>
+              <input className="input mono" value={accountSid} onChange={(e) => setAccountSid(e.target.value)} placeholder="AC…" />
+            </div>
+            <div>
+              <label className="label">
+                Auth Token {tokenSet && <span className="badge badge-success ml-1">set</span>}
+              </label>
+              <input
+                className="input mono"
+                type="password"
+                value={authToken}
+                onChange={(e) => setAuthToken(e.target.value)}
+                placeholder={tokenSet ? "•••••••• (leave blank to keep)" : "your auth token"}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Messaging Service SID (optional)</label>
+              <input
+                className="input mono"
+                value={messagingSid}
+                onChange={(e) => setMessagingSid(e.target.value)}
+                placeholder="MG… — a sender pool for SMS, recommended for scale"
+              />
+            </div>
+          </div>
+        )}
         <div className="mt-4 flex justify-end">
-          <button className="btn btn-primary btn-sm" onClick={save} disabled={saving || !accountSid.trim()}>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={save}
+            disabled={saving || (provider === "twilio" ? !accountSid.trim() : !(telnyxKey.trim() || telnyxKeySet))}
+          >
             {saving ? <Spinner size={15} /> : <Check size={15} />} Save credentials
           </button>
         </div>
@@ -1263,16 +1339,16 @@ function SettingsTab({ settings, reload }: { settings: Settings | null; reload: 
 
       <SectionCard
         title="Connect calling (LiveKit SIP)"
-        description="Calls are carried into your voice agent over LiveKit SIP. Point it at your Twilio Elastic SIP trunk once, and every call flows through the agent."
+        description="Calls are carried into your voice agent over LiveKit SIP. Point it at your carrier's SIP trunk once, and every call flows through the agent."
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">Twilio SIP domain (outbound)</label>
+            <label className="label">Carrier SIP domain (outbound)</label>
             <input
               className="input mono"
               value={sipDomain}
               onChange={(e) => setSipDomain(e.target.value)}
-              placeholder="yourco.pstn.twilio.com"
+              placeholder={provider === "telnyx" ? "sip.telnyx.com" : "yourco.pstn.twilio.com"}
             />
           </div>
           <div>

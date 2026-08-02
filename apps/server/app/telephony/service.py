@@ -58,7 +58,10 @@ def build_provider(row: TelephonyConfig) -> TelephonyProvider:
     provider = (row.provider or "twilio").lower()
     if provider == "twilio" and (cfg.get("account_sid") and cfg.get("auth_token")):
         return TwilioProvider(cfg)
-    # telnyx / signalwire adapters slot in here the same way
+    if provider == "telnyx" and cfg.get("api_key"):
+        from .telnyx_provider import TelnyxProvider
+
+        return TelnyxProvider(cfg)
     return UnconfiguredProvider()
 
 

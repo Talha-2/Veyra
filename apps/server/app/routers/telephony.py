@@ -103,10 +103,11 @@ def get_settings(session: Session = Depends(get_session)):
         "configured": provider.configured(),
         "config": service.masked_config(row),
         "public_base_url": base,
+        # provider-aware: the studio shows the endpoints for the active carrier
         "webhooks": {
-            "voice": f"{base}/api/telephony/webhooks/twilio/voice",
-            "sms": f"{base}/api/telephony/webhooks/twilio/sms",
-            "status": f"{base}/api/telephony/webhooks/twilio/status",
+            "voice": f"{base}/api/telephony/webhooks/{row.provider}/voice",
+            "sms": f"{base}/api/telephony/webhooks/{row.provider}/sms",
+            "status": f"{base}/api/telephony/webhooks/{row.provider}/status",
         },
         "livekit": {
             "outbound_trunk_id": lk.get("outbound_trunk_id", ""),
@@ -189,9 +190,9 @@ async def connect(req: ConnectIn, session: Session = Depends(get_session)):
         try:
             await provider.configure_number(
                 n.provider_sid,
-                voice_url=f"{base}/api/telephony/webhooks/twilio/voice",
-                sms_url=f"{base}/api/telephony/webhooks/twilio/sms",
-                status_url=f"{base}/api/telephony/webhooks/twilio/status",
+                voice_url=f"{base}/api/telephony/webhooks/{provider.name}/voice",
+                sms_url=f"{base}/api/telephony/webhooks/{provider.name}/sms",
+                status_url=f"{base}/api/telephony/webhooks/{provider.name}/status",
             )
             result["numbers_configured"] += 1
         except Exception as exc:
@@ -267,9 +268,9 @@ async def buy_number(req: BuyIn, session: Session = Depends(get_session)):
     try:
         await provider.configure_number(
             bought.provider_sid,
-            voice_url=f"{base}/api/telephony/webhooks/twilio/voice",
-            sms_url=f"{base}/api/telephony/webhooks/twilio/sms",
-            status_url=f"{base}/api/telephony/webhooks/twilio/status",
+            voice_url=f"{base}/api/telephony/webhooks/{provider.name}/voice",
+            sms_url=f"{base}/api/telephony/webhooks/{provider.name}/sms",
+            status_url=f"{base}/api/telephony/webhooks/{provider.name}/status",
         )
     except Exception as exc:
         logger.warning("could not auto-configure webhooks for %s: %s", bought.e164, exc)
@@ -641,6 +642,7 @@ async def _verify(request: Request, session: Session) -> bool:
 
 
 @router.post("/webhooks/twilio/voice")
+@router.post("/webhooks/telnyx/voice")  # TeXML posts are Twilio compatible
 async def twilio_voice(request: Request, session: Session = Depends(get_session)):
     """Inbound call. Log it, then hand the media to the LiveKit agent by dialing
     LiveKit's SIP host (a dispatch rule there drops the call into a fresh room the
@@ -688,6 +690,7 @@ async def twilio_voice(request: Request, session: Session = Depends(get_session)
 
 
 @router.post("/webhooks/twilio/status")
+@router.post("/webhooks/telnyx/status")  # TeXML status callbacks share the shape
 async def twilio_status(
     request: Request,
     CallSid: str = Form(""),
@@ -775,7 +778,7 @@ def _xml_escape(s: str) -> str:
     )
 
 
-async def _autoreply(session: Session, num: PhoneNumber, from_e164: str, to_e164: str, body: str) -> str:
+async def _autoreply(session: Session, num: PhoneNumber, from_e164: str, to_e164: str, body: str, provider: str = "twilio") -> str:
     """Generate an SMS reply with the same business context the voice agent has,
     log it as an outbound message (TwiML sends it), and return the text. Failures
     are swallowed — a bad LLM call must never break receiving the inbound text."""
@@ -814,10 +817,70 @@ async def _autoreply(session: Session, num: PhoneNumber, from_e164: str, to_e164
         to_number=from_e164,
         number_id=num.id,
         counterparty=from_e164,
-        provider="twilio",
+        provider=provider,
         body=reply,
         status="sent",
     )
     session.add(out)
     session.commit()
     return reply
+
+
+@router.post("/webhooks/telnyx/sms")
+async def telnyx_sms(request: Request, session: Session = Depends(get_session)):
+    """Telnyx messaging webhook (JSON events). message.received logs the inbound
+    text and, when the number has auto reply on, answers through the API (there
+    is no TwiML-style inline reply on Telnyx). Delivery events update status."""
+    try:
+        event = (await request.json()).get("data") or {}
+    except Exception:
+        return PlainTextResponse("")
+    etype = event.get("event_type", "")
+    payload = event.get("payload") or {}
+
+    if etype == "message.received":
+        from_number = (payload.get("from") or {}).get("phone_number", "")
+        tos = payload.get("to") or [{}]
+        to_number = tos[0].get("phone_number", "") if tos else ""
+        body = payload.get("text", "") or ""
+        num = session.exec(select(PhoneNumber).where(PhoneNumber.e164 == to_number)).first()
+        session.add(SmsMessage(
+            id=new_id("sm"), direction="inbound", from_number=from_number, to_number=to_number,
+            number_id=num.id if num else None, counterparty=from_number, provider="telnyx",
+            provider_sid=payload.get("id", ""), body=body, status="received",
+        ))
+        session.commit()
+        try:
+            from ..publicapi import webhooks as out_hooks
+
+            out_hooks.emit("message.received", {"object": "message", "from": from_number, "to": to_number, "body": body})
+        except Exception:
+            pass
+        if num and num.sms_autoreply and body.strip():
+            reply = await _autoreply(session, num, from_number, to_number, body, provider="telnyx")
+            if reply:
+                try:
+                    provider = service.get_provider(session)
+                    sent = await provider.send_sms(to_number, from_number, reply)
+                    row = session.exec(
+                        select(SmsMessage).where(SmsMessage.counterparty == from_number)
+                        .order_by(SmsMessage.created_at.desc())
+                    ).first()
+                    if row and row.direction == "outbound" and not row.provider_sid:
+                        row.provider_sid = sent.provider_sid
+                        row.status = sent.status
+                        session.add(row)
+                        session.commit()
+                except Exception as exc:
+                    logger.warning("telnyx auto reply send failed: %s", exc)
+    elif etype in ("message.sent", "message.finalized"):
+        sid = payload.get("id", "")
+        tos = payload.get("to") or [{}]
+        status = tos[0].get("status", "") if tos else ""
+        if sid and status:
+            m = session.exec(select(SmsMessage).where(SmsMessage.provider_sid == sid)).first()
+            if m:
+                m.status = status
+                session.add(m)
+                session.commit()
+    return PlainTextResponse("")
