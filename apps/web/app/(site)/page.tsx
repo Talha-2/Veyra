@@ -53,16 +53,22 @@ export default function Home() {
           </Reveal>
           <Reveal delay={240}>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/signup" className="btn btn-gradient btn-lg">Start building free <ArrowRight /></Link>
-              <a href={CALENDAR_URL} {...bookProps} className="btn btn-secondary btn-lg"><CalendarDays /> Book a demo</a>
+              <a href={CALENDAR_URL} {...bookProps} className="btn btn-gradient btn-lg">Request a demo <ArrowRight /></a>
+              <Link href="/signup" className="btn btn-mint btn-lg">Start building free</Link>
             </div>
           </Reveal>
           <Reveal delay={320}>
             <a href="#demo" className="text-tertiary mt-7 inline-flex items-center gap-2 text-[13px]">
-              <VoiceWaveform bars={12} /> <Mic size={14} /> or talk to a live agent below
+              <Mic size={14} /> or talk to a live agent below
             </a>
           </Reveal>
         </div>
+        {/* the signature: full-bleed six-color spectrogram, hero only */}
+        <Reveal delay={380}>
+          <div className="spectro mt-14" aria-hidden>
+            {Array.from({ length: 72 }).map((_, i) => <i key={i} />)}
+          </div>
+        </Reveal>
       </section>
 
       {/* ── live demo, floated on glass ── */}

@@ -11,73 +11,71 @@
 :root {
   color-scheme: light;
 
-  /* backgrounds — clean near-white with a cool cast */
-  --bg: #ffffff;
-  --bg-subtle: #f4f7fb;
-  --surface: #ffffff;
+  /* ── warm paper counterpart of the Vapi console: Cream paper, ink text,
+     the same Ember/Mint action pair, hairline structure, no shadows ── */
+  --bg: #faf8f2;
+  --bg-subtle: #f4f1e8;
+  --surface: #fffdf6;
   --surface-raised: #ffffff;
   --surface-overlay: #ffffff;
-  --surface-sunken: #eef3f9;
-  --stage: #0a0c12;            /* dark demo / voice stage — reads on both themes */
-  --stage-raised: #12151d;
-  --stage-border: rgba(120, 170, 255, 0.18);
-  --stage-text: #eef2f8;
-  --stage-text-muted: #8b95a9;
+  --surface-sunken: #f1eee5;
+  --stage: #0e0e13;            /* dark demo / voice stage — reads on both themes */
+  --stage-raised: #18181b;
+  --stage-border: #27272a;
+  --stage-text: #fffaea;
+  --stage-text-muted: #71717a;
 
-  /* borders */
-  --border: #e5eaf1;
-  --border-strong: #d2dae6;
-  --border-accent: rgba(37, 99, 235, 0.35);
+  /* borders — warm hairlines */
+  --border: #e5e2d8;
+  --border-strong: #d8d7d4;
+  --border-accent: rgba(233, 107, 52, 0.45);
 
-  /* text — deep navy ink */
-  --text-primary: #0b1220;
-  --text-secondary: #51607a;
-  --text-tertiary: #8b97ac;
-  --text-disabled: #b6c0d0;
-  --text-inverse: #ffffff;
-  --text-on-accent: #ffffff;
+  /* text — near-black ink */
+  --text-primary: #131316;
+  --text-secondary: #52525b;
+  --text-tertiary: #8b8b94;
+  --text-disabled: #b9b9c0;
+  --text-inverse: #fffaea;
+  --text-on-accent: #fffaea;
 
-  /* accent: electric blue */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-active: #1e40af;
-  --accent-subtle: rgba(37, 99, 235, 0.08);
-  --accent-subtle-hover: rgba(37, 99, 235, 0.14);
-  --accent-text: #1d5fd8;
-  --accent-glow: rgba(37, 99, 235, 0.22);
-  --accent-2: #06b6d4;         /* cyan — gradient partner */
+  /* accent: Ember Orange + Mint Pulse pair */
+  --accent: #e96b34;
+  --accent-hover: #d55f2c;
+  --accent-active: #c25526;
+  --accent-subtle: rgba(233, 107, 52, 0.09);
+  --accent-subtle-hover: rgba(233, 107, 52, 0.15);
+  --accent-text: #c2571f;
+  --accent-glow: rgba(233, 107, 52, 0.0);
+  --accent-2: #10b981;
 
   /* semantic */
-  --success: #15803d; --success-subtle: rgba(21, 128, 61, 0.1);  --success-border: rgba(21, 128, 61, 0.3);
-  --warning: #b45309; --warning-subtle: rgba(180, 83, 9, 0.1);   --warning-border: rgba(180, 83, 9, 0.3);
-  --danger:  #dc2626; --danger-subtle:  rgba(220, 38, 38, 0.08); --danger-border:  rgba(220, 38, 38, 0.3);
-  --info:    #2563eb; --info-subtle:    rgba(37, 99, 235, 0.08); --info-border:    rgba(37, 99, 235, 0.3);
+  --success: #0e9f6e; --success-subtle: rgba(14, 159, 110, 0.09);  --success-border: rgba(14, 159, 110, 0.3);
+  --warning: #b45309; --warning-subtle: rgba(180, 83, 9, 0.1);     --warning-border: rgba(180, 83, 9, 0.3);
+  --danger:  #dc2626; --danger-subtle:  rgba(220, 38, 38, 0.08);   --danger-border:  rgba(220, 38, 38, 0.3);
+  --info:    #0284c7; --info-subtle:    rgba(2, 132, 199, 0.08);   --info-border:    rgba(2, 132, 199, 0.3);
 
   /* voice domain */
-  --voice-agent: #2563eb;
-  --voice-caller: #7c3aed;
-  --chart-1: #2563eb; --chart-2: #06b6d4; --chart-3: #16a34a; --chart-4: #7c3aed; --chart-5: #d97706;
+  --voice-agent: #0284c7;
+  --voice-caller: #7c5cff;
+  --chart-1: #0284c7; --chart-2: #c65fcd; --chart-3: #0e9f6e; --chart-4: #7c5cff; --chart-5: #d3a300;
 
-  /* gradients / glow */
-  --gradient-brand: linear-gradient(120deg, #2563eb 0%, #06b6d4 100%);
-  --hero-glow:
-    radial-gradient(55% 55% at 50% -5%, rgba(37, 99, 235, 0.16), transparent 70%),
-    radial-gradient(45% 45% at 85% 10%, rgba(6, 182, 212, 0.14), transparent 72%),
-    radial-gradient(40% 45% at 12% 25%, rgba(124, 58, 237, 0.08), transparent 70%);
+  /* flat: the "gradient" is just Ember; no glows */
+  --gradient-brand: linear-gradient(120deg, #e96b34 0%, #e96b34 100%);
+  --hero-glow: none;
 
-  /* elevation — cool, soft */
-  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 16px -10px rgba(15, 23, 42, 0.10);
-  --shadow-raised: 0 18px 40px -22px rgba(15, 23, 42, 0.28), 0 2px 8px rgba(15, 23, 42, 0.05);
-  --shadow-overlay: 0 28px 56px -16px rgba(15, 23, 42, 0.24), 0 2px 8px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
-  --ring: 0 0 0 2px var(--bg), 0 0 0 4px rgba(37, 99, 235, 0.45);
+  /* shadowless — structure from hairlines and surface steps */
+  --shadow-xs: none;
+  --shadow-card: none;
+  --shadow-raised: 0 0 0 1px #e5e2d8;
+  --shadow-overlay: 0 0 0 1px #d8d7d4;
+  --ring: 0 0 0 2px var(--bg), 0 0 0 4px rgba(233, 107, 52, 0.5);
 
-  /* radii */
+  /* radii — near-sharp console geometry: 5.6px containers, full-pill actions */
   --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-sm: 5.6px;
+  --radius-md: 5.6px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
   --radius-pill: 9999px;
 
   /* motion */
@@ -88,62 +86,64 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* deep, cool near-black — luminance-stacked surfaces */
-  --bg: #08090c;
-  --bg-subtle: #05060a;
-  --surface: #0e1015;
-  --surface-raised: #14171d;
-  --surface-overlay: #171b22;
-  --surface-sunken: #0a0b0f;
-  --stage: #0a0c12;
-  --stage-raised: #12151d;
-  --stage-border: rgba(120, 170, 255, 0.22);
-  --stage-text: #eef2f8;
-  --stage-text-muted: #8b95a9;
+  /* ── Vapi console: Void / Carbon / Slab, Iron hairlines, Cream ink ──
+     Neon spectrogram across midnight concrete. Flat, shadowless; depth
+     comes from the three near-black surfaces and 1px Iron borders only. */
+  --bg: #0e0e13;                 /* Void Canvas */
+  --bg-subtle: #09090b;          /* Carbon */
+  --surface: #09090b;            /* Carbon Surface — cards, lists */
+  --surface-raised: #18181b;     /* Slab Elevated */
+  --surface-overlay: #18181b;
+  --surface-sunken: #18181b;     /* chips/inputs sit as Slab on Carbon */
+  --stage: #09090b;
+  --stage-raised: #18181b;
+  --stage-border: #27272a;
+  --stage-text: #fffaea;
+  --stage-text-muted: #71717a;
 
-  /* borders — cool translucent */
-  --border: rgba(150, 182, 240, 0.10);
-  --border-strong: rgba(150, 182, 240, 0.18);
-  --border-accent: rgba(77, 155, 255, 0.45);
+  /* borders — Iron hairlines, the structural skeleton */
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --border-accent: rgba(233, 107, 52, 0.5);
 
-  --text-primary: #eef1f7;
-  --text-secondary: #a2acbe;
-  --text-tertiary: #6a7488;
-  --text-disabled: #4a5163;
-  --text-inverse: #0b1220;
-  --text-on-accent: #04122e;
+  /* text — warm Cream, never pure white */
+  --text-primary: #fffaea;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --text-disabled: #52525b;
+  --text-inverse: #0e0e13;
+  --text-on-accent: #0e0e13;
 
-  /* accent: brighter electric blue that glows on black */
-  --accent: #4d9bff;
-  --accent-hover: #6bb0ff;
-  --accent-active: #3b82f6;
-  --accent-subtle: rgba(77, 155, 255, 0.12);
-  --accent-subtle-hover: rgba(77, 155, 255, 0.18);
-  --accent-text: #7bb4ff;
-  --accent-glow: rgba(77, 155, 255, 0.30);
-  --accent-2: #22d3ee;
+  /* accent: Ember Orange (primary action), Mint Pulse (secondary pair) */
+  --accent: #e96b34;
+  --accent-hover: #f07d4a;
+  --accent-active: #d55f2c;
+  --accent-subtle: rgba(233, 107, 52, 0.12);
+  --accent-subtle-hover: rgba(233, 107, 52, 0.18);
+  --accent-text: #f08a5c;
+  --accent-glow: rgba(233, 107, 52, 0.0);   /* glows are off in this system */
+  --accent-2: #62f6b5;                       /* Mint Pulse */
 
-  --success: #34d399; --success-subtle: rgba(52, 211, 153, 0.12);  --success-border: rgba(52, 211, 153, 0.3);
-  --warning: #fbbf24; --warning-subtle: rgba(251, 191, 36, 0.12);  --warning-border: rgba(251, 191, 36, 0.3);
-  --danger:  #f87171; --danger-subtle:  rgba(248, 113, 113, 0.12); --danger-border:  rgba(248, 113, 113, 0.3);
-  --info:    #7bb4ff; --info-subtle:    rgba(123, 180, 255, 0.12); --info-border:    rgba(123, 180, 255, 0.3);
+  --success: #62f6b5; --success-subtle: rgba(98, 246, 181, 0.10);  --success-border: rgba(98, 246, 181, 0.3);
+  --warning: #ffdd03; --warning-subtle: rgba(255, 221, 3, 0.10);   --warning-border: rgba(255, 221, 3, 0.3);
+  --danger:  #f87171; --danger-subtle:  rgba(248, 113, 113, 0.10); --danger-border:  rgba(248, 113, 113, 0.3);
+  --info:    #4dcafa; --info-subtle:    rgba(77, 202, 250, 0.10);  --info-border:    rgba(77, 202, 250, 0.3);
 
-  --voice-agent: #4d9bff;
-  --voice-caller: #a78bfa;
-  --chart-1: #4d9bff; --chart-2: #22d3ee; --chart-3: #34d399; --chart-4: #a78bfa; --chart-5: #fbbf24;
+  --voice-agent: #4dcafa;
+  --voice-caller: #9977ff;
+  /* charts wear the spectrogram palette */
+  --chart-1: #4dcafa; --chart-2: #de94e2; --chart-3: #62f6b5; --chart-4: #9977ff; --chart-5: #ffdd03;
 
-  --gradient-brand: linear-gradient(120deg, #4d9bff 0%, #22d3ee 100%);
-  --hero-glow:
-    radial-gradient(55% 55% at 50% -5%, rgba(77, 155, 255, 0.20), transparent 70%),
-    radial-gradient(45% 45% at 85% 10%, rgba(34, 211, 238, 0.14), transparent 72%),
-    radial-gradient(40% 45% at 12% 25%, rgba(167, 139, 250, 0.10), transparent 70%);
+  /* flat system: the "gradient" is just Ember, the glow is nothing */
+  --gradient-brand: linear-gradient(120deg, #e96b34 0%, #e96b34 100%);
+  --hero-glow: none;
 
-  /* elevation = subtle ring + deep shadow (richer than flat) */
+  /* shadowless — depth is surface contrast + Iron hairlines */
   --shadow-xs: none;
-  --shadow-card: 0 0 0 1px rgba(150, 182, 240, 0.05);
-  --shadow-raised: 0 0 0 1px rgba(150, 182, 240, 0.08), 0 24px 60px -24px rgba(0, 0, 0, 0.75);
-  --shadow-overlay: 0 28px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(150, 182, 240, 0.10);
-  --ring: 0 0 0 2px var(--bg), 0 0 0 4px rgba(77, 155, 255, 0.55);
+  --shadow-card: none;
+  --shadow-raised: 0 0 0 1px #27272a;
+  --shadow-overlay: 0 0 0 1px #3f3f46;
+  --ring: 0 0 0 2px var(--bg), 0 0 0 4px rgba(233, 107, 52, 0.55);
 }
 
 /* ── base ──────────────────────────────────────────────────────────── */
@@ -202,12 +202,14 @@ body {
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
+/* Anti-convention display: light weight, tight leading — the spectrogram and
+   CTAs carry the visual weight, the headline whispers. */
 .display-hero {
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-weight: 640;
-  font-size: clamp(2.85rem, 6.6vw, 5.35rem);
-  letter-spacing: -0.045em;
-  line-height: 0.98;
+  font-weight: 300;
+  font-size: clamp(2.85rem, 6.4vw, 5.1rem);
+  letter-spacing: -0.025em;
+  line-height: 1.05;
 }
 /* crisp sans display — studio/dashboard headings */
 .display {
@@ -266,8 +268,9 @@ body {
   justify-content: center;
   gap: 8px;
   height: 36px;
-  padding: 0 16px;
-  border-radius: var(--radius-sm);
+  padding: 0 18px;
+  /* actions are the only full pills in the system — a single obvious affordance */
+  border-radius: var(--radius-pill);
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
@@ -897,12 +900,22 @@ input[type="range"].slider::-moz-range-thumb {
 /* ── landing utilities (blue/cyan, editorial) ─────────────────────────── */
 
 /* gradient primary CTA — premium hero button */
+/* Primary CTA — Ember pill (was a gradient; the system is flat) */
 .btn-gradient {
-  background: var(--gradient-brand);
-  color: #ffffff;
+  background: var(--accent);
+  color: var(--text-on-accent);
   border: none;
   position: relative;
+  font-weight: 560;
 }
+/* Mint secondary — the complementary sibling of Ember. Use beside it, never alone. */
+.btn-mint {
+  background: var(--accent-2);
+  color: #0e0e13;
+  border: none;
+  font-weight: 560;
+}
+.btn-mint:hover:not(:disabled) { filter: brightness(1.06); }
 .btn-gradient:hover:not(:disabled) { filter: brightness(1.06) saturate(1.05); }
 [data-theme="dark"] .btn-gradient { color: #04122e; font-weight: 600; }
 
@@ -3200,8 +3213,8 @@ input[type="range"].slider::-moz-range-thumb {
 .band { position: relative; padding-block: clamp(2.75rem, 5.2vw, 4.75rem); }
 .band-sm { position: relative; padding-block: clamp(1.75rem, 3.4vw, 3rem); }
 .section-head { max-width: 720px; }
-.section-title { font-family: var(--font-sans), system-ui, sans-serif; font-weight: 630;
-  letter-spacing: -0.035em; line-height: 1.04; font-size: clamp(1.85rem, 3.9vw, 2.9rem); }
+.section-title { font-family: var(--font-sans), system-ui, sans-serif; font-weight: 300;
+  letter-spacing: -0.02em; line-height: 1.12; font-size: clamp(1.85rem, 3.9vw, 2.9rem); }
 .lead { color: var(--text-secondary); font-size: clamp(1rem, 1.35vw, 1.14rem); line-height: 1.62; }
 
 /* alternating feature rows — text beside a live mockup, no boxes */
@@ -3548,3 +3561,84 @@ input[type="range"].slider::-moz-range-thumb {
 
 /* thin luminous divider */
 .glowline { height: 1px; width: 100%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 45%, transparent), transparent); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CONSOLE FLATTENING — the Vapi system is flat and shadowless. These
+   overrides retire the aurora/glass/gradient layers in favor of Carbon
+   surfaces and Iron hairlines. Cascade order: this block wins.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* the aurora is retired — the canvas is an empty dark stage */
+.aurora { display: none; }
+
+/* glass becomes Carbon: flat surface, hairline border, no blur, no lift */
+.glass-frame, .glass-card, .bento__tile, .price-card, .mock, .stat-chip {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  border-radius: var(--radius-md) !important;
+}
+.glass-card::before { display: none; }
+.glass-card:hover, .bento__tile:hover, .price-card:hover, .mock:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: var(--border-strong) !important;
+}
+.glass-card__icon { background: var(--surface-raised); box-shadow: none; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.bento__art::after { display: none; }
+.bento__art .mock { box-shadow: none; }
+.bento__tile--wide { border-radius: var(--radius-md) !important; }
+
+/* mesh/blob/beam decorations off */
+.mesh, .blob, .mesh-grid::after, .mesh-beams::before { display: none !important; }
+.glowline { background: var(--border); }
+
+/* the brand-gradient text becomes Ember ink */
+.text-gradient { background: none; -webkit-background-clip: unset; background-clip: unset; color: var(--accent); }
+
+/* marquee + chips: quiet console labels */
+.chip { border-radius: var(--radius-md); }
+
+/* nav glass -> flat canvas with a hairline */
+.nav-glass { background: color-mix(in srgb, var(--bg) 92%, transparent) !important; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.nav-panel { border-radius: var(--radius-lg); box-shadow: 0 0 0 1px var(--border) !important; }
+
+/* desk app: flatten the elevated layer to the console system */
+.desk-app { background: var(--bg); --dk-radius: var(--radius-md); --dk-surface: var(--surface);
+  --dk-shadow: none; --dk-lift: none; --dk-hairline: none; }
+.desk-sidebar { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; border-right: 1px solid var(--border); }
+.desk-app .card, .desk-app .kpi, .desk-app .table-wrap { box-shadow: none; border-radius: var(--radius-md); }
+.desk-app .kpi:hover { transform: none; box-shadow: none; border-color: var(--border-strong); }
+.desk-app .btn-primary { box-shadow: none; }
+.desk-app .btn-primary:hover:not(:disabled) { box-shadow: none; }
+.desk-app .modal { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--surface-raised);
+  box-shadow: 0 0 0 1px var(--border-strong); border-radius: var(--radius-lg); }
+.desk-app .seg, .desk-app .seg button.active { box-shadow: none; }
+.desk-app .table-wrap thead th { backdrop-filter: none; -webkit-backdrop-filter: none; }
+.desk-app .desk-nav-item.active::before { background: var(--accent); }
+
+/* mono console labels: bento + kpi labels track wide */
+.bento__label, .desk-app .kpi__label { letter-spacing: .08em; }
+
+/* ── the signature: six-color spectrogram waveform ─────────────────────────
+   A horizontal array of 5.6px-radius bars mimicking audio amplitude. The ONLY
+   place the vivid palette appears. Static; amplitude drawn by nth-child. */
+.spectro { display: flex; align-items: center; gap: 6px; width: 100%; height: 92px; overflow: hidden; }
+.spectro i { flex: 1 0 auto; min-width: 6px; border-radius: 5.6px; height: 18%; }
+.spectro i:nth-child(6n+1) { background: #4dcafa; }
+.spectro i:nth-child(6n+2) { background: #de94e2; }
+.spectro i:nth-child(6n+3) { background: #ffdd03; }
+.spectro i:nth-child(6n+4) { background: #9977ff; }
+.spectro i:nth-child(6n+5) { background: #62f6b5; }
+.spectro i:nth-child(6n)   { background: #e96b34; }
+.spectro i:nth-child(9n+1) { height: 26%; } .spectro i:nth-child(9n+2) { height: 58%; }
+.spectro i:nth-child(9n+3) { height: 84%; } .spectro i:nth-child(9n+4) { height: 46%; }
+.spectro i:nth-child(9n+5) { height: 100%; } .spectro i:nth-child(9n+6) { height: 64%; }
+.spectro i:nth-child(9n+7) { height: 30%; } .spectro i:nth-child(9n+8) { height: 74%; }
+.spectro i:nth-child(9n)   { height: 40%; }
+@media (prefers-reduced-motion: no-preference) {
+  .spectro i { animation: spectro-breathe 3.2s ease-in-out infinite; transform-origin: center; }
+  .spectro i:nth-child(3n) { animation-delay: .4s; } .spectro i:nth-child(3n+1) { animation-delay: .9s; }
+  @keyframes spectro-breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(.72); } }
+}
