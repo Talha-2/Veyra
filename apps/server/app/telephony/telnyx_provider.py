@@ -108,6 +108,10 @@ class TelnyxProvider(TelephonyProvider):
                 if ri.get("region_type") == "location":
                     locality = ri.get("region_name", "")
             cost = (r.get("cost_information") or {}).get("monthly_cost", "")
+            try:
+                cost = f"{float(cost):.2f}" if cost else ""
+            except (TypeError, ValueError):
+                pass
             out.append(AvailableNumber(
                 e164=r.get("phone_number", ""),
                 friendly_name=r.get("phone_number", ""),
