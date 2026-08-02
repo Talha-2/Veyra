@@ -1,0 +1,42 @@
+services:
+  server:
+    build: ./apps/server
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    ports:
+      - "8000:8000"
+    volumes:
+      - voice-data:/data
+    restart: unless-stopped
+
+  agent:
+    build: ./apps/agent
+    env_file: .env
+    environment:
+      BACKEND_URL: http://server:8000
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        # what the BROWSER uses to reach the API (host-mapped port).
+        # override with PUBLIC_API_URL in .env when deploying to a real host.
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        # "Book a demo" link — set CALENDAR_URL in .env (Google Calendar / Calendly)
+        NEXT_PUBLIC_CALENDAR_URL: ${CALENDAR_URL:-}
+    ports:
+      # Host port is configurable: Windows/Hyper-V can reserve whole ranges
+      # (netsh interface ipv4 show excludedportrange protocol=tcp) and then
+      # Docker cannot bind them. Override with WEB_PORT in .env if 3000 is taken.
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  voice-data:

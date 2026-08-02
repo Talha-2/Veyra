@@ -1,0 +1,38 @@
+# deps
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# builds
+.next/
+out/
+dist/
+
+# env & secrets
+.env
+.env.local
+.env*.local
+
+# data (runtime artifacts)
+data/
+*.db
+*.lance/
+
+# misc
+.DS_Store
+*.log
+
+# agent tooling / local notes (not product code)
+.claude/
+scratchpad/
+*.local
+
+# playwright / test artifacts
+playwright-report/
+test-results/
+
+# os / editor
+Thumbs.db
+.idea/
+.vscode/

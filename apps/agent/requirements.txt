@@ -1,0 +1,11 @@
+livekit-agents[deepgram,elevenlabs,openai,silero,turn-detector]>=1.2
+livekit-plugins-noise-cancellation>=0.2
+# optional TTS failover provider — remove this line if the plugin isn't
+# available for your platform; the worker guards the import and runs without it
+livekit-plugins-inworld>=1.0
+livekit-plugins-cartesia>=1.0
+httpx>=0.27
+python-dotenv>=1.0
+# Langfuse observability (OpenTelemetry traces)
+opentelemetry-exporter-otlp-proto-http>=1.20
+opentelemetry-sdk>=1.20
