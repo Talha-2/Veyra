@@ -1,10 +1,14 @@
 "use client";
 
-/* Shared building blocks for Vera Desk (the CRM): avatars, assignee stacks,
+/* Shared building blocks for Veyra Desk (the CRM): avatars, assignee stacks,
    colored status/stage pill selects, and the dashboard area chart. Kept in one
    place so every screen renders identical, on-brand pieces. */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Popover } from "@/components/desk/popover";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ── avatars ──────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = ["#2563eb", "#7c3aed", "#0891b2", "#db2777", "#16a34a", "#ea580c", "#4f46e5", "#0d9488"];
@@ -63,30 +67,43 @@ export function AssigneeStack({ members, max = 3, size = 26 }: { members: Member
 // ── colored pill select (status / stage / priority) ──────────────────────────
 export type PillOption = { value: string; label: string; color?: string };
 
+/* The trigger keeps the tinted-pill identity; the menu it opens is the shared
+   shadcn dropdown instead of the browser's native <select> popup, so the one
+   surface that used to escape the design system now matches it — and gains
+   arrow-key navigation and a visible current-value check. */
 export function PillSelect({
   value, options, onChange, minWidth = 96,
 }: { value: string; options: PillOption[]; onChange: (v: string) => void; minWidth?: number }) {
-  const current = options.find((o) => o.value === value) || { value, label: value, color: "#94a3b8" };
-  const color = current.color || "#94a3b8";
+  const current = options.find((o) => o.value === value) || { value, label: value, color: "" };
+  const color = current.color || "var(--text-tertiary)";
   return (
-    <span
-      className="relative inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium"
-      style={{ minWidth, background: `color-mix(in srgb, ${color} 16%, transparent)`, color, border: `1px solid color-mix(in srgb, ${color} 34%, transparent)` }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
-      <span className="truncate">{current.label}</span>
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.7 }}><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onClick={(e) => e.stopPropagation()}
-        className="absolute inset-0 cursor-pointer opacity-0"
-        aria-label="Change"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+    // stop row-level click handlers (list rows open threads) from firing
+    <span onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium"
+          style={{ minWidth, background: `color-mix(in srgb, ${color} 16%, transparent)`, color, border: `1px solid color-mix(in srgb, ${color} 34%, transparent)` }}
+          aria-label={`Change (currently ${current.label})`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+          <span className="truncate">{current.label}</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.7 }} aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-40">
+          {options.map((o) => {
+            const oc = o.color || "var(--text-tertiary)";
+            return (
+              <DropdownMenuItem key={o.value} onClick={() => onChange(o.value)}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: oc }} aria-hidden="true" />
+                <span className="flex-1">{o.label}</span>
+                {o.value === value && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12l5 5L20 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                )}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </span>
   );
 }
@@ -205,20 +222,22 @@ export function AreaChart({ series, height = 300 }: { series: Pt[]; height?: num
 }
 
 // pill option builders shared by screens
+/* Status and priority ride the shared semantic tokens, so a pill reads the
+   same way in both themes and never drifts from the rest of the console. */
 export const STATUS_OPTIONS: PillOption[] = [
-  { value: "open", label: "Open", color: "#2563eb" },
-  { value: "in_progress", label: "In Progress", color: "#d97706" },
-  { value: "pending", label: "Pending", color: "#8b5cf6" },
-  { value: "testing", label: "Testing", color: "#0891b2" },
-  { value: "resolved", label: "Resolved", color: "#16a34a" },
-  { value: "closed", label: "Closed", color: "#16a34a" },
+  { value: "open", label: "Open", color: "var(--info)" },
+  { value: "in_progress", label: "In Progress", color: "var(--warning)" },
+  { value: "pending", label: "Pending", color: "var(--chart-4)" },
+  { value: "testing", label: "Testing", color: "var(--chart-1)" },
+  { value: "resolved", label: "Resolved", color: "var(--success)" },
+  { value: "closed", label: "Closed", color: "var(--success)" },
 ];
 
 export const PRIORITY_OPTIONS: PillOption[] = [
-  { value: "low", label: "Low", color: "#94a3b8" },
-  { value: "normal", label: "Medium", color: "#d97706" },
-  { value: "high", label: "High", color: "#ea580c" },
-  { value: "urgent", label: "Urgent", color: "#dc2626" },
+  { value: "low", label: "Low", color: "var(--text-tertiary)" },
+  { value: "normal", label: "Medium", color: "var(--warning)" },
+  { value: "high", label: "High", color: "var(--accent)" },
+  { value: "urgent", label: "Urgent", color: "var(--danger)" },
 ];
 
 // ── interactive assignee picker (click + to assign anyone) ───────────────────
@@ -226,39 +245,36 @@ export function AssigneePicker({
   value, members, onChange, size = 26, align = "left",
 }: { value: string[]; members: Member[]; onChange: (ids: string[]) => void; size?: number; align?: "left" | "right" }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLButtonElement>(null);
   const selected = useMemo(() => members.filter((m) => value.includes(m.id)), [members, value]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
 
   const toggle = (id: string) =>
     onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
 
   return (
-    <div className="relative inline-flex items-center gap-1.5" ref={ref}>
+    <div className="relative inline-flex items-center gap-1.5">
       {selected.length > 0 && <AssigneeStack members={selected} size={size} max={4} />}
       <button
+        ref={ref}
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
         className="inline-flex items-center justify-center rounded-full border border-dashed transition-colors"
         style={{ width: size, height: size, borderColor: "var(--border-strong)", color: "var(--text-tertiary)" }}
         aria-label="Assign"
+        aria-expanded={open}
         title="Assign to a team member"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
       </button>
-      {open && (
-        <div
-          className="absolute top-full z-50 mt-1.5 w-56 overflow-hidden rounded-[12px] p-1.5"
-          style={{ [align]: 0, background: "var(--surface-overlay)", border: "1px solid var(--border)", boxShadow: "var(--shadow-overlay)" }}
-          onClick={(e) => e.stopPropagation()}
-        >
+      {/* portalled so the menu is never clipped by a scrolling pane */}
+      <Popover open={open} anchor={ref} onClose={() => setOpen(false)} align={align === "right" ? "end" : "start"} width={224} label="Assign to">
+        <div className="p-1.5" onClick={(e) => e.stopPropagation()}>
           <div className="mono px-2.5 py-1.5 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>Assign to</div>
+          {members.length === 0 && (
+            <p className="px-2.5 pb-2 text-[12px]" style={{ color: "var(--text-tertiary)" }}>
+              No teammates yet — add one in Team.
+            </p>
+          )}
           <div className="max-h-64 overflow-y-auto">
             {members.map((m) => {
               const on = value.includes(m.id);
@@ -275,14 +291,14 @@ export function AssigneePicker({
                     className="flex h-4 w-4 items-center justify-center rounded"
                     style={{ background: on ? "var(--accent)" : "transparent", border: `1.5px solid ${on ? "var(--accent)" : "var(--border-strong)"}` }}
                   >
-                    {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 6" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                    {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 6" stroke="var(--text-on-accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                   </span>
                 </button>
               );
             })}
           </div>
         </div>
-      )}
+      </Popover>
     </div>
   );
 }

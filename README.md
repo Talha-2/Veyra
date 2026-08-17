@@ -1,12 +1,12 @@
 <div align="center">
 
-# Vera Studio
+# Veyra Studio
 
 **AI voice and chat agents that answer, call, and close — plus the CRM to run them.**
 
-Vera is an all in one platform for building production grade AI agents that talk to your
+Veyra is an all in one platform for building production grade AI agents that talk to your
 customers over the phone and chat, run real workflows across a thousand tools, and hand off
-to a human when it matters. It ships with **Vera Desk**, a clean client CRM whose inbox is
+to a human when it matters. It ships with **Veyra Desk**, a clean client CRM whose inbox is
 powered by the same live calls and texts.
 
 </div>
@@ -25,7 +25,7 @@ powered by the same live calls and texts.
 - **Telephony** — provision real numbers, place and receive calls to any country, run an IVR,
   transfer to a teammate / extension / external number, and send or auto answer SMS. Bridged into
   the agent over LiveKit SIP behind a provider adapter (Twilio to start).
-- **Vera Desk (CRM)** — a unified inbox (calls, texts, email), tickets linked to conversations,
+- **Veyra Desk (CRM)** — a unified inbox (calls, texts, email), tickets linked to conversations,
   contacts, an AI first dashboard, click to assign, and a team workload view.
 - **Knowledge base** — upload or author documents; a full RAG pipeline (heading aware chunking →
   local embeddings via fastembed → LanceDB + BM25 fused with RRF) grounds every factual answer.
@@ -39,7 +39,7 @@ A small monorepo, orchestrated with Docker Compose:
 
 ```
 apps/
-  web/      Next.js 15 (App Router, React 19) — marketing site, Studio, and Vera Desk
+  web/      Next.js 15 (App Router, React 19) — marketing site, Studio, and Veyra Desk
   server/   FastAPI + SQLModel — REST API, RAG, integrations, telephony, CRM, auth
   agent/    LiveKit Agents worker — the real time voice pipeline (STT then LLM then TTS)
   mcp/      FastMCP server — the platform exposed as tools for the deep agent

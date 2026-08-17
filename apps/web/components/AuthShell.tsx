@@ -21,7 +21,7 @@ export default function AuthShell({
     <main className="relative flex min-h-screen flex-col overflow-hidden">
       <MeshBg variant="auth" />
       <header className="relative z-10 flex items-center justify-between px-6 py-5">
-        <Link href="/" aria-label="Vera home">
+        <Link href="/" aria-label="Veyra home">
           <Logo size={26} />
         </Link>
         <ThemeToggle />

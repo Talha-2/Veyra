@@ -306,7 +306,7 @@ export default function TuningPage() {
                       <label className="label">Keyterms</label>
                       <input
                         className="input"
-                        placeholder="Vera, nova-3, SKU-12b"
+                        placeholder="Veyra, nova-3, SKU-12b"
                         value={(cfg.stt_keyterms ?? []).join(", ")}
                         onChange={(e) =>
                           set(

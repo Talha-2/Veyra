@@ -40,12 +40,12 @@ const TRUST: { tag: string; title: string; body: string }[] = [
 const RELIABILITY: { title: string; body: string; metric: string }[] = [
   {
     title: "Degrade to safe",
-    body: "When something breaks, Vera falls back to a human or a callback. It never invents a policy just to fill the silence.",
+    body: "When something breaks, Veyra falls back to a human or a callback. It never invents a policy just to fill the silence.",
     metric: "human fallback",
   },
   {
     title: "Provider failover",
-    body: "If a voice or model provider degrades mid-call, Vera fails over automatically, so the caller hears a voice, not dead air.",
+    body: "If a voice or model provider degrades mid-call, Veyra fails over automatically, so the caller hears a voice, not dead air.",
     metric: "mid-call",
   },
   {
@@ -71,7 +71,7 @@ export default function SecurityPage() {
               Trusted with your calls, your data, and your customers.
             </h1>
             <p className="lead-lg mt-7 max-w-[56ch]">
-              Vera runs on infrastructure you can put in front of real customers. Credentials stay
+              Veyra runs on infrastructure you can put in front of real customers. Credentials stay
               server-side, nothing ships without your approval, and every action the agent takes
               is scoped, signed, and logged.
             </p>
@@ -92,7 +92,7 @@ export default function SecurityPage() {
         <div className="wrap">
           <h2 className="section-title max-w-[22ch]">The boring parts, taken seriously.</h2>
           <p className="lead mt-5 max-w-[58ch]">
-            You are putting Vera in front of real customers, so the controls are not an add-on.
+            You are putting Veyra in front of real customers, so the controls are not an add-on.
             They are how the platform is built.
           </p>
           <div className="rows mt-12">
@@ -117,7 +117,7 @@ export default function SecurityPage() {
               <p className="lead" style={{ maxWidth: "70ch" }}>
                 Credentials never touch the browser. The agent holds your keys server-side and
                 acts on your behalf, so a token cannot leak from a page, a device, or a customer's
-                session. You connect a tool once; Vera does the rest without exposing the secret.
+                session. You connect a tool once; Veyra does the rest without exposing the secret.
               </p>
             </div>
           </div>

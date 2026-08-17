@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-03T23:50:00Z",
+  "title": "Design System: Veyra",
+  "extensions": {
+    "colorMeta": {
+      "ember": { "role": "primary", "displayName": "Ember Orange", "canonical": "#e96b34", "tonalRamp": ["#40160a", "#6b2811", "#933c1a", "#bc5224", "#e96b34", "#f08a5c", "#f6ab88", "#fcd4c0"] },
+      "mint-pulse": { "role": "secondary", "displayName": "Mint Pulse", "canonical": "#62f6b5", "tonalRamp": ["#073826", "#0c5c3f", "#129158", "#2cc487", "#62f6b5", "#8bf9c9", "#b3fbdc", "#dbfeee"] },
+      "void": { "role": "neutral", "displayName": "Void Canvas", "canonical": "#0e0e13", "tonalRamp": ["#09090b", "#0e0e13", "#18181b", "#27272a", "#3f3f46", "#52525b", "#71717a", "#a1a1aa"] },
+      "carbon": { "role": "neutral", "displayName": "Carbon Surface", "canonical": "#09090b", "tonalRamp": ["#09090b", "#0e0e13", "#18181b", "#27272a", "#3f3f46", "#52525b", "#71717a", "#a1a1aa"] },
+      "slab": { "role": "neutral", "displayName": "Slab Elevated", "canonical": "#18181b", "tonalRamp": ["#09090b", "#0e0e13", "#18181b", "#27272a", "#3f3f46", "#52525b", "#71717a", "#a1a1aa"] },
+      "iron": { "role": "neutral", "displayName": "Iron Hairline", "canonical": "#27272a", "tonalRamp": ["#09090b", "#18181b", "#27272a", "#3f3f46", "#52525b", "#71717a", "#a1a1aa", "#d4d4d8"] },
+      "cream": { "role": "neutral", "displayName": "Cream Ink", "canonical": "#fffaea", "tonalRamp": ["#1a1812", "#3d382b", "#6b6350", "#9a917c", "#c6bda6", "#e8e1cd", "#f7f2e2", "#fffaea"] },
+      "paper": { "role": "neutral", "displayName": "Warm Paper", "canonical": "#faf8f2", "tonalRamp": ["#131316", "#52525b", "#8b8b94", "#b9b9c0", "#d8d7d4", "#e5e2d8", "#f4f1e8", "#faf8f2"] },
+      "ink": { "role": "neutral", "displayName": "Near-Black Ink", "canonical": "#131316", "tonalRamp": ["#131316", "#52525b", "#8b8b94", "#b9b9c0", "#d8d7d4", "#e5e2d8", "#f4f1e8", "#faf8f2"] },
+      "spectro-sky": { "role": "tertiary", "displayName": "Spectro Sky", "canonical": "#4dcafa", "tonalRamp": ["#082c3d", "#0e5471", "#157ca6", "#27a3d6", "#4dcafa", "#7ed9fb", "#aee7fd", "#d7f3fe"] },
+      "spectro-orchid": { "role": "tertiary", "displayName": "Spectro Orchid", "canonical": "#de94e2", "tonalRamp": ["#3a1440", "#63256b", "#8d3b96", "#b862bf", "#de94e2", "#e8b3ea", "#f1cff2", "#f8e7f9"] },
+      "spectro-volt": { "role": "tertiary", "displayName": "Volt Yellow", "canonical": "#ffdd03", "tonalRamp": ["#423a00", "#6e6000", "#9c8800", "#ccb200", "#ffdd03", "#ffe74d", "#fff08c", "#fff8c7"] },
+      "spectro-violet": { "role": "tertiary", "displayName": "Spectro Violet", "canonical": "#9977ff", "tonalRamp": ["#1c0f45", "#35217b", "#4f36ad", "#7355d9", "#9977ff", "#b298ff", "#ccbcff", "#e5ddff"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headline only (.display-hero); weight-300 whisper, balance-wrapped." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles (.section-title); stands alone, no eyebrow above it." },
+      "title": { "displayName": "Title", "purpose": "Row and card titles (.row__title) at Inter variable weight 510." },
+      "body": { "displayName": "Body", "purpose": "Base prose; .lead (17px) and .lead-lg carry section intros in secondary color, capped 46-62ch." },
+      "label": { "displayName": "Mono Label", "purpose": "The organizing voice: uppercase Geist Mono +0.08em for nav links, row tags, stat captions, console titlebars, field labels." }
+    },
+    "shadows": [
+      { "name": "shadow-card", "value": "none", "purpose": "The system is flat and shadowless; separation comes from surface steps and 1px hairlines." },
+      { "name": "shadow-raised", "value": "0 0 0 1px #27272a", "purpose": "A 1px ring-border masquerading as elevation (dark Iron; #e5e2d8 in light). Not a real shadow." },
+      { "name": "ring", "value": "0 0 0 2px var(--bg), 0 0 0 4px rgba(233, 107, 52, 0.55)", "purpose": "Focus-visible ring — the only true box-shadow in the system (0.5 alpha in light theme)." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.25, 0.46, 0.45, 0.94)", "purpose": "Default 150ms easing for hover/state transitions (buttons, links, borders)." },
+      { "name": "ease-entrance", "value": "cubic-bezier(0.165, 0.84, 0.44, 1)", "purpose": "The one authored entrance: .rise, 0.7s translateY(14px)+fade, staggered via --rise-delay (90ms steps) in the hero only." },
+      { "name": "spectro-breathe", "value": "3.4s ease-in-out infinite (scaleY 1 -> 0.68)", "purpose": "The hero spectrogram's ambient breathe; staggered on 3n/7n cycles; off under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "row-collapse", "value": "720px" },
+      { "name": "nav-links", "value": "768px" },
+      { "name": "stat-grid", "value": "860px" },
+      { "name": "feature-split", "value": "900px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Ember Button",
+      "kind": "button",
+      "refersTo": "button-ember",
+      "description": "The primary CTA pill: Ember fill, near-black Void label, 12px uppercase mono-feel tracking.",
+      "html": "<button class=\"ds-btn-ember\">Request a demo</button>",
+      "css": ".ds-btn-ember { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 44px; padding: 0 24px; border: none; border-radius: 9999px; background: var(--accent, #e96b34); color: #0e0e13; font-size: 12px; font-weight: 570; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; cursor: pointer; transition: background 150ms cubic-bezier(0.25,0.46,0.45,0.94), transform 150ms cubic-bezier(0.25,0.46,0.45,0.94); } .ds-btn-ember:hover { background: var(--accent-hover, #f07d4a); } .ds-btn-ember:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Mint Button",
+      "kind": "button",
+      "refersTo": "button-mint",
+      "description": "The secondary CTA pill: hard-coded Mint Pulse fill in both themes, Void label. Never a third sibling beside the pair.",
+      "html": "<button class=\"ds-btn-mint\">Start building free</button>",
+      "css": ".ds-btn-mint { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 44px; padding: 0 24px; border: none; border-radius: 9999px; background: #62f6b5; color: #0e0e13; font-size: 12px; font-weight: 570; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; cursor: pointer; transition: background 150ms cubic-bezier(0.25,0.46,0.45,0.94), transform 150ms cubic-bezier(0.25,0.46,0.45,0.94); } .ds-btn-mint:hover { background: #79f8c0; } .ds-btn-mint:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Console Pill",
+      "kind": "button",
+      "refersTo": "console-pill",
+      "description": "The inverted TALK TO VERA pill: text-primary background, page-background text, uppercase mono, 2x2 dotgrid.",
+      "html": "<button class=\"ds-console-pill\">Talk to Veyra<span class=\"ds-dotgrid\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i></span></button>",
+      "css": ".ds-console-pill { display: inline-flex; align-items: center; gap: 14px; padding: 17px 38px; border: none; border-radius: 9999px; background: var(--text-primary, #fffaea); color: var(--bg, #0e0e13); font-family: var(--font-mono, ui-monospace, monospace); font-size: 14px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; transition: transform 180ms cubic-bezier(0.25,0.46,0.45,0.94); } .ds-console-pill:hover { transform: scale(1.03); } .ds-console-pill:active { transform: scale(0.99); } .ds-dotgrid { display: grid; grid-template-columns: repeat(2, 4px); gap: 3px; } .ds-dotgrid i { width: 4px; height: 4px; border-radius: 1px; background: currentColor; }"
+    },
+    {
+      "name": "Mono Link",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "The quiet tertiary action: uppercase mono text link with a small arrow; used wherever a third CTA is tempting.",
+      "html": "<a href=\"#\" class=\"ds-link-mono\">See the platform <svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a>",
+      "css": ".ds-link-mono { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary, #a1a1aa); text-decoration: none; transition: color 150ms cubic-bezier(0.25,0.46,0.45,0.94); } .ds-link-mono:hover { color: var(--text-primary, #fffaea); } .ds-link-mono svg { width: 13px; height: 13px; }"
+    },
+    {
+      "name": "Console Panel",
+      "kind": "card",
+      "refersTo": "console-panel",
+      "description": "The Carbon surface with a mono titlebar and status dot — the site's card and its code-drawn 'image' frame.",
+      "html": "<div class=\"ds-console\"><div class=\"ds-console-bar\"><span class=\"ds-console-dot\"></span>vera.studio — deep agent<span class=\"ds-console-spacer\"></span>live</div><div class=\"ds-console-body\">Console body content sits on 20px padding inside the 5.6px Carbon frame.</div></div>",
+      "css": ".ds-console { background: var(--surface, #09090b); border: 1px solid var(--border, #27272a); border-radius: 5.6px; overflow: hidden; max-width: 520px; } .ds-console-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border, #27272a); font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary, #71717a); } .ds-console-spacer { margin-left: auto; } .ds-console-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success, #62f6b5); flex-shrink: 0; } .ds-console-body { padding: 20px; font-size: 13.5px; color: var(--text-secondary, #a1a1aa); }"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "5.6px console tag on a hairline; mono variant for tool/status tags inside consoles.",
+      "html": "<span class=\"ds-chip\">Google Calendar</span> <span class=\"ds-chip ds-chip-mono\">managed oauth</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 5.6px; border: 1px solid var(--border, #27272a); background: var(--surface, #09090b); font-size: 12.5px; font-weight: 500; color: var(--text-secondary, #a1a1aa); white-space: nowrap; } .ds-chip-mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; }"
+    },
+    {
+      "name": "List Row",
+      "kind": "custom",
+      "refersTo": "title",
+      "description": "The hairline-skeleton content row: mono tag, title plus body, right-aligned mono metric; tag turns Ember on hover.",
+      "html": "<a href=\"#\" class=\"ds-row\"><span class=\"ds-row-tag\">voice</span><span><span class=\"ds-row-title\">Calls that hold up</span><span class=\"ds-row-body\">Sub-second replies on live audio. Callers can interrupt mid-sentence and still get the right answer.</span></span><span class=\"ds-row-metric\">&lt;1.2s voice-to-voice</span></a>",
+      "css": ".ds-row { display: grid; grid-template-columns: 176px 1fr auto; gap: 16px 28px; align-items: baseline; padding: 22px 0; border-top: 1px solid var(--border, #27272a); border-bottom: 1px solid var(--border, #27272a); text-decoration: none; } .ds-row-tag { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary, #71717a); transition: color 150ms cubic-bezier(0.25,0.46,0.45,0.94); } .ds-row-title { font-size: 17px; font-weight: 510; letter-spacing: -0.01em; color: var(--text-primary, #fffaea); } .ds-row-body { display: block; font-size: 14px; line-height: 1.55; color: var(--text-secondary, #a1a1aa); margin-top: 6px; max-width: 62ch; } .ds-row-metric { font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; color: var(--text-primary, #fffaea); text-align: right; white-space: nowrap; } .ds-row:hover { background: color-mix(in srgb, var(--text-primary, #fffaea) 3%, transparent); } .ds-row:hover .ds-row-tag { color: var(--accent, #e96b34); }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Contact-form input: 5.6px, hairline stroke, mono label above; focus turns the border Ember with no ring.",
+      "html": "<label class=\"ds-field-label\" for=\"ds-f\">Work email</label><input id=\"ds-f\" class=\"ds-field\" type=\"email\" placeholder=\"you@company.com\" />",
+      "css": ".ds-field { width: 100%; max-width: 320px; height: 44px; padding: 0 14px; background: var(--surface, #09090b); border: 1px solid var(--border-strong, #3f3f46); border-radius: 5.6px; font-size: 14px; color: var(--text-primary, #fffaea); transition: border-color 150ms cubic-bezier(0.25,0.46,0.45,0.94); } .ds-field::placeholder { color: var(--text-tertiary, #71717a); } .ds-field:focus { outline: none; border-color: var(--accent, #e96b34); } .ds-field-label { display: block; margin-bottom: 8px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary, #a1a1aa); }"
+    },
+    {
+      "name": "Nav Link Row",
+      "kind": "nav",
+      "refersTo": "label",
+      "description": "The console nav voice: wide-tracked uppercase mono links, secondary to primary on hover/current.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav-word\">Veyra</span><a href=\"#\" class=\"ds-nav-link\" aria-current=\"page\">Platform</a><a href=\"#\" class=\"ds-nav-link\">Solutions</a><a href=\"#\" class=\"ds-nav-link\">Pricing</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 28px; padding: 0 4px; height: 60px; border-bottom: 1px solid rgba(216, 215, 212, 0.22); } .ds-nav-word { font-weight: 650; font-size: 18px; letter-spacing: -0.01em; color: var(--text-primary, #fffaea); text-transform: uppercase; } .ds-nav-link { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary, #a1a1aa); text-decoration: none; transition: color 150ms cubic-bezier(0.25,0.46,0.45,0.94); } .ds-nav-link:hover, .ds-nav-link[aria-current=\"page\"] { color: var(--text-primary, #fffaea); }"
+    },
+    {
+      "name": "Spectro Waveform",
+      "kind": "custom",
+      "refersTo": "spectro-sky",
+      "description": "The signature: the only place the six-hue palette appears — full-bleed hero voice spectrogram with a reduced-motion-aware breathe.",
+      "html": "<div class=\"ds-spectro\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>",
+      "css": ".ds-spectro { display: flex; align-items: center; gap: 5px; width: 100%; height: 118px; overflow: hidden; } .ds-spectro i { flex: 1 0 auto; min-width: 5px; border-radius: 5.6px; height: 16%; } .ds-spectro i:nth-child(6n+1) { background: #4dcafa; } .ds-spectro i:nth-child(6n+2) { background: #de94e2; } .ds-spectro i:nth-child(6n+3) { background: #ffdd03; } .ds-spectro i:nth-child(6n+4) { background: #9977ff; } .ds-spectro i:nth-child(6n+5) { background: #62f6b5; } .ds-spectro i:nth-child(6n) { background: #e96b34; } .ds-spectro i:nth-child(11n+1) { height: 22%; } .ds-spectro i:nth-child(11n+2) { height: 48%; } .ds-spectro i:nth-child(11n+3) { height: 92%; } .ds-spectro i:nth-child(11n+4) { height: 36%; } .ds-spectro i:nth-child(11n+5) { height: 74%; } .ds-spectro i:nth-child(11n+6) { height: 100%; } .ds-spectro i:nth-child(11n+7) { height: 58%; } .ds-spectro i:nth-child(11n+8) { height: 28%; } .ds-spectro i:nth-child(11n+9) { height: 82%; } .ds-spectro i:nth-child(11n+10) { height: 44%; } .ds-spectro i:nth-child(11n) { height: 64%; } .ds-spectro i:nth-child(13n) { height: 14%; } @media (prefers-reduced-motion: no-preference) { .ds-spectro i { animation: ds-spectro-breathe 3.4s ease-in-out infinite; transform-origin: center; } .ds-spectro i:nth-child(3n) { animation-delay: 0.5s; } .ds-spectro i:nth-child(3n+1) { animation-delay: 1.1s; } .ds-spectro i:nth-child(7n) { animation-duration: 4.2s; } } @keyframes ds-spectro-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.68); } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Neon spectrogram across midnight concrete",
+    "overview": "Veyra's marketing site is a voice-AI platform rendered as the console it is. The canvas is near-black Void, panels are Carbon, raised elements are Slab; the structure is drawn entirely in 1px Iron hairlines; the ink is warm Cream, never pure white. Headlines whisper at weight 300 while wide-tracked Geist Mono labels do the organizing. Color is rationed with intent: the six-hue neon spectrogram appears exactly once — as the full-bleed hero waveform — and everywhere else the only chromatic voices are the Ember Orange / Mint Pulse action pair. Dark is the definitive brand rendition; light is the same token system re-expressed on warm paper. The system explicitly refuses the aurora/glass/gradient SaaS hero: it is flat and shadowless throughout. Depth comes from the three near-black surface steps and hairline borders. The site's images are code-drawn product consoles built from the system's own grammar — never stock art or browser chrome.",
+    "keyCharacteristics": [
+      "Void/Carbon/Slab surface ladder with Iron 1px hairline structure; zero box-shadows",
+      "Cream ink (#fffaea) at weight-300 display sizes; 12px uppercase +0.08em Geist Mono labels",
+      "Ember + Mint full-pill CTA pair with near-black labels — always binary, never a third",
+      "Six-color spectrogram quarantined to the hero waveform (.spectro) only",
+      "5.6px container radius everywhere; actions are full pills — nothing in between",
+      "One authored entrance (hero .rise stagger) plus the spectrogram's breathe; all other sections static",
+      "Both themes ship from one token set; light is the warm-paper counterpart, dark is definitive"
+    ],
+    "rules": [
+      { "name": "The Quarantine Rule", "body": "The six-color spectrogram palette appears in .spectro and nowhere else. Any other graphic that needs a waveform uses .gwave — single-color Ember bars.", "section": "colors" },
+      { "name": "The Two-Voice Rule", "body": "Outside the hero waveform, the only accents on any screen are Ember and Mint. Semantic colors speak only inside console mocks' log lines and status dots.", "section": "colors" },
+      { "name": "The Standing Headline Rule", "body": "Headings stand alone. No eyebrows, no kickers, no mono-tag stacked above a section title — the mono voice labels rows, stats, and consoles, never headlines.", "section": "typography" },
+      { "name": "The Mono Address Rule", "body": "Anything that names, tags, or navigates is 11-12px uppercase Geist Mono at +0.08em; anything that persuades is Inter. The two voices never blend mid-element.", "section": "typography" },
+      { "name": "The Hairline Skeleton Rule", "body": "Sections, rows, plan features, and footer are all separated by the same 1px --border hairline. Never introduce a divider of any other weight, color, or style.", "section": "layout" },
+      { "name": "The No-Shadow Rule", "body": "Nothing casts a shadow, ever — not on hover, not on overlay. If an element needs separation, give it the next surface step and a hairline.", "section": "elevation" },
+      { "name": "The Two-Silhouette Rule", "body": "If it holds content it's a 5.6px rectangle; if you click it to act it's a full pill.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do build every action as one of exactly two pills: Ember primary + Mint secondary, 12px uppercase +0.08em labels in near-black (#0e0e13) — and demote any third action to a .link-mono text link.",
+      "Do give every container the 5.6px radius and a 1px hairline; step to the next surface token (Carbon to Slab / Paper to Parchment) when something must feel raised.",
+      "Do open every below-the-fold section with .band--line and let .section-title stand alone at weight 300.",
+      "Do label with 11-12px uppercase Geist Mono at +0.08em (row tags, stat captions, console bars, field labels) and keep prose in Inter.",
+      "Do draw new product imagery as .console mocks in the system's own grammar — mono titlebar, status dot, hairline internals.",
+      "Do style both themes through the tokens; dark (Void/Carbon/Iron/Cream) is the definitive rendition, light is its warm-paper counterpart from the same variables.",
+      "Do honor prefers-reduced-motion: the .rise entrance, spectro breathe, and console-pill scale all switch off."
+    ],
+    "donts": [
+      "Don't use the six-color spectrogram palette outside .spectro; in-console waveforms are single-color Ember .gwave bars.",
+      "Don't add box-shadows, glows, gradients, or glass effects anywhere — --shadow-card is none by design; the nav's backdrop-blur is the only translucency.",
+      "Don't place an eyebrow, kicker, or mono-tag above a headline; headlines stand alone.",
+      "Don't introduce a third CTA sibling, a non-pill button, or an 8px friendly card radius — the system has exactly two silhouettes.",
+      "Don't push display or section headings above weight 300, or brighten dark-theme text past Cream (#fffaea) to pure white.",
+      "Don't add entrance animations beyond the hero's .rise stagger; sections below the fold arrive static.",
+      "Don't reach into the DESK INBOX or Studio class layers from site pages, or use .site-*/marketing classes inside the apps — the systems share tokens, not components.",
+      "Don't invent customer logos, testimonials, or new metrics; the proof strip is the real infrastructure stack and the published numbers (PRODUCT.md)."
+    ]
+  }
+}

@@ -434,6 +434,10 @@ def _build_llm(config: dict):
         api_key = os.getenv("OPENAI_API_KEY")
     elif "groq.com" in base_url and os.getenv("GROQ_API_KEY"):
         api_key = os.getenv("GROQ_API_KEY")
+    elif "googleapis.com" in base_url and (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    elif "cerebras.ai" in base_url and os.getenv("CEREBRAS_API_KEY"):
+        api_key = os.getenv("CEREBRAS_API_KEY")
     else:
         api_key = os.getenv("LLM_API_KEY") or os.getenv("XAI_API_KEY", "")
     model = config.get("llm_model") or os.getenv("LLM_MODEL") or os.getenv("XAI_REALTIME_MODEL", "grok-3-mini")

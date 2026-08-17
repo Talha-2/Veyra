@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { PageHeader, EmptyState, Spinner, Modal } from "@/components/ui";
+import { PageHeader, EmptyState, Spinner, Modal, TableSkeleton } from "@/components/ui";
 import { Avatar, Tag, timeAgo } from "@/components/desk/kit";
 import { toast } from "@/components/Toasts";
 import {
@@ -12,7 +12,9 @@ import {
   ArrowUpDown,
   MoreVertical,
   Mail,
+  MessageSquare,
   Phone,
+  Printer,
   Trash2,
   User,
   Users,
@@ -38,7 +40,34 @@ type Contact = {
   tags: string[];
   last_contact_at: string;
   created_at: string;
+  // the newest real touch on any channel, when there is one
+  activity?: { kind: "call" | "sms" | "email" | "fax"; at: string } | null;
 };
+
+/* What actually last happened with this person — a call, a text, an email, a
+   fax — falling back to the row's creation only when no conversation exists. */
+function ActivityCell({ contact }: { contact: Contact }) {
+  const a = contact.activity;
+  const meta: Record<string, { icon: typeof Star; label: string }> = {
+    call: { icon: Phone, label: "Call" },
+    sms: { icon: MessageSquare, label: "Text" },
+    email: { icon: Mail, label: "Email" },
+    fax: { icon: Printer, label: "Fax" },
+  };
+  const m = a ? meta[a.kind] : null;
+  const Icon = m?.icon ?? Star;
+  const when = a?.at ?? contact.created_at;
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span className="badge" style={{ height: 22, fontSize: 11.5, gap: 5 }}>
+        <Icon size={11} /> {m ? m.label : "Contact created"}
+      </span>
+      <span className="text-tertiary text-[12px]" title={new Date(when).toLocaleString()}>
+        {timeAgo(when)}
+      </span>
+    </div>
+  );
+}
 
 type ContactsResponse = {
   rows: Contact[];
@@ -162,7 +191,7 @@ export default function ContactsPage() {
     <div>
       <PageHeader
         title="Contacts"
-        description="Everyone Vera has talked to, across every channel."
+        description="Everyone Veyra has talked to, across every channel."
         actions={addButton}
       />
 
@@ -213,8 +242,8 @@ export default function ContactsPage() {
 
       {/* body */}
       {loading ? (
-        <div className="flex justify-center py-24">
-          <Spinner size={20} />
+        <div className="card" aria-busy>
+          <TableSkeleton rows={9} columns={[28, 22, 16, 14, 12]} />
         </div>
       ) : total === 0 ? (
         <div className="card">
@@ -282,20 +311,7 @@ export default function ContactsPage() {
                         </div>
                       </td>
                       <td>
-                        <div className="flex flex-col items-start gap-1">
-                          <span
-                            className="badge"
-                            style={{ height: 22, fontSize: 11.5, gap: 5 }}
-                          >
-                            <Star size={11} /> Contact created
-                          </span>
-                          <span
-                            className="text-tertiary text-[12px]"
-                            title={timeAgo(c.last_contact_at || c.created_at)}
-                          >
-                            {new Date(c.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
+                        <ActivityCell contact={c} />
                       </td>
                       <td>
                         <button

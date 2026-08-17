@@ -24,6 +24,7 @@ from .base import (
     AvailableNumber,
     NotConfiguredError,
     PurchasedNumber,
+    SentFax,
     SentMessage,
     TelephonyError,
     TelephonyProvider,
@@ -42,6 +43,9 @@ class TelnyxProvider(TelephonyProvider):
         self.api_key = (self._c.get("api_key") or "").strip()
         self.messaging_profile_id = (self._c.get("messaging_profile_id") or "").strip()
         self.connection_id = (self._c.get("connection_id") or "").strip()
+        # Programmable Fax rides on its own Telnyx application (connection);
+        # falls back to the voice connection id when a dedicated one isn't set.
+        self.fax_connection_id = (self._c.get("fax_connection_id") or "").strip()
 
     def configured(self) -> bool:
         return bool(self.api_key)
@@ -184,6 +188,26 @@ class TelnyxProvider(TelephonyProvider):
         data = (await self._request("POST", "/messages", json=payload)).get("data") or {}
         to = (data.get("to") or [{}])[0]
         return SentMessage(provider_sid=data.get("id", ""), status=to.get("status") or "queued")
+
+    # ── fax ──────────────────────────────────────────────────────────────────
+    async def send_fax(self, from_e164: str, to_e164: str, media_url: str) -> SentFax:
+        """Telnyx Programmable Fax: POST /v2/faxes with a fax application
+        (connection) id. Status arrives on the fax webhook (fax.delivered /
+        fax.failed), which the router records."""
+        conn = self.fax_connection_id or self.connection_id
+        if not conn:
+            raise TelephonyError(
+                "Set a Telnyx fax application id (fax_connection_id) in telephony settings to send faxes.",
+                status=409,
+            )
+        payload = {
+            "connection_id": conn,
+            "from": from_e164,
+            "to": to_e164,
+            "media_url": media_url,
+        }
+        data = (await self._request("POST", "/faxes", json=payload)).get("data") or {}
+        return SentFax(provider_sid=data.get("id", ""), status=data.get("status") or "queued")
 
     # ── webhook signature ────────────────────────────────────────────────────
     def verify_webhook(self, url: str, params: dict, signature: str) -> bool:

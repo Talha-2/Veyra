@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-/* Solutions — how Vera is used across industries. Console cards with mono
+/* Solutions — how Veyra is used across industries. Console cards with mono
    industry tags; the common thread as hairline rows. */
 
 const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/contact";
@@ -20,37 +20,37 @@ const USE_CASES: UseCase[] = [
   {
     tag: "Healthcare",
     title: "A front desk that never sends patients to voicemail",
-    body: "Practices lose bookings the moment the phone rings through to a machine. Vera answers every call, books and reschedules against your calendar, triages by urgency, and hands the rare emergency straight to your on-call line.",
+    body: "Practices lose bookings the moment the phone rings through to a machine. Veyra answers every call, books and reschedules against your calendar, triages by urgency, and hands the rare emergency straight to your on-call line.",
     tasks: ["Book + reschedule", "Intake questions", "Warm transfer to on-call"],
   },
   {
     tag: "Home services",
     title: "Every missed call is a job that went to a competitor",
-    body: "When a pipe bursts, the first company to pick up wins the work. Vera captures the job, quotes the visit, checks the crew's availability, and books the slot — day or night — so leads never ring out.",
+    body: "When a pipe bursts, the first company to pick up wins the work. Veyra captures the job, quotes the visit, checks the crew's availability, and books the slot — day or night — so leads never ring out.",
     tasks: ["Capture + qualify", "Quote + schedule", "Dispatch the crew"],
   },
   {
     tag: "Real estate",
     title: "Follow up on every lead the second it lands",
-    body: "Speed to lead decides who tours the property. Vera calls new inquiries within seconds, answers questions on the listing, qualifies budget and timeline, and books the showing straight onto the agent's calendar.",
+    body: "Speed to lead decides who tours the property. Veyra calls new inquiries within seconds, answers questions on the listing, qualifies budget and timeline, and books the showing straight onto the agent's calendar.",
     tasks: ["Instant speed-to-lead", "Qualify budget + timeline", "Book the showing"],
   },
   {
     tag: "E-commerce",
     title: "Order questions answered before they become tickets",
-    body: "Where-is-my-order, returns, and sizing swamp support at peak. Vera looks up the order, starts the return, tracks the shipment, and applies the right policy — on chat and on the phone, with no queue.",
+    body: "Where-is-my-order, returns, and sizing swamp support at peak. Veyra looks up the order, starts the return, tracks the shipment, and applies the right policy — on chat and on the phone, with no queue.",
     tasks: ["Order status", "Returns + exchanges", "Escalate edge cases"],
   },
   {
     tag: "Financial services",
     title: "High-volume calls handled with a careful hand",
-    body: "Balance checks, payment reminders, and appointment setting eat your team's day. Vera handles the routine securely, stays grounded in your policies, and never improvises an answer it cannot back up.",
+    body: "Balance checks, payment reminders, and appointment setting eat your team's day. Veyra handles the routine securely, stays grounded in your policies, and never improvises an answer it cannot back up.",
     tasks: ["Balance + payments", "Appointment setting", "Grounded answers"],
   },
   {
     tag: "Recruiting",
     title: "Screen every applicant while the role is still hot",
-    body: "Good candidates ghost when screening takes days. Vera calls applicants the moment they apply, runs the phone screen, checks availability and must-haves, and books qualified people onto the recruiter's calendar.",
+    body: "Good candidates ghost when screening takes days. Veyra calls applicants the moment they apply, runs the phone screen, checks availability and must-haves, and books qualified people onto the recruiter's calendar.",
     tasks: ["Instant phone screens", "Check must-haves", "Book the interview"],
   },
 ];
@@ -65,7 +65,7 @@ const OUTCOMES: [string, string][] = [
 const COMMON: { title: string; body: string; metric: string }[] = [
   {
     title: "Grounded in your playbook",
-    body: "Vera answers from your knowledge base and business profile, not a generic script — every industry gets your policies and your tone.",
+    body: "Veyra answers from your knowledge base and business profile, not a generic script — every industry gets your policies and your tone.",
     metric: "your knowledge",
   },
   {
@@ -75,7 +75,7 @@ const COMMON: { title: string; body: string; metric: string }[] = [
   },
   {
     title: "Escalates on your terms",
-    body: "When a call needs a person, Vera warm-transfers with context or books a callback. It degrades to safe instead of guessing.",
+    body: "When a call needs a person, Veyra warm-transfers with context or books a callback. It degrades to safe instead of guessing.",
     metric: "warm + cold",
   },
   {
@@ -91,11 +91,11 @@ export default function SolutionsPage() {
       {/* ── hero ── */}
       <section className="band" style={{ paddingTop: "clamp(4rem, 8vw, 6.5rem)" }}>
         <div className="wrap text-center">
-          <h1 className="display-hero mx-auto max-w-[46rem]" style={{ textWrap: "balance" }}>
+          <h1 className="display-hero mx-auto max-w-[62rem]" style={{ textWrap: "balance" }}>
             One agent, tuned to the way your business actually works.
           </h1>
           <p className="lead-lg mx-auto mt-7 max-w-[54ch]">
-            From the healthcare front desk to home-services dispatch: Vera answers the phone, runs
+            From the healthcare front desk to home-services dispatch: Veyra answers the phone, runs
             your workflow, and closes the loop in your tools. Only the playbook changes.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -183,11 +183,11 @@ export default function SolutionsPage() {
       <section className="band band--line">
         <div className="wrap-tight text-center">
           <h2 className="section-title mx-auto max-w-[20ch]">
-            Tell Vera your business. Watch it pick up.
+            Tell Veyra your business. Watch it pick up.
           </h2>
           <p className="lead mx-auto mt-5 max-w-[46ch]">
             Describe your industry in plain English and the deep agent drafts the workflows,
-            knowledge, and voice. Approve it, and Vera is on the phone.
+            knowledge, and voice. Approve it, and Veyra is on the phone.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <a href={CALENDAR_URL} {...bookProps} className="btn-ember">

@@ -114,7 +114,7 @@ function SidebarContent({
   return (
     <>
       <div className="flex h-16 shrink-0 items-center px-4">
-        <Link href="/" aria-label="Vera home">
+        <Link href="/" aria-label="Veyra home">
           <Logo size={26} suffix="STUDIO" />
         </Link>
       </div>
@@ -153,7 +153,7 @@ function SidebarContent({
       >
         <Link href="/desk" className="sidebar-item">
           <Inbox strokeWidth={1.5} />
-          Open Vera Desk
+          Open Veyra Desk
         </Link>
         <Link href="/" className="sidebar-item">
           <ExternalLink strokeWidth={1.5} />

@@ -221,7 +221,7 @@ export default function TelephonyPage() {
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Telephony"
-        description="The phone infrastructure: buy numbers, route inbound calls, set up the IVR and transfers, and connect your carrier. Conversations with customers live in Vera Desk."
+        description="The phone infrastructure: buy numbers, route inbound calls, set up the IVR and transfers, and connect your carrier. Conversations with customers live in Veyra Desk."
         actions={
           <span className={`badge ${configured ? "badge-success" : ""}`}>
             <span className={`dot ${configured ? "dot-pulse" : ""}`} />
@@ -573,7 +573,7 @@ function RoutingModal({
 
   const assignedName =
     assignedTo === "ai"
-      ? "the Vera AI agent"
+      ? "the Veyra AI agent"
       : agents.find((a) => a.id === assignedTo)?.name || "the assigned teammate";
   const summary = ivrEnabled
     ? "Callers hear the call menu, then route by their choice to the AI, a teammate, an extension, an external number, or voicemail."
@@ -605,7 +605,7 @@ function RoutingModal({
           value={assignedTo}
           onChange={(e) => setAssignedTo(e.target.value)}
         >
-          <option value="ai">Vera AI agent</option>
+          <option value="ai">Veyra AI agent</option>
           {agents.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name}
@@ -762,7 +762,7 @@ function CallsTab({ numbers, settings }: { numbers: Num[]; settings: Settings | 
     setPlacing(true);
     try {
       await api.post("/api/telephony/calls", { to, from_number_id: fromId });
-      toast.success("Calling…", { description: `Vera is dialing ${to}` });
+      toast.success("Calling…", { description: `Veyra is dialing ${to}` });
       setTo("");
       load();
     } catch (e: any) {
@@ -778,7 +778,7 @@ function CallsTab({ numbers, settings }: { numbers: Num[]; settings: Settings | 
   return (
     <div className="space-y-5">
       {/* dialer */}
-      <SectionCard title="Place a call" description="Vera dials the number and handles the conversation with your tuned voice agent.">
+      <SectionCard title="Place a call" description="Veyra dials the number and handles the conversation with your tuned voice agent.">
         {!ready && (
           <p className="hint mb-3" style={{ color: "var(--warning)" }}>
             Outbound calling needs the SIP trunk connected. Open Settings and click Connect first.
@@ -907,7 +907,7 @@ function CallDetail({ call, onClose }: { call: any; onClose: () => void }) {
               >
                 {t.text}
               </div>
-              <span className="text-tertiary mt-0.5 text-[11px]">{t.role === "assistant" ? "Vera" : "Caller"}</span>
+              <span className="text-tertiary mt-0.5 text-[11px]">{t.role === "assistant" ? "Veyra" : "Caller"}</span>
             </div>
           ))}
         </div>
@@ -1064,7 +1064,7 @@ function SettingsTab({ settings, reload }: { settings: Settings | null; reload: 
             </div>
             <p className="hint sm:col-span-2">
               Numbers you buy are assigned to this profile and connection automatically, and the
-              messaging webhook is pointed at Vera for you.
+              messaging webhook is pointed at Veyra for you.
             </p>
           </div>
         ) : (

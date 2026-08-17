@@ -37,7 +37,7 @@ export function ConsoleMock() {
     <div className="console" style={{ width: "100%", maxWidth: 520 }}>
       <div className="console__bar">
         <span className="console__dot" />
-        vera.studio — deep agent
+        veyra.studio — deep agent
         <span className="spacer" />
         live
       </div>
@@ -68,7 +68,7 @@ export function WorkflowMock() {
     ["ask", "Collect the time", "“what date works for you?”"],
     ["act", "Create calendar event", "google calendar · booked", true],
     ["branch", "Confirmed?", "yes → confirm · no → human"],
-    ["end", "Wrap up", "summary posted to vera desk"],
+    ["end", "Wrap up", "summary posted to veyra desk"],
   ];
   return (
     <div className="console" style={{ width: "100%", maxWidth: 440 }}>
@@ -126,7 +126,7 @@ export function TelephonyMock() {
   );
 }
 
-// ── vera desk: every channel in one inbox ──
+// ── veyra desk: every channel in one inbox ──
 export function InboxMock() {
   const rows: [string, string, string, string][] = [
     ["call", "Dana Okafor", "Missed call · called back in 40s", "new lead"],
@@ -138,7 +138,7 @@ export function InboxMock() {
     <div className="console" style={{ width: "100%", maxWidth: 480 }}>
       <div className="console__bar">
         <span className="console__dot" />
-        vera desk — inbox
+        veyra desk — inbox
         <span className="spacer" />
         4 open
       </div>
@@ -213,7 +213,7 @@ export function IntegrationGrid() {
 // ── voice: a live transcript with the turn readout ──
 export function TranscriptMock() {
   const lines: [string, string][] = [
-    ["agent", "Thanks for calling Vera. How can I help you today?"],
+    ["agent", "Thanks for calling Veyra. How can I help you today?"],
     ["caller", "Hi — do you have any openings this Friday afternoon?"],
     ["agent", "We do. There’s a 2:30 and a 4 o’clock. Want me to book one?"],
   ];

@@ -20,8 +20,8 @@ const CATEGORIES: Category[] = [
   {
     tag: "CRM",
     title: "Log every contact and move the deal",
-    body: "Vera creates and updates records, writes the call summary, and advances the deal the moment the conversation ends.",
-    tools: ["HubSpot", "Salesforce", "Pipedrive", "Vera Desk"],
+    body: "Veyra creates and updates records, writes the call summary, and advances the deal the moment the conversation ends.",
+    tools: ["HubSpot", "Salesforce", "Pipedrive", "Veyra Desk"],
   },
   {
     tag: "Calendars",
@@ -32,7 +32,7 @@ const CATEGORIES: Category[] = [
   {
     tag: "Support",
     title: "Open and resolve tickets",
-    body: "Vera raises tickets, pulls the customer's history, and answers from your help center before a human is ever paged.",
+    body: "Veyra raises tickets, pulls the customer's history, and answers from your help center before a human is ever paged.",
     tools: ["Zendesk", "Intercom", "Freshdesk", "Help Scout"],
   },
   {
@@ -66,7 +66,7 @@ const EXTEND: { tag: string; title: string; body: string }[] = [
   {
     tag: "mcp",
     title: "Bring your own MCP servers",
-    body: "Point Vera at a Model Context Protocol server and its tools appear alongside the catalog. Your internal systems become actions the agent can take, with the same approval and logging as everything else.",
+    body: "Point Veyra at a Model Context Protocol server and its tools appear alongside the catalog. Your internal systems become actions the agent can take, with the same approval and logging as everything else.",
   },
   {
     tag: "custom http",
@@ -85,7 +85,7 @@ export default function IntegrationsPage() {
             Connect the tools you already run.
           </h1>
           <p className="lead-lg mx-auto mt-7 max-w-[54ch]">
-            Vera reaches a thousand apps through Composio with managed OAuth. Connect a tool once
+            Veyra reaches a thousand apps through Composio with managed OAuth. Connect a tool once
             and the agent reads it, fills the parameters itself, and takes the action live on the
             call.
           </p>
@@ -154,7 +154,7 @@ export default function IntegrationsPage() {
           <h2 className="section-title max-w-[20ch]">Your own tools, first class.</h2>
           <p className="lead mt-5 max-w-[58ch]">
             The catalog covers the tools most teams share. When you need your own, bring an MCP
-            server or wire a raw endpoint — it behaves like every other action Vera runs.
+            server or wire a raw endpoint — it behaves like every other action Veyra runs.
           </p>
           <div className="rows mt-12">
             {EXTEND.map((e) => (
@@ -174,9 +174,9 @@ export default function IntegrationsPage() {
       {/* ── close ── */}
       <section className="band band--line">
         <div className="wrap-tight text-center">
-          <h2 className="section-title mx-auto max-w-[20ch]">Your stack, one connection away.</h2>
+          <h2 className="section-title mx-auto max-w-[28ch]">Your stack, one connection away.</h2>
           <p className="lead mx-auto mt-5 max-w-[46ch]">
-            Plug Vera into the tools you already run and let it do the work between the words —
+            Plug Veyra into the tools you already run and let it do the work between the words —
             book, charge, update, and follow up, live on every call.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">

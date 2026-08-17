@@ -12,17 +12,17 @@ Businesses that want their customer conversations (phone calls, chat, SMS, email
 
 ## Product Purpose
 
-Vera builds and runs AI voice and chat agents that talk to customers: they answer and place real phone calls, run workflows across ~1000 integrated tools, ground answers in the business's knowledge, and hand off to a human when it matters. Success = a business describes itself in plain English and gets a deployed, working agent (numbers, workflows, knowledge, voice) it can supervise.
+Veyra builds and runs AI voice and chat agents that talk to customers: they answer and place real phone calls, run workflows across ~1000 integrated tools, ground answers in the business's knowledge, and hand off to a human when it matters. Success = a business describes itself in plain English and gets a deployed, working agent (numbers, workflows, knowledge, voice) it can supervise.
 
 ## Positioning
 
-The deep agent: describe your business in plain English and an autonomous builder plans, delegates to system experts, and ships the whole deployment (workflows, knowledge, telephony, voice) with human approval gates. Neighboring voice-AI platforms (Vapi, Retell) sell developer toolkits; Vera sells the built outcome plus the operating surface (Vera Desk: one inbox for every channel with tickets, assignment, team workload).
+The deep agent: describe your business in plain English and an autonomous builder plans, delegates to system experts, and ships the whole deployment (workflows, knowledge, telephony, voice) with human approval gates. Neighboring voice-AI platforms (Vapi, Retell) sell developer toolkits; Veyra sells the built outcome plus the operating surface (Veyra Desk: one inbox for every channel with tickets, assignment, team workload).
 
 ## Operating Context
 
 - Marketing site: `apps/web/app/(site)/` — landing, platform, pricing, solutions, integrations, security, company, contact. Next.js 15 App Router, Tailwind v4, self-hosted fonts (`apps/web/app/fonts/`), lucide-react icons.
-- Product surfaces: Vera Studio (`/studio` — agent builder, workflows, knowledge, telephony, evals) and Vera Desk (`/desk` — CRM/inbox). These keep their own design layer; marketing-site work must not restructure them.
-- Live demo: `VoiceDemo` component (LiveKit-powered talk-to-Vera widget) embedded on the landing page — a real product demonstration, keep it working.
+- Product surfaces: Veyra Studio (`/studio` — agent builder, workflows, knowledge, telephony, evals) and Veyra Desk (`/desk` — CRM/inbox). These keep their own design layer; marketing-site work must not restructure them.
+- Live demo: `VoiceDemo` component (LiveKit-powered talk-to-Veyra widget) embedded on the landing page — a real product demonstration, keep it working.
 - Infrastructure stack (truthful, publicly claimable): LiveKit, Deepgram, Cartesia, OpenAI, Composio, ElevenLabs, Twilio.
 
 ## Capabilities and Constraints
@@ -34,7 +34,7 @@ The deep agent: describe your business in plain English and an autonomous builde
 
 ## Brand Commitments
 
-- Name: Vera. Wordmark set in text (no logo asset on the marketing site); `Logo.tsx` exists for app surfaces.
+- Name: Veyra. Wordmark set in text (no logo asset on the marketing site); `Logo.tsx` exists for app surfaces.
 - Binding visual direction (user-pinned, 2026-08-03): the Vapi style reference — "neon spectrogram across midnight concrete." Void/Carbon/Slab surfaces, Iron hairline structure, Cream text, Ember Orange + Mint Pulse CTA pair, six-color spectrogram quarantined to the hero waveform, 5.6px container radius / full-pill actions, weight-300 display headlines, wide-tracked mono labels, flat and shadowless. The reference document supplied by the user is the authority for tokens and component recipes; its craft level (vapi.ai) is the bar.
 - Voice: sparse, confident, concrete; no marketing flourish, no exclamation marks. Business-led claims backed by technical specifics.
 

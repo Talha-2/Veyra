@@ -1,4 +1,4 @@
-"""Vera Desk — the client CRM (v2).
+"""Veyra Desk — the client CRM (v2).
 
 A clean, AI first view over the same data the platform runs on. The inbox is
 built from real telephony Calls and SmsMessages; contacts, leads (in pipelines
@@ -22,6 +22,8 @@ from ..db import (
     Call,
     Contact,
     Conversation,
+    EmailMessage,
+    FaxMessage,
     Lead,
     Note,
     PhoneNumber,
@@ -69,6 +71,13 @@ def _call_peer(c: Call) -> str:
     return c.from_number if c.direction == "inbound" else c.to_number
 
 
+def _peer_contact(session: Session, peer: str) -> Contact | None:
+    """A thread peer is a phone number, or an email address for mail threads."""
+    if "@" in peer:
+        return session.exec(select(Contact).where(Contact.email == peer.lower())).first()
+    return session.exec(select(Contact).where(Contact.phone == peer)).first()
+
+
 def _ensure_conv(session: Session, peer: str, contact_id: str | None, last_at: str) -> Conversation:
     """Upsert the assignment/status row for a thread, backfilling for real
     (non seeded) conversations the first time they appear in the inbox."""
@@ -86,7 +95,12 @@ def _ensure_conv(session: Session, peer: str, contact_id: str | None, last_at: s
 
 
 def _conv_meta(conv: Conversation, mmap: dict) -> dict:
-    return {"status": conv.status, "assignees": _assignees(conv.assignee_ids_json, mmap)}
+    return {
+        "status": conv.status,
+        "is_favorite": bool(conv.is_favorite),
+        "created_at": conv.created_at.isoformat(),
+        "assignees": _assignees(conv.assignee_ids_json, mmap),
+    }
 
 
 def _contact_out(c: Contact) -> dict:
@@ -164,10 +178,143 @@ def _err(code: int, msg: str):
     return HTTPException(code, msg)
 
 
+def _last_activity_map(session: Session) -> dict[str, dict]:
+    """contact_id → {kind, at} for the most recent real touch on any channel.
+    Built once per request so a contact list can show what actually happened
+    instead of falling back to the row's creation date."""
+    contacts = session.exec(select(Contact)).all()
+    by_phone = {c.phone: c.id for c in contacts if c.phone}
+    by_email = {c.email.lower(): c.id for c in contacts if c.email}
+    out: dict[str, dict] = {}
+
+    def touch(cid: str | None, kind: str, at) -> None:
+        if not cid or at is None:
+            return
+        cur = out.get(cid)
+        naive = _as_naive(at)
+        if cur is None or naive > _as_naive(cur["at"]):
+            out[cid] = {"kind": kind, "at": naive}
+
+    for c in session.exec(select(Call)).all():
+        touch(by_phone.get(_call_peer(c)), "call", c.created_at)
+    for m in session.exec(select(SmsMessage)).all():
+        touch(by_phone.get(m.counterparty), "sms", m.created_at)
+    for e in session.exec(select(EmailMessage)).all():
+        touch(by_email.get((e.counterparty or "").lower()), "email", e.created_at)
+    for f in session.exec(select(FaxMessage)).all():
+        touch(by_phone.get(f.counterparty), "fax", f.created_at)
+
+    return {k: {"kind": v["kind"], "at": v["at"].isoformat()} for k, v in out.items()}
+
+
 # ── team + pipelines + reference data ────────────────────────────────────────
+_MEMBER_COLORS = ["#2563eb", "#7c3aed", "#0891b2", "#db2777", "#16a34a", "#ea580c", "#4f46e5", "#0d9488"]
+_MEMBER_ROLES = ("admin", "agent", "ai")
+
+
+def _initials(name: str) -> str:
+    parts = [p for p in name.replace(".", " ").split() if p]
+    return ("".join(p[0] for p in parts[:2]) or "?").upper()
+
+
 @router.get("/team")
 def team(session: Session = Depends(get_session)):
     return list(_members_map(session).values())
+
+
+class MemberIn(BaseModel):
+    name: str
+    role: str = "agent"
+    phone: str = ""
+    extension: str = ""
+    color: str = ""
+
+
+@router.post("/team")
+def create_member(req: MemberIn, session: Session = Depends(get_session)):
+    """Add a teammate. They become assignable in the inbox and on tickets, and
+    a transfer target for calls once they have a phone or extension."""
+    name = req.name.strip()
+    if not name:
+        raise _err(422, "A team member needs a name.")
+    role = req.role if req.role in _MEMBER_ROLES else "agent"
+    existing = session.exec(select(TeamMember)).all()
+    m = TeamMember(
+        id=new_id("tm"),
+        name=name,
+        initials=_initials(name),
+        color=req.color or _MEMBER_COLORS[len(existing) % len(_MEMBER_COLORS)],
+        role=role,
+        phone=req.phone.strip(),
+        extension=req.extension.strip(),
+    )
+    session.add(m)
+    session.commit()
+    session.refresh(m)
+    return _members_map(session)[m.id]
+
+
+class MemberPatch(BaseModel):
+    name: str | None = None
+    role: str | None = None
+    phone: str | None = None
+    extension: str | None = None
+    color: str | None = None
+
+
+@router.patch("/team/{member_id}")
+def update_member(member_id: str, patch: MemberPatch, session: Session = Depends(get_session)):
+    m = session.get(TeamMember, member_id)
+    if m is None:
+        raise _err(404, "Team member not found.")
+    if patch.name is not None:
+        name = patch.name.strip()
+        if not name:
+            raise _err(422, "A team member needs a name.")
+        m.name = name
+        m.initials = _initials(name)
+    if patch.role is not None and patch.role in _MEMBER_ROLES:
+        m.role = patch.role
+    if patch.phone is not None:
+        m.phone = patch.phone.strip()
+    if patch.extension is not None:
+        m.extension = patch.extension.strip()
+    if patch.color:
+        m.color = patch.color
+    session.add(m)
+    session.commit()
+    session.refresh(m)
+    return _members_map(session)[m.id]
+
+
+@router.delete("/team/{member_id}")
+def delete_member(member_id: str, session: Session = Depends(get_session)):
+    """Remove a teammate and hand their work back to the unassigned queue, so
+    nothing is silently orphaned on a conversation or ticket nobody can see."""
+    m = session.get(TeamMember, member_id)
+    if m is None:
+        raise _err(404, "Team member not found.")
+    if m.role == "admin" and sum(1 for x in session.exec(select(TeamMember)).all() if x.role == "admin") <= 1:
+        raise _err(409, "This is the last admin. Promote someone else before removing them.")
+
+    unassigned = 0
+    for conv in session.exec(select(Conversation)).all():
+        ids = json.loads(conv.assignee_ids_json or "[]")
+        if member_id in ids:
+            conv.assignee_ids_json = json.dumps([i for i in ids if i != member_id])
+            conv.updated_at = now()
+            session.add(conv)
+            unassigned += 1
+    for t in session.exec(select(Ticket)).all():
+        ids = json.loads(t.assignee_ids_json or "[]")
+        if member_id in ids:
+            t.assignee_ids_json = json.dumps([i for i in ids if i != member_id])
+            t.updated_at = now()
+            session.add(t)
+            unassigned += 1
+    session.delete(m)
+    session.commit()
+    return {"ok": True, "unassigned": unassigned}
 
 
 @router.get("/pipelines")
@@ -201,62 +348,99 @@ def tags(session: Session = Depends(get_session)):
 # ── dashboard (AI first) ─────────────────────────────────────────────────────
 @router.get("/dashboard")
 def dashboard(session: Session = Depends(get_session)):
+    """Every figure here is counted from real rows — calls, messages, emails,
+    faxes, tickets. Nothing is modelled or extrapolated: a quiet workspace
+    reports zeros rather than a plausible-looking curve. `sample` flags that
+    the only activity on record is the seeded demo data."""
     contacts = session.exec(select(Contact)).all()
     tickets = session.exec(select(Ticket)).all()
     leads = session.exec(select(Lead)).all()
     calls = session.exec(select(Call)).all()
     sms = session.exec(select(SmsMessage)).all()
+    emails = session.exec(select(EmailMessage)).all()
+    faxes = session.exec(select(FaxMessage)).all()
+    convs = session.exec(select(Conversation)).all()
 
-    ai_tickets = sum(1 for t in tickets if (t.creator or "").lower().startswith("vera"))
-    total_convos = len(contacts) + len(calls) + len(sms)
-    support_volume = len(contacts) + len(tickets) + len(calls) + len(sms)
-    ai_pct = round(ai_tickets / max(len(tickets), 1) * 100) if tickets else 28
-    ai_pct = max(8, min(ai_pct, 92))
+    # who owns each thread: a human assignee means the team handled it, an
+    # empty assignee list means the agent carried it alone
+    team_peers = {c.peer for c in convs if json.loads(c.assignee_ids_json or "[]")}
+    agent_only_peers = {c.peer for c in convs} - team_peers
 
-    # KPI values derived from real counts (labelled as sample while the line is quiet)
-    value_delivered = ai_tickets * 300 + len(leads) * 40
-    time_saved_hrs = round(ai_tickets * 8.4 + len(sms) * 0.1, 1)
-    ai_hours = round(ai_tickets * 1.6 + len(calls) * 0.2, 1)
-    missed_calls_prevented = ai_tickets * 40 + len(contacts) * 6
-    contacts_in_ai = round(len(contacts) * ai_pct / 100)
+    def peer_of(row, kind: str) -> str:
+        if kind == "call":
+            return _call_peer(row)
+        return row.counterparty or ""
 
-    # 30 day conversation productivity, AI vs team. Stable across refreshes.
-    import random as _r
+    # ── 30-day activity, agent-handled vs team-handled, from real timestamps ──
+    today = _as_naive(now()).replace(hour=0, minute=0, second=0, microsecond=0)
+    days = [today - timedelta(days=i) for i in range(29, -1, -1)]
+    buckets: dict[str, dict] = {d.strftime("%Y-%m-%d"): {"ai": 0, "team": 0} for d in days}
 
-    rng = _r.Random(360)
-    today = _as_naive(now())
-    series = []
-    base_ai, base_team = 18, 40
-    for i in range(29, -1, -1):
-        day = today - timedelta(days=i)
-        wave = 1 + 0.6 * __import__("math").sin(i / 3.0)
-        ai_v = max(0, round(base_ai * wave + rng.randint(-6, 22)))
-        team_v = max(0, round(base_team * (2 - wave) + rng.randint(-8, 30)))
-        series.append({"date": day.strftime("%b %d"), "ai": ai_v, "team": team_v})
+    events: list[tuple] = (
+        [(c.created_at, peer_of(c, "call")) for c in calls]
+        + [(m.created_at, peer_of(m, "sms")) for m in sms]
+        + [(e.created_at, peer_of(e, "email")) for e in emails]
+        + [(f.created_at, peer_of(f, "fax")) for f in faxes]
+    )
+    for at, peer in events:
+        key = _as_naive(at).strftime("%Y-%m-%d")
+        b = buckets.get(key)
+        if b is None:
+            continue
+        b["team" if peer in team_peers else "ai"] += 1
 
+    series = [
+        {"date": d.strftime("%b %d"), "ai": buckets[d.strftime("%Y-%m-%d")]["ai"],
+         "team": buckets[d.strftime("%Y-%m-%d")]["team"]}
+        for d in days
+    ]
     ai_sum = sum(p["ai"] for p in series)
     team_sum = sum(p["team"] for p in series)
-    handled_pct = round(ai_sum / max(ai_sum + team_sum, 1) * 100)
+    handled_pct = round(ai_sum / max(ai_sum + team_sum, 1) * 100) if (ai_sum + team_sum) else 0
 
-    # most active number
-    number = session.exec(select(PhoneNumber).where(PhoneNumber.status == "active")).first()
-    most_active = number.friendly_name or number.e164 if number else "Main Line"
+    # ── real operational counts ──
+    inbound_calls = [c for c in calls if c.direction == "inbound"]
+    answered = [c for c in inbound_calls if c.status == "completed"]
+    missed = [c for c in inbound_calls if c.status in ("no-answer", "busy", "failed", "canceled")]
+    talk_seconds = sum(c.duration_sec for c in calls)
+    agent_calls = [c for c in calls if c.room]  # the LiveKit agent held the line
+    inbound_msgs = sum(1 for m in sms if m.direction == "inbound")
+    outbound_msgs = sum(1 for m in sms if m.direction == "outbound")
+    inbound_email = sum(1 for e in emails if e.direction == "inbound")
+    unread_email = sum(1 for e in emails if e.unread)
+    ai_tickets = sum(1 for t in tickets if (t.creator or "").lower().startswith("vera"))
+    open_tickets = sum(1 for t in tickets if t.status in ("open", "in_progress", "pending"))
+
+    # busiest number, by real call + message volume
+    numbers = session.exec(select(PhoneNumber).where(PhoneNumber.status == "active")).all()
+    by_number: dict[str, int] = {}
+    for c in calls:
+        if c.number_id:
+            by_number[c.number_id] = by_number.get(c.number_id, 0) + 1
+    for m in sms:
+        if m.number_id:
+            by_number[m.number_id] = by_number.get(m.number_id, 0) + 1
+    top_id = max(by_number, key=by_number.get) if by_number else None
+    top_num = next((n for n in numbers if n.id == top_id), None) or (numbers[0] if numbers else None)
+    most_active = (top_num.friendly_name or top_num.e164) if top_num else "No number yet"
+
+    demo_only = all(c.provider == "demo" for c in calls) if calls else True
 
     return {
         "top": {
-            "ai_managed_pct": ai_pct,
-            "support_volume": support_volume,
+            "ai_managed_pct": handled_pct,
+            "support_volume": len(events),
             "most_active_number": most_active,
-            "inbound_events": len(calls) + len(sms) + len(leads),
+            "inbound_events": len(inbound_calls) + inbound_msgs + inbound_email + sum(1 for f in faxes if f.direction == "inbound"),
             "leads": len(leads),
         },
         "ai": {
-            "value_delivered": value_delivered,
-            "time_saved_hrs": time_saved_hrs,
-            "ai_hours": ai_hours,
-            "contacts_in_ai": contacts_in_ai,
+            "calls_handled": len(agent_calls),
+            "talk_minutes": round(talk_seconds / 60),
             "tickets_by_ai": ai_tickets,
-            "missed_calls_prevented": missed_calls_prevented,
+            "contacts_in_ai": len(agent_only_peers),
+            "answered_pct": round(len(answered) / max(len(inbound_calls), 1) * 100) if inbound_calls else 0,
+            "missed_calls": len(missed),
         },
         "productivity": {
             "managed": ai_sum,
@@ -265,18 +449,25 @@ def dashboard(session: Session = Depends(get_session)):
         },
         "handled": {
             "ai_pct": handled_pct,
-            "team_pct": 100 - handled_pct,
-            "no_escalation": round(ai_sum * 0.12),
+            "team_pct": 100 - handled_pct if (ai_sum + team_sum) else 0,
+            "open_tickets": open_tickets,
             "tool_actions": sum(1 for t in tickets if t.channel in ("form", "email")),
-            "first_response_s": 31,
+        },
+        "channels": {
+            "calls": len(calls),
+            "sms_in": inbound_msgs,
+            "sms_out": outbound_msgs,
+            "email": len(emails),
+            "email_unread": unread_email,
+            "fax": len(faxes),
         },
         "counts": {
             "contacts": len(contacts),
             "tickets": len(tickets),
             "leads": len(leads),
-            "open_tickets": sum(1 for t in tickets if t.status in ("open", "in_progress", "pending")),
+            "open_tickets": open_tickets,
         },
-        "sample": total_convos == 0 or len(calls) == 0,
+        "sample": demo_only,
     }
 
 
@@ -294,10 +485,19 @@ def list_contacts(
         and (not source or c.source == source)
         and (not ql or ql in f"{c.name} {c.phone} {c.email} {c.company}".lower())
     ]
+
+    # real last activity per contact: the newest thing on any of their threads,
+    # so the list reflects conversations rather than the row's creation date
+    activity = _last_activity_map(session)
+
+    def last_at(c: Contact):
+        a = activity.get(c.id)
+        return _as_naive(a["at"]) if a else _as_naive(c.last_contact_at or c.created_at)
+
     if sort == "name":
         rows.sort(key=lambda c: (c.name or "").lower())
     elif sort == "activity":
-        rows.sort(key=lambda c: _as_naive(c.last_contact_at or c.created_at), reverse=True)
+        rows.sort(key=last_at, reverse=True)
     else:
         rows.sort(key=lambda c: _as_naive(c.created_at), reverse=True)
 
@@ -306,7 +506,10 @@ def list_contacts(
     page = max(1, page)
     start = (page - 1) * per_page
     return {
-        "rows": [_contact_out(c) for c in rows[start:start + per_page]],
+        "rows": [
+            {**_contact_out(c), "activity": activity.get(c.id)}
+            for c in rows[start:start + per_page]
+        ],
         "total": total,
         "page": page,
         "per_page": per_page,
@@ -693,15 +896,33 @@ def inbox(
         b["last_text"] = f"{c.direction.title()} call · {c.status}"
         b["last_at"] = c.created_at.isoformat()
         b["last_kind"] = "call"
+    for e in session.exec(select(EmailMessage).order_by(EmailMessage.created_at.asc())).all():
+        b = bucket(e.counterparty)
+        b["channels"].add("email")
+        b["count"] += 1
+        b["last_text"] = (("You: " if e.direction == "outbound" else "") + (e.subject or e.snippet))[:90]
+        b["last_at"] = e.created_at.isoformat()
+        b["last_kind"] = "email"
+        if e.unread:
+            b["unread"] = b.get("unread", 0) + 1
+    for f in session.exec(select(FaxMessage).order_by(FaxMessage.created_at.asc())).all():
+        b = bucket(f.counterparty)
+        b["channels"].add("fax")
+        b["count"] += 1
+        b["last_text"] = f"{f.direction.title()} fax · {f.pages or '?'} pages · {f.status}"
+        b["last_at"] = f.created_at.isoformat()
+        b["last_kind"] = "fax"
 
-    cmap = {c.phone: c for c in session.exec(select(Contact)).all() if c.phone}
+    all_contacts = session.exec(select(Contact)).all()
+    cmap = {c.phone: c for c in all_contacts if c.phone}
+    cmap.update({c.email.lower(): c for c in all_contacts if c.email})
     convmap = {cv.peer: cv for cv in session.exec(select(Conversation)).all()}
     ql = q.lower().strip()
     out = []
     for peer, b in convos.items():
         if peer == "unknown":
             continue
-        contact = cmap.get(peer)
+        contact = cmap.get(peer.lower() if "@" in peer else peer)
         conv = convmap.get(peer) or _ensure_conv(session, peer, contact.id if contact else None, b["last_at"])
         meta = _conv_meta(conv, mmap)
         assignee_ids = [a["id"] for a in meta["assignees"]]
@@ -721,10 +942,13 @@ def inbox(
             "contact": {"id": contact.id if contact else None, "name": name, "stage": contact.stage if contact else "new"},
             "channels": sorted(b["channels"]),
             "count": b["count"],
+            "unread": b.get("unread", 0),
             "last_text": b["last_text"],
             "last_at": b["last_at"],
             "last_kind": b["last_kind"],
             "status": conv.status,
+            "is_favorite": bool(conv.is_favorite),
+            "created_at": conv.created_at.isoformat(),
             "assignees": meta["assignees"],
         })
     out.sort(key=lambda x: x["last_at"], reverse=True)
@@ -734,21 +958,50 @@ def inbox(
 class ConvPatch(BaseModel):
     assignee_ids: list[str] | None = None
     status: str | None = None
+    is_favorite: bool | None = None
 
 
-@router.patch("/conversations/{peer}")
-def update_conversation(peer: str, patch: ConvPatch, session: Session = Depends(get_session)):
-    contact = session.exec(select(Contact).where(Contact.phone == peer)).first()
+def _apply_conv_patch(session: Session, peer: str, patch: ConvPatch) -> Conversation:
+    contact = _peer_contact(session, peer)
     conv = _ensure_conv(session, peer, contact.id if contact else None, now().isoformat())
     if patch.assignee_ids is not None:
         conv.assignee_ids_json = json.dumps(patch.assignee_ids)
     if patch.status is not None and patch.status in ("open", "snoozed", "closed"):
         conv.status = patch.status
+    if patch.is_favorite is not None:
+        conv.is_favorite = patch.is_favorite
     conv.updated_at = now()
     session.add(conv)
+    return conv
+
+
+@router.patch("/conversations/{peer}")
+def update_conversation(peer: str, patch: ConvPatch, session: Session = Depends(get_session)):
+    conv = _apply_conv_patch(session, peer, patch)
     session.commit()
     session.refresh(conv)
     return {"peer": peer, **_conv_meta(conv, _members_map(session))}
+
+
+class ConvBulk(BaseModel):
+    """One operation across a selection of threads. Deliberately has no delete:
+    a Veyra conversation is a derived view over real telephony and mailbox
+    records, so 'delete the conversation' has no safe meaning here — archiving
+    (status=closed) is the reversible equivalent."""
+
+    peers: list[str]
+    status: str | None = None
+    is_favorite: bool | None = None
+    assignee_ids: list[str] | None = None
+
+
+@router.post("/conversations/bulk")
+def bulk_conversations(req: ConvBulk, session: Session = Depends(get_session)):
+    patch = ConvPatch(status=req.status, is_favorite=req.is_favorite, assignee_ids=req.assignee_ids)
+    for peer in req.peers:
+        _apply_conv_patch(session, peer, patch)
+    session.commit()
+    return {"ok": True, "updated": len(req.peers)}
 
 
 @router.get("/workload")
@@ -791,15 +1044,31 @@ def conversation(peer: str, session: Session = Depends(get_session)):
     mmap = _members_map(session)
     timeline: list[dict] = []
     for m in session.exec(select(SmsMessage).where(SmsMessage.counterparty == peer)).all():
-        timeline.append({"kind": "sms", "direction": m.direction, "body": m.body, "status": m.status, "at": m.created_at.isoformat()})
+        timeline.append({"kind": "sms", "id": m.id, "direction": m.direction, "body": m.body,
+                         "status": m.status, "error": m.error, "at": m.created_at.isoformat()})
     for c in session.exec(select(Call)).all():
         if _call_peer(c) != peer:
             continue
-        timeline.append({"kind": "call", "direction": c.direction, "status": c.status,
-                         "duration_sec": c.duration_sec, "room": c.room, "at": c.created_at.isoformat()})
+        timeline.append({"kind": "call", "id": c.id, "direction": c.direction, "status": c.status,
+                         "duration_sec": c.duration_sec, "room": c.room,
+                         "recording_url": c.recording_url, "at": c.created_at.isoformat()})
+    for e in session.exec(select(EmailMessage).where(EmailMessage.counterparty == peer.lower())).all():
+        timeline.append({
+            "kind": "email", "id": e.id, "direction": e.direction,
+            "from_addr": e.from_addr, "to_addr": e.to_addr, "provider": e.provider,
+            "subject": e.subject, "snippet": e.snippet,
+            "body_text": e.body_text, "body_html": e.body_html,
+            "thread_external_id": e.thread_external_id,
+            "status": e.status, "unread": e.unread, "error": e.error,
+            "at": e.created_at.isoformat(),
+        })
+    for f in session.exec(select(FaxMessage).where(FaxMessage.counterparty == peer)).all():
+        timeline.append({"kind": "fax", "id": f.id, "direction": f.direction,
+                         "media_url": f.media_url, "pages": f.pages, "status": f.status,
+                         "error": f.error, "at": f.created_at.isoformat()})
     timeline.sort(key=lambda x: x["at"])
 
-    contact = session.exec(select(Contact).where(Contact.phone == peer)).first()
+    contact = _peer_contact(session, peer)
     sidebar = {"tickets": [], "notes": [], "reminders": [], "tags": []}
     if contact:
         sidebar["tickets"] = [_ticket_out(t, mmap, contact.name) for t in session.exec(select(Ticket).where(Ticket.contact_id == contact.id)).all()]
@@ -809,13 +1078,29 @@ def conversation(peer: str, session: Session = Depends(get_session)):
 
     last = timeline[-1]["at"] if timeline else now().isoformat()
     conv = _ensure_conv(session, peer, contact.id if contact else None, last)
+    fallback = {"name": peer, "phone": "" if "@" in peer else peer, "email": peer.lower() if "@" in peer else ""}
     return {
         "peer": peer,
-        "contact": _contact_out(contact) if contact else {"name": peer, "phone": peer},
+        "contact": _contact_out(contact) if contact else fallback,
         "timeline": timeline,
         "sidebar": sidebar,
         "conversation": _conv_meta(conv, mmap),
     }
+
+
+@router.post("/inbox/{peer}/read")
+def mark_read(peer: str, session: Session = Depends(get_session)):
+    """Opening a thread clears its unread email dot."""
+    changed = 0
+    for e in session.exec(
+        select(EmailMessage).where(EmailMessage.counterparty == peer.lower(), EmailMessage.unread == True)  # noqa: E712
+    ).all():
+        e.unread = False
+        session.add(e)
+        changed += 1
+    if changed:
+        session.commit()
+    return {"ok": True, "marked": changed}
 
 
 # ── public lead intake (forms / ads) ─────────────────────────────────────────
@@ -874,7 +1159,7 @@ def lead_intake(req: LeadIntake, session: Session = Depends(get_session)):
     if req.message.strip():
         t = Ticket(id=new_id("tk"), subject=f"New lead from {req.source} — {c.name or c.email or c.phone}",
                    body=req.message, contact_id=c.id, channel="form", priority="normal",
-                   type="New Appointment", creator="Vera AI")
+                   type="New Appointment", creator="Veyra AI")
         session.add(t)
         session.commit()
         ticket_id = t.id

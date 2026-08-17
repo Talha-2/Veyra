@@ -30,7 +30,7 @@ export default function SiteFooter() {
       <div className="wrap">
         <div className="grid gap-10 py-16 md:grid-cols-[1.5fr_1fr_1fr_1fr_1fr]">
           <div className="max-w-xs">
-            <div className="site-nav__word">Vera</div>
+            <div className="site-nav__word">Veyra</div>
             <p className="mt-4 text-[14px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               AI agents that answer, call, and close. One grounded brain across voice, chat, phone,
               and SMS.
@@ -53,7 +53,7 @@ export default function SiteFooter() {
               ["Pricing", "/pricing"],
               ["Voice agents", "/platform#voice"],
               ["Deep agent", "/platform#agent"],
-              ["Vera Desk", "/platform#desk"],
+              ["Veyra Desk", "/platform#desk"],
             ]}
           />
           <Col
@@ -88,7 +88,7 @@ export default function SiteFooter() {
           style={{ borderTop: "1px solid var(--border)" }}
         >
           <p className="mono-tag mono-tag--dim" style={{ textTransform: "none", letterSpacing: "0.04em" }}>
-            © 2026 Vera. All rights reserved.
+            © 2026 Veyra. All rights reserved.
           </p>
           <ThemeToggle />
         </div>

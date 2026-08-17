@@ -18,7 +18,7 @@ const PLANS: Plan[] = [
   {
     name: "Starter",
     amount: "Free",
-    blurb: "Everything you need to try Vera end to end",
+    blurb: "Everything you need to try Veyra end to end",
     features: [
       "Build voice and chat agents",
       "The visual workflow builder",
@@ -32,7 +32,7 @@ const PLANS: Plan[] = [
     name: "Growth",
     amount: "$99",
     unit: "per month",
-    blurb: "For teams putting Vera on real conversations",
+    blurb: "For teams putting Veyra on real conversations",
     featured: true,
     features: [
       "Everything in Starter, plus",
@@ -42,7 +42,7 @@ const PLANS: Plan[] = [
       "Evals and simulated callers",
       "Email support",
     ],
-    cta: { href: "/signup", label: "Start building", ember: true },
+    cta: { href: "/signup", label: "Start building" },
   },
   {
     name: "Scale",
@@ -56,7 +56,7 @@ const PLANS: Plan[] = [
       "Custom voices and models",
       "A dedicated success contact",
     ],
-    cta: { href: "/contact", label: "Contact sales" },
+    cta: { href: "/contact", label: "Contact sales", ember: true },
   },
 ];
 
@@ -71,11 +71,11 @@ const FAQS: [string, string][] = [
   ],
   [
     "Can I use my own phone numbers?",
-    "Yes. Provision new numbers inside Vera across more than a hundred countries, or connect numbers you already own. The same agent you tuned for voice runs on whichever line you point at it.",
+    "Yes. Provision new numbers inside Veyra across more than a hundred countries, or connect numbers you already own. The same agent you tuned for voice runs on whichever line you point at it.",
   ],
   [
     "What languages are supported?",
-    "Vera handles 42+ languages with streaming speech-to-text that follows callers in real time, including code-switching mid-sentence. No configuration change is needed when a caller switches languages.",
+    "Veyra handles 42+ languages with streaming speech-to-text that follows callers in real time, including code-switching mid-sentence. No configuration change is needed when a caller switches languages.",
   ],
   [
     "Can I self-host or bring my own models?",
@@ -93,11 +93,11 @@ export default function PricingPage() {
       {/* ── hero ── */}
       <section className="band" style={{ paddingTop: "clamp(4rem, 8vw, 6.5rem)" }}>
         <div className="wrap text-center">
-          <h1 className="display-hero mx-auto max-w-[44rem]" style={{ textWrap: "balance" }}>
+          <h1 className="display-hero mx-auto max-w-[58rem]" style={{ textWrap: "balance" }}>
             Simple pricing that scales with your conversations.
           </h1>
           <p className="lead-lg mx-auto mt-6 max-w-[50ch]">
-            One flat platform fee, plus usage at provider cost. Start free and pay only when Vera
+            One flat platform fee, plus usage at provider cost. Start free and pay only when Veyra
             is answering your calls.
           </p>
           <p className="mono-tag mono-tag--dim mt-6">No credit card to start</p>
@@ -189,11 +189,11 @@ export default function PricingPage() {
       <section className="band band--line">
         <div className="wrap-tight text-center">
           <h2 className="section-title mx-auto max-w-[22ch]">
-            Start free. Upgrade when Vera is answering your calls.
+            Start free. Upgrade when Veyra is answering your calls.
           </h2>
           <p className="lead mx-auto mt-5 max-w-[46ch]">
             Build voice and chat agents, provision real numbers, and wire your tools. Move up the
-            moment Vera is live and earning its keep.
+            moment Veyra is live and earning its keep.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Link href="/contact" className="btn-ember">

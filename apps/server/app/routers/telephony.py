@@ -13,6 +13,7 @@ and the write endpoints return a 409 the studio renders as 'connect a provider'.
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends, Form, Request, Response
@@ -20,7 +21,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from ..db import Call, CallTranscript, PhoneNumber, SmsMessage, get_session, new_id, now
+from ..db import Call, CallTranscript, FaxMessage, PhoneNumber, SmsMessage, get_session, new_id, now
 from ..telephony import livekit_sip, service
 from ..telephony.base import TelephonyError
 
@@ -77,6 +78,21 @@ def _msg_out(m: SmsMessage) -> dict:
         "status": m.status,
         "error": m.error,
         "created_at": m.created_at.isoformat(),
+    }
+
+
+def _fax_out(f: FaxMessage) -> dict:
+    return {
+        "id": f.id,
+        "direction": f.direction,
+        "from_number": f.from_number,
+        "to_number": f.to_number,
+        "counterparty": f.counterparty,
+        "media_url": f.media_url,
+        "pages": f.pages,
+        "status": f.status,
+        "error": f.error,
+        "created_at": f.created_at.isoformat(),
     }
 
 
@@ -626,6 +642,110 @@ async def send_message(req: SendSmsIn, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(m)
     return _msg_out(m)
+
+
+# ── fax ──────────────────────────────────────────────────────────────────────
+class SendFaxIn(BaseModel):
+    to: str
+    media_url: str
+    from_number_id: str = ""
+
+
+@router.get("/fax")
+def list_faxes(session: Session = Depends(get_session)):
+    rows = session.exec(select(FaxMessage).order_by(FaxMessage.created_at.desc()).limit(100)).all()
+    return [_fax_out(f) for f in rows]
+
+
+@router.post("/fax")
+async def send_fax(req: SendFaxIn, session: Session = Depends(get_session)):
+    """Send a document (a publicly reachable PDF URL) as a fax through the
+    provider. Telnyx carries it; other providers return an honest 409."""
+    from fastapi import HTTPException
+
+    if not req.media_url.strip():
+        raise HTTPException(422, "A fax needs a document: pass a PDF URL as media_url.")
+    provider = service.get_provider(session)
+    from_num = None
+    if req.from_number_id:
+        from_num = session.get(PhoneNumber, req.from_number_id)
+    if from_num is None:
+        from_num = session.exec(select(PhoneNumber).where(PhoneNumber.status == "active")).first()
+    if from_num is None:
+        raise HTTPException(409, "Buy a number before sending faxes.")
+
+    f = FaxMessage(
+        id=new_id("fx"),
+        direction="outbound",
+        from_number=from_num.e164,
+        to_number=req.to,
+        number_id=from_num.id,
+        counterparty=req.to,
+        provider=provider.name,
+        media_url=req.media_url.strip(),
+        status="queued",
+    )
+    try:
+        sent = await provider.send_fax(from_num.e164, req.to, req.media_url.strip())
+        f.provider_sid = sent.provider_sid
+        f.status = sent.status
+    except TelephonyError as exc:
+        f.status = "failed"
+        f.error = str(exc)
+        session.add(f)
+        session.commit()
+        raise _err(exc)
+    session.add(f)
+    session.commit()
+    session.refresh(f)
+    return _fax_out(f)
+
+
+@router.post("/webhooks/telnyx/fax")
+async def telnyx_fax(request: Request, session: Session = Depends(get_session)):
+    """Telnyx fax webhook (JSON events). fax.received logs an inbound fax with
+    its document URL; delivery/failure events update the outbound row."""
+    try:
+        event = (await request.json()).get("data") or {}
+    except Exception:
+        return PlainTextResponse("")
+    etype = event.get("event_type", "")
+    payload = event.get("payload") or {}
+    sid = payload.get("fax_id") or payload.get("id") or ""
+
+    if etype == "fax.received":
+        from_number = payload.get("from", "") or ""
+        to_number = payload.get("to", "") or ""
+        num = session.exec(select(PhoneNumber).where(PhoneNumber.e164 == to_number)).first()
+        session.add(FaxMessage(
+            id=new_id("fx"), direction="inbound", from_number=from_number, to_number=to_number,
+            number_id=num.id if num else None, counterparty=from_number, provider="telnyx",
+            provider_sid=sid, media_url=payload.get("media_url", "") or "",
+            pages=int(payload.get("page_count") or 0), status="received",
+        ))
+        session.commit()
+        try:
+            from ..publicapi import webhooks as out_hooks
+
+            out_hooks.emit("fax.received", {"object": "fax", "from": from_number, "to": to_number})
+        except Exception:
+            pass
+    elif etype.startswith("fax."):
+        # fax.queued / fax.media.processed / fax.sending / fax.delivered / fax.failed
+        f = session.exec(select(FaxMessage).where(FaxMessage.provider_sid == sid)).first() if sid else None
+        if f:
+            status = etype.removeprefix("fax.").replace("media.processed", "sending")
+            f.status = {"queued": "queued", "sending": "sending", "delivered": "delivered", "failed": "failed"}.get(status, f.status)
+            if payload.get("page_count"):
+                try:
+                    f.pages = int(payload["page_count"])
+                except (TypeError, ValueError):
+                    pass
+            if etype == "fax.failed":
+                f.error = payload.get("failure_reason", "") or "delivery failed"
+            session.add(f)
+            session.commit()
+    return PlainTextResponse("")
 
 
 # ── inbound webhooks (Twilio) ────────────────────────────────────────────────

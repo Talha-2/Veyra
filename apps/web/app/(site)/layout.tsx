@@ -29,7 +29,7 @@ Ember #e96b34 + Mint #62f6b5 pill pair, six-color spectrogram quarantined to the
 STORY: A business owner sees their calls answered by serious infrastructure they can run without
 engineers — and either requests a demo (Ember) or starts free (Mint).
 FIRST VIEWPORT: Centered two-line light headline, one-sentence sub, the binary pill pair, the
-inverted cream TALK TO VERA console, and the full-bleed spectrogram closing the fold.
+inverted cream TALK TO VEYRA console, and the full-bleed spectrogram closing the fold.
 FORM: brief-pinned (user-supplied Vapi reference beats the roll); seed: vapi-console/pinned.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the
 verdict, and DESIGN.md

@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font-size",
+        "value": "10px",
+        "createdAt": "2026-08-16T18:09:21.576Z",
+        "reason": "10px is the smallest step of the documented DESIGN.md typography.scale ramp (scale: [10px, 10.5px, 11px, ...]) and already carries mono micro-labels across globals.css"
+      }
+    ]
+  }
+}

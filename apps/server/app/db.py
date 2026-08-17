@@ -192,12 +192,56 @@ class SmsMessage(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now)
 
 
-# ── Vera Desk (client CRM) ───────────────────────────────────────────────────
+class EmailMessage(SQLModel, table=True):
+    """One email, inbound or outbound, normalized from a connected mailbox
+    (Gmail/Outlook through Composio managed OAuth). Threads are grouped by the
+    counterparty address, mirroring how SMS threads key on the phone number."""
+
+    id: str = Field(primary_key=True)  # em_...
+    direction: str = "outbound"  # inbound | outbound
+    from_addr: str = ""
+    to_addr: str = ""  # primary recipient; extra recipients live in cc
+    cc: str = ""
+    counterparty: str = Field(default="", index=True)  # other side's address, lowercase (thread key)
+    account: str = ""  # connected mailbox address this came through
+    provider: str = "gmail"  # gmail | outlook | demo
+    external_id: str = Field(default="", index=True)  # provider message id (dedupe key)
+    thread_external_id: str = ""  # provider thread id
+    subject: str = ""
+    snippet: str = ""
+    body_text: str = ""
+    body_html: str = ""
+    status: str = "received"  # queued | sent | received | failed
+    unread: bool = False
+    error: str | None = None
+    created_at: datetime = Field(default_factory=now)
+
+
+class FaxMessage(SQLModel, table=True):
+    """One fax, inbound or outbound. Sent through the telephony provider
+    (Telnyx Programmable Fax; Twilio retired fax for new accounts)."""
+
+    id: str = Field(primary_key=True)  # fx_...
+    direction: str = "outbound"  # inbound | outbound
+    from_number: str = ""
+    to_number: str = ""
+    number_id: str | None = Field(default=None, index=True)
+    counterparty: str = Field(default="", index=True)  # other party's number (thread key)
+    provider: str = "telnyx"
+    provider_sid: str = ""
+    media_url: str = ""  # the document (PDF) being transmitted / received
+    pages: int = 0
+    status: str = "queued"  # queued | sending | delivered | received | failed
+    error: str | None = None
+    created_at: datetime = Field(default_factory=now)
+
+
+# ── Veyra Desk (client CRM) ───────────────────────────────────────────────────
 # The simplified, client-facing product on top of the same data the technical
 # platform runs on. Its inbox reads the real telephony Calls and SmsMessages;
 # Contacts (leads) auto-populate from that activity and from public form/ad
 # intake, and move through pipeline stages. Nothing here is a separate silo —
-# it is a clean view over what Vera is already doing.
+# it is a clean view over what Veyra is already doing.
 
 CONTACT_STAGES = ["new", "open", "qualified", "won", "lost"]
 TICKET_STATUSES = ["open", "in_progress", "pending", "testing", "resolved", "closed"]
@@ -318,6 +362,7 @@ class Conversation(SQLModel, table=True):
     contact_id: str | None = Field(default=None, index=True)
     assignee_ids_json: str = "[]"
     status: str = "open"  # open | snoozed | closed
+    is_favorite: bool = False  # starred by the team — its own inbox view
     last_at: datetime | None = None
     created_at: datetime = Field(default_factory=now)
     updated_at: datetime = Field(default_factory=now)
@@ -386,6 +431,9 @@ def _migrate() -> None:
                 conn.execute(text("ALTER TABLE phonenumber ADD COLUMN assigned_to VARCHAR DEFAULT ''"))
             if "ivr_json" not in pcols:
                 conn.execute(text("ALTER TABLE phonenumber ADD COLUMN ivr_json VARCHAR DEFAULT '{}'"))
+        ccols = {row[1] for row in conn.execute(text("PRAGMA table_info(conversation)"))}
+        if ccols and "is_favorite" not in ccols:
+            conn.execute(text("ALTER TABLE conversation ADD COLUMN is_favorite BOOLEAN DEFAULT 0"))
         mcols = {row[1] for row in conn.execute(text("PRAGMA table_info(teammember)"))}
         if mcols:
             if "phone" not in mcols:
@@ -405,7 +453,7 @@ _SEED_TEAM = [
     ("Sara Michael", "SM", "#7c3aed", "agent"),
     ("Maria Novak", "MN", "#0891b2", "agent"),
     ("Shurhaini A.", "SA", "#db2777", "agent"),
-    ("Vera AI", "AI", "#16a34a", "ai"),
+    ("Veyra AI", "AI", "#16a34a", "ai"),
 ]
 _SEED_PIPELINES = [
     ("Patient Inquiries", [
@@ -424,7 +472,7 @@ _SEED_FIRST = ["Maria", "Stacy", "Camoray", "Gary", "Kristin", "Tooba", "Shea", 
 _SEED_LAST = ["Alarcon", "Duncan", "Wathen", "Osborn", "Batchelor", "Salman", "Houston", "Freeman",
               "Perrin", "Seidel", "Knight", "Badom", "Buchanan", "Lutz", "Torres", "Carraway",
               "Rivera", "Okafor", "Lee", "Nair", "Desta", "Giri", "Braxton", "Schweppe"]
-_SEED_COMPANIES = ["", "Northside Clinic", "", "Bright Health", "", "", "Wellpoint", "", "Vera"]
+_SEED_COMPANIES = ["", "Northside Clinic", "", "Bright Health", "", "", "Wellpoint", "", "Veyra"]
 _SEED_TICKETS = [
     ("Appointment Update", "high", ["Reschedule request", "Cancellation notice", "New appointment request"]),
     ("Billing Question", "normal", ["Insurance eligibility check", "Invoice question", "Refund request"]),
@@ -434,7 +482,7 @@ _SEED_TICKETS = [
 
 
 def seed_desk() -> None:
-    """Populate Vera Desk with sample CRM data the first time it runs, so the
+    """Populate Veyra Desk with sample CRM data the first time it runs, so the
     product is demoable without a live phone line. Idempotent: does nothing once
     team members exist. Everything here is clearly sample data the user can clear."""
     with Session(engine) as s:
@@ -505,14 +553,14 @@ def seed_desk() -> None:
             s.add(Ticket(
                 id=new_id("tk"),
                 subject=f"{rng.choice(subjects)} — {c.name}",
-                body="Logged from an inbound conversation handled by Vera.",
+                body="Logged from an inbound conversation handled by Veyra.",
                 status=rng.choice(TICKET_STATUSES),
                 priority=prio if rng.random() < 0.4 else rng.choice(["normal", "normal", "high", "low"]),
                 type=ttype,
                 contact_id=c.id,
                 channel=rng.choice(["call", "sms", "email", "form"]),
                 assignee_ids_json=json.dumps(rng.sample(team_ids, k=rng.randint(1, 4))),
-                creator=rng.choice(["Vera AI", "Jonathan Reed"]),
+                creator=rng.choice(["Veyra AI", "Jonathan Reed"]),
                 created_at=now() - timedelta(days=days, hours=rng.randint(0, 23)),
                 updated_at=now() - timedelta(hours=rng.randint(0, 40)),
             ))
@@ -567,7 +615,7 @@ _DEMO_THREADS = [
 
 def seed_demo_conversations() -> None:
     """Populate the inbox with a handful of realistic conversations (calls and
-    texts) so Vera Desk demos well before a live phone line exists. Idempotent:
+    texts) so Veyra Desk demos well before a live phone line exists. Idempotent:
     does nothing once any Conversation row exists."""
     with Session(engine) as s:
         if s.exec(select(Conversation)).first():
@@ -626,11 +674,75 @@ def seed_demo_conversations() -> None:
         s.commit()
 
 
+_DEMO_EMAILS = [
+    {
+        "subject": "Re: quote for 20 seats",
+        "thread": [
+            ("inbound", "Hi — could you send over a quote for 20 seats? We'd want telephony included."),
+            ("outbound", "Absolutely. Quote attached: 20 seats on Growth with telephony at provider cost. Happy to walk through it on a call."),
+            ("inbound", "Thanks. Can we schedule something for Thursday afternoon?"),
+        ],
+    },
+    {
+        "subject": "Intake forms before Friday's appointment",
+        "thread": [
+            ("outbound", "Hi — a reminder that your intake forms are due before Friday's appointment. The portal link is below."),
+            ("inbound", "Just submitted them. Does the 2:30 slot still work?"),
+        ],
+    },
+]
+
+
+def seed_demo_email() -> None:
+    """A few email threads and one fax so the omnichannel inbox demos before a
+    mailbox or fax line is connected. Idempotent: skips once any email exists."""
+    with Session(engine) as s:
+        if s.exec(select(EmailMessage)).first():
+            return
+        contacts = s.exec(select(Contact)).all()
+        if not contacts:
+            return
+        rng = random.Random(361)
+        ours = "team@vera.demo"
+        picked = contacts[2:2 + len(_DEMO_EMAILS)] or contacts[: len(_DEMO_EMAILS)]
+        for i, (c, tmpl) in enumerate(zip(picked, _DEMO_EMAILS)):
+            if not c.email:
+                slug = (c.name or "contact").lower().replace(" ", ".")
+                c.email = f"{slug}@example.com"
+                s.add(c)
+            base = now() - timedelta(days=rng.randint(0, 4), hours=rng.randint(1, 9))
+            for j, (direction, body) in enumerate(tmpl["thread"]):
+                ts = base + timedelta(hours=j * rng.randint(1, 5))
+                s.add(EmailMessage(
+                    id=new_id("em"), direction=direction,
+                    from_addr=(c.email if direction == "inbound" else ours),
+                    to_addr=(ours if direction == "inbound" else c.email),
+                    counterparty=c.email.lower(), account=ours, provider="demo",
+                    subject=(tmpl["subject"] if j == 0 or direction == "outbound" else f"Re: {tmpl['subject'].removeprefix('Re: ')}"),
+                    snippet=body[:120], body_text=body,
+                    status=("received" if direction == "inbound" else "sent"),
+                    unread=(direction == "inbound" and j == len(tmpl["thread"]) - 1),
+                    created_at=ts,
+                ))
+        # one inbound fax so the channel is visible
+        fx_contact = next((c for c in contacts if c.phone), None)
+        if fx_contact:
+            s.add(FaxMessage(
+                id=new_id("fx"), direction="inbound",
+                from_number=fx_contact.phone, to_number="+18445550142",
+                counterparty=fx_contact.phone, provider="demo",
+                media_url="", pages=3, status="received",
+                created_at=now() - timedelta(days=1, hours=3),
+            ))
+        s.commit()
+
+
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)  # creates the new Folder table
     _migrate()  # backfills new Document columns on pre-existing databases
-    seed_desk()  # sample CRM data on first run so Vera Desk looks alive
+    seed_desk()  # sample CRM data on first run so Veyra Desk looks alive
     seed_demo_conversations()  # sample inbox threads (calls + texts)
+    seed_demo_email()  # sample email threads + a fax (omnichannel inbox demo)
 
 
 def get_session():

@@ -56,7 +56,7 @@ async def ensure_outbound_trunk(
     lk = _client()
     try:
         trunk = api.SIPOutboundTrunkInfo(
-            name="Vera outbound",
+            name="Veyra outbound",
             address=sip_domain,
             numbers=numbers,
             auth_username=username,
@@ -80,7 +80,7 @@ async def ensure_inbound_trunk(*, numbers: list[str], existing_id: str = "") -> 
 
     lk = _client()
     try:
-        trunk = api.SIPInboundTrunkInfo(name="Vera inbound", numbers=numbers)
+        trunk = api.SIPInboundTrunkInfo(name="Veyra inbound", numbers=numbers)
         resp = await lk.sip.create_sip_inbound_trunk(
             api.CreateSIPInboundTrunkRequest(trunk=trunk)
         )

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { PageHeader, SectionCard, EmptyState, Spinner } from "@/components/ui";
+import { PageHeader, SectionCard, EmptyState, Modal, Spinner, TableSkeleton } from "@/components/ui";
 import { Avatar } from "@/components/desk/kit";
+import { toast } from "@/components/Toasts";
 import {
   Users,
   Ticket,
@@ -13,6 +14,10 @@ import {
   AlertCircle,
   ArrowUpRight,
   Crown,
+  Pencil,
+  Phone,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 /* ── data shape ───────────────────────────────────────────────────────────── */
@@ -48,29 +53,58 @@ function roleText(role: string): { label: string; isAi: boolean; isAdmin: boolea
 
 /* ── page ─────────────────────────────────────────────────────────────────── */
 
+type Member = {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+  role: string;
+  phone?: string;
+  extension?: string;
+};
+
 export default function TeamWorkloadPage() {
   const [data, setData] = useState<Workload | null>(null);
+  const [roster, setRoster] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<Member | "new" | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    api
-      .get("/api/desk/workload")
-      .then((d) => {
-        if (alive) setData(d as Workload);
-      })
-      .catch(() => {
-        if (alive) setData(null);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
+  const load = useCallback(async () => {
+    try {
+      const [w, t] = await Promise.all([
+        api.get("/api/desk/workload"),
+        api.get("/api/desk/team"),
+      ]);
+      setData(w as Workload);
+      setRoster(t as Member[]);
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const remove = async (m: Member) => {
+    try {
+      const r = await api.del(`/api/desk/team/${m.id}`);
+      toast.success(
+        `${m.name} removed`,
+        r.unassigned
+          ? { description: `${r.unassigned} item${r.unassigned === 1 ? "" : "s"} returned to the unassigned queue.` }
+          : undefined,
+      );
+      load();
+    } catch (e: any) {
+      toast.error("Could not remove", { description: e.message });
+    }
+  };
+
   const members = data?.members ?? [];
+  const detailOf = (id: string) => roster.find((r) => r.id === id);
   const unassignedSum = data ? data.unassigned.tickets + data.unassigned.conversations : 0;
   // the busiest bar spans the full track; everyone else is measured against it
   const maxLoad = Math.max(1, ...members.map((m) => m.load));
@@ -81,11 +115,16 @@ export default function TeamWorkloadPage() {
       <PageHeader
         title="Team"
         description="See who is handling what, and balance the load across the team."
+        actions={
+          <button className="btn btn-primary btn-sm" onClick={() => setEditing("new")}>
+            <Plus /> Add member
+          </button>
+        }
       />
 
       {loading ? (
-        <div className="flex items-center justify-center py-24">
-          <Spinner size={20} />
+        <div className="card" aria-busy>
+          <TableSkeleton rows={6} columns={[32, 20, 16, 14]} />
         </div>
       ) : !data ? (
         <div className="card">
@@ -267,6 +306,40 @@ export default function TeamWorkloadPage() {
                           {m.load}
                         </span>
                       </div>
+
+                      {/* per-member controls */}
+                      <div className="flex shrink-0 items-center gap-1">
+                        {detailOf(m.id)?.extension && (
+                          <span
+                            className="mono text-tertiary mr-1 hidden text-[11.5px] md:inline"
+                            title="Internal extension — call transfers reach this"
+                          >
+                            x{detailOf(m.id)?.extension}
+                          </span>
+                        )}
+                        <button
+                          className="btn btn-ghost btn-icon btn-sm"
+                          onClick={() => {
+                            const d = detailOf(m.id);
+                            if (d) setEditing(d);
+                          }}
+                          aria-label={`Edit ${m.name}`}
+                          title="Edit member"
+                        >
+                          <Pencil />
+                        </button>
+                        <button
+                          className="btn btn-danger-ghost btn-icon btn-sm"
+                          onClick={() => {
+                            const d = detailOf(m.id);
+                            if (d) remove(d);
+                          }}
+                          aria-label={`Remove ${m.name}`}
+                          title="Remove member"
+                        >
+                          <Trash2 />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -275,6 +348,142 @@ export default function TeamWorkloadPage() {
           </SectionCard>
         </div>
       )}
+
+      {editing && (
+        <MemberEditor
+          member={editing === "new" ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/* ── add / edit a teammate ────────────────────────────────────────────────── */
+
+const ROLES: { value: string; label: string; hint: string }[] = [
+  { value: "admin", label: "Admin", hint: "Full access, and can manage the team" },
+  { value: "agent", label: "Agent", hint: "Handles conversations and tickets" },
+  { value: "ai", label: "AI agent", hint: "Veyra itself — work it handles alone" },
+];
+
+function MemberEditor({
+  member,
+  onClose,
+  onSaved,
+}: {
+  member: Member | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(member?.name ?? "");
+  const [role, setRole] = useState(member?.role ?? "agent");
+  const [phone, setPhone] = useState(member?.phone ?? "");
+  const [extension, setExtension] = useState(member?.extension ?? "");
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    try {
+      const body = { name: name.trim(), role, phone: phone.trim(), extension: extension.trim() };
+      if (member) {
+        await api.patch(`/api/desk/team/${member.id}`, body);
+        toast.success("Member updated");
+      } else {
+        await api.post("/api/desk/team", body);
+        toast.success(`${body.name} added to the team`);
+      }
+      onSaved();
+    } catch (e: any) {
+      toast.error("Could not save", { description: e.message });
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} title={member ? "Edit team member" : "Add team member"}>
+      <div className="mb-5">
+        <label className="label" htmlFor="tm-name">Name</label>
+        <input
+          id="tm-name"
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Jordan Rivera"
+          autoFocus
+        />
+      </div>
+
+      <div className="mb-5">
+        <label className="label">Role</label>
+        <div className="flex flex-col gap-2">
+          {ROLES.map((r) => (
+            <button
+              key={r.value}
+              type="button"
+              onClick={() => setRole(r.value)}
+              className="flex items-center gap-3 rounded-[var(--radius-md)] border p-3 text-left transition-colors"
+              style={{
+                borderColor: role === r.value ? "var(--accent)" : "var(--border)",
+                background: role === r.value ? "var(--accent-subtle)" : "transparent",
+              }}
+            >
+              <span
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
+                style={{
+                  borderColor: role === r.value ? "var(--accent)" : "var(--border-strong)",
+                  background: role === r.value ? "var(--accent)" : "transparent",
+                }}
+              >
+                {role === r.value && <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#fff" }} />}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-medium">{r.label}</span>
+                <span className="text-tertiary block text-[12px]">{r.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label" htmlFor="tm-phone">
+            <span className="inline-flex items-center gap-1.5"><Phone size={13} /> Direct line</span>
+          </label>
+          <input
+            id="tm-phone"
+            className="input mono"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+1 415 555 0142"
+          />
+          <p className="hint mt-1.5">Warm transfers ring this number.</p>
+        </div>
+        <div>
+          <label className="label" htmlFor="tm-ext">Extension</label>
+          <input
+            id="tm-ext"
+            className="input mono"
+            value={extension}
+            onChange={(e) => setExtension(e.target.value)}
+            placeholder="101"
+          />
+          <p className="hint mt-1.5">Reachable from the IVR menu.</p>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={save} disabled={busy || !name.trim()}>
+          {busy ? <Spinner size={15} /> : null} {member ? "Save changes" : "Add member"}
+        </button>
+      </div>
+    </Modal>
   );
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-/* Company — why Vera exists, how we build, what it runs on. Story in light
+/* Company — why Veyra exists, how we build, what it runs on. Story in light
    type, principles as hairline rows, the stack as a quiet strip. */
 
 const STACK = ["LiveKit", "Deepgram", "Cartesia", "OpenAI", "Composio", "ElevenLabs", "Twilio"];
@@ -50,7 +50,7 @@ export default function CompanyPage() {
               We are building the agent that actually picks up.
             </h1>
             <p className="lead-lg mt-7 max-w-[56ch]">
-              Most AI voice agents demo beautifully and fall apart on the first real call. Vera is
+              Most AI voice agents demo beautifully and fall apart on the first real call. Veyra is
               built for the callers that break demos: grounded, sub-second, and reliable under
               conditions no scripted demo will ever show you.
             </p>
@@ -61,9 +61,9 @@ export default function CompanyPage() {
       {/* ── why ── */}
       <section className="band band--line">
         <div className="wrap-tight">
-          <h2 className="section-title max-w-[16ch]">Why Vera exists.</h2>
+          <h2 className="section-title max-w-[16ch]">Why Veyra exists.</h2>
           <p className="lead-lg mt-8">
-            We started Vera because the distance between a great voice demo and a voice agent you
+            We started Veyra because the distance between a great voice demo and a voice agent you
             would put on your main line is enormous. The demo answers one clean question in a
             quiet room. The real line brings accents, background noise, people who talk over you,
             and the occasional provider outage at the worst possible moment.

@@ -31,11 +31,11 @@ export default function SiteNav() {
   return (
     <nav className="site-nav">
       <div className="wrap site-nav__row">
-        <Link href="/" aria-label="Vera home" className="site-nav__word">
-          Vera
+        <Link href="/" aria-label="Veyra home" className="site-nav__word">
+          Veyra
         </Link>
 
-        <div className="site-nav__links hidden md:flex">
+        <div className="site-nav__links">
           {LINKS.map(([label, href]) => (
             <Link
               key={href}
@@ -74,7 +74,7 @@ export default function SiteNav() {
       {open && (
         <div className="site-menu md:hidden">
           <div className="site-nav__row" style={{ marginBottom: 8 }}>
-            <span className="site-nav__word">Vera</span>
+            <span className="site-nav__word">Veyra</span>
             <button className="btn btn-ghost btn-icon" onClick={() => setOpen(false)} aria-label="Close menu">
               <X />
             </button>

@@ -72,14 +72,14 @@ export default function VoiceDemo() {
 
           <div>
             <h3 style={{ fontSize: 26, fontWeight: 300, letterSpacing: "-0.02em", color: "var(--stage-text)" }}>
-              Talk to the agent, live.
+              Start a live call.
             </h3>
             <p
               className="mx-auto mt-2.5 max-w-md text-[15px] leading-relaxed"
               style={{ color: "var(--stage-text-muted)" }}
             >
-              A real microphone conversation with barge-in, streaming transcription, and a per-turn latency
-              readout. Your browser will ask for mic access.
+              Allow microphone access when your browser asks, then just start talking — you can
+              interrupt Veyra mid-sentence at any time.
             </p>
           </div>
 

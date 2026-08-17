@@ -71,6 +71,12 @@ class SentMessage:
     status: str = "queued"
 
 
+@dataclass
+class SentFax:
+    provider_sid: str
+    status: str = "queued"
+
+
 class TelephonyProvider(ABC):
     """One carrier. Concrete adapters (TwilioProvider) implement each method; the
     UnconfiguredProvider stub raises NotConfiguredError so an un-set-up workspace
@@ -114,6 +120,16 @@ class TelephonyProvider(ABC):
     @abstractmethod
     async def send_sms(self, from_e164: str, to_e164: str, body: str) -> SentMessage:
         ...
+
+    # ── fax ──────────────────────────────────────────────────────────────────
+    async def send_fax(self, from_e164: str, to_e164: str, media_url: str) -> SentFax:
+        """Transmit a document (PDF URL) as a fax. Providers that cannot fax get
+        this honest default instead of a silent no-op: Twilio retired
+        Programmable Fax for new accounts, so only Telnyx overrides it."""
+        raise TelephonyError(
+            f"Faxing is not supported on {self.name}. Connect Telnyx to send and receive faxes.",
+            status=409,
+        )
 
     # ── inbound webhook parsing / signature ──────────────────────────────────
     def verify_webhook(self, url: str, params: dict, signature: str) -> bool:

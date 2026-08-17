@@ -35,9 +35,9 @@ const jetbrainsMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Vera — AI agents that answer, call, and close",
+  title: "Veyra — AI agents that answer, call, and close",
   description:
-    "Vera builds AI voice and chat agents that talk to your customers, run real workflows, and connect to your CRM. Sub-second, grounded, and built for the calls that break everything else.",
+    "Veyra builds AI voice and chat agents that talk to your customers, run real workflows, and connect to your CRM. Sub-second, grounded, and built for the calls that break everything else.",
 };
 
 // set theme before paint: localStorage first, then OS preference

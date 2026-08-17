@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone", // minimal server bundle for the Docker image
+  // Standalone is for Docker only — Vercel uses its own Next.js output layout.
+  ...(process.env.VERCEL ? {} : { output: "standalone" }),
 };
 
 export default nextConfig;

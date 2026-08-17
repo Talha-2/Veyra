@@ -18,12 +18,12 @@ const REACH: { tag: string; label: string; node: React.ReactNode; sub: string }[
         dev@z360.biz
       </a>
     ),
-    sub: "Straight to the team building Vera.",
+    sub: "Straight to the team building Veyra.",
   },
   {
     tag: "demo",
     label: "Book a live demo",
-    node: <span>Grab a slot and we will walk Vera through your exact workflows.</span>,
+    node: <span>Grab a slot and we will walk Veyra through your exact workflows.</span>,
     sub: "Same day where we can, no strings.",
   },
   {
@@ -63,10 +63,10 @@ export default function ContactPage() {
             {/* ── left: the pitch and the ways in ── */}
             <div>
               <h1 className="display-hero" style={{ fontSize: "clamp(2.2rem, 4.4vw, 3.4rem)", textWrap: "balance" }}>
-                Let&rsquo;s get Vera answering your calls.
+                Let&rsquo;s get Veyra answering your calls.
               </h1>
               <p className="lead mt-6 max-w-[48ch]">
-                Tell us what you are building and we will show you Vera running on your real use
+                Tell us what you are building and we will show you Veyra running on your real use
                 case. Live callers, real workflows, the same day where we can. No slideware.
               </p>
 
@@ -210,12 +210,12 @@ export default function ContactPage() {
           <p className="lead mx-auto mt-4 max-w-[42ch]">
             Spin up your first agent free and book time with us once you have something to show.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/signup" className="btn-ember">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/signup" className="btn-mint">
               Start building free <ArrowRight />
             </Link>
-            <Link href="/pricing" className="btn-mint">
-              See pricing
+            <Link href="/pricing" className="link-mono">
+              See pricing <ArrowRight />
             </Link>
           </div>
         </div>

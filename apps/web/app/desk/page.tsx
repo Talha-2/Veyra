@@ -1,29 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+/* Veyra Desk — Overview.
+
+   Leads with ONE hero figure (the share of conversations Veyra carried), then a
+   hairline stat strip, then the trend as the main event. Deliberately not a
+   grid of identical cards: cards are the lazy page scaffold, and nesting them
+   is worse. Structure here comes from the hairline skeleton — the same 1px
+   seam the rest of the console uses — so the numbers are the only loud thing.
+
+   Every figure is a real count from the workspace's own rows. There is no
+   historical baseline in the API, so there are NO period-over-period deltas —
+   an invented "+12% vs last month" would be the easiest lie on the page. */
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  type LucideIcon,
-  Bot,
-  MessageSquare,
-  Phone,
-  Users,
-  TrendingUp,
-  Clock,
-  Zap,
-  PhoneOff,
-  Ticket,
-  Sparkles,
-  CalendarDays,
-  RefreshCw,
-  ArrowUpRight,
-  ArrowDownRight,
+  ArrowUpRight, CalendarDays, Clock, PhoneOff, RefreshCw, Ticket as TicketIcon,
+  TrendingUp, Users, Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { PageHeader, SectionCard, Spinner } from "@/components/ui";
-import { AreaChart } from "@/components/desk/kit";
-
-/* ── data shape ───────────────────────────────────────────────────────────── */
+import { PageHeader, Spinner } from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarMix, HeroFigure, StatTile, TrendArea, compact, type MixItem } from "@/components/desk/charts";
 
 type Dashboard = {
   top: {
@@ -34,431 +34,200 @@ type Dashboard = {
     leads: number;
   };
   ai: {
-    value_delivered: number;
-    time_saved_hrs: number;
-    ai_hours: number;
-    contacts_in_ai: number;
+    calls_handled: number;
+    talk_minutes: number;
     tickets_by_ai: number;
-    missed_calls_prevented: number;
+    contacts_in_ai: number;
+    answered_pct: number;
+    missed_calls: number;
   };
-  productivity: {
-    managed: number;
-    total: number;
-    series: { date: string; ai: number; team: number }[];
-  };
-  handled: {
-    ai_pct: number;
-    team_pct: number;
-    no_escalation: number;
-    tool_actions: number;
-    first_response_s: number;
-  };
+  productivity: { managed: number; total: number; series: { date: string; ai: number; team: number }[] };
+  handled: { ai_pct: number; team_pct: number; open_tickets: number; tool_actions: number };
+  channels: { calls: number; sms_in: number; sms_out: number; email: number; email_unread: number; fax: number };
   counts: { contacts: number; tickets: number; leads: number; open_tickets: number };
   sample: boolean;
 };
 
-type Tab = "AI Productivity" | "Support" | "Channels" | "Team";
-const TABS: Tab[] = ["AI Productivity", "Support", "Channels", "Team"];
-
-type Delta = { dir: "up" | "down"; text: string };
-
-/* ── small pieces ─────────────────────────────────────────────────────────── */
-
-// A bordered pill used in the header for the date range and refresh hint.
-function Chip({ icon: Icon, children }: { icon?: LucideIcon; children: React.ReactNode }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium"
-      style={{
-        padding: "6px 11px",
-        borderRadius: 999,
-        border: "1px solid var(--border)",
-        background: "var(--surface)",
-        color: "var(--text-secondary)",
-      }}
-    >
-      {Icon ? <Icon size={14} strokeWidth={1.9} /> : null}
-      {children}
-    </span>
-  );
+/* A hairline-divided run of figures. Not cards — the seam does the separating,
+   which is what keeps a row of numbers from reading as five competing boxes. */
+function StatStrip({ children }: { children: React.ReactNode }) {
+  return <div className="stat-strip">{children}</div>;
 }
-
-// The tiny "last 30 days" / "Live now" tag that sits in the top right of a KPI.
-function MiniChip({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      className="shrink-0 whitespace-nowrap text-[11px]"
-      style={{
-        padding: "4px 8px",
-        borderRadius: 999,
-        background: "var(--surface-sunken)",
-        border: "1px solid var(--border)",
-        color: "var(--text-tertiary)",
-        lineHeight: 1,
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function Kpi({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  chip,
-  delta,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: React.ReactNode;
-  sub?: string;
-  chip?: string;
-  delta?: Delta;
-}) {
-  return (
-    <div className="kpi">
-      <div className="flex items-start justify-between gap-2">
-        <span className="kpi__label">
-          <Icon size={14} strokeWidth={1.9} />
-          {label}
-        </span>
-        {chip ? <MiniChip>{chip}</MiniChip> : null}
-      </div>
-      <div className="kpi__value">{value}</div>
-      {sub ? <div className="kpi__sub">{sub}</div> : null}
-      {delta ? (
-        <div
-          className={`kpi__delta ${delta.dir}`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            marginTop: 8,
-            fontSize: 12,
-            fontWeight: 550,
-          }}
-        >
-          {delta.dir === "up" ? (
-            <ArrowUpRight size={13} strokeWidth={2.4} />
-          ) : (
-            <ArrowDownRight size={13} strokeWidth={2.4} />
-          )}
-          <span>{delta.text}</span>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-// A bordered stat block used in the "What AI handled" column.
-function MiniStat({
-  label,
-  value,
-  sub,
-  rightNote,
-}: {
-  label: string;
-  value: React.ReactNode;
-  sub?: string;
-  rightNote?: string;
-}) {
-  return (
-    <div
-      style={{
-        border: "1px solid var(--border)",
-        borderRadius: 12,
-        padding: "12px 14px",
-        background: "var(--surface-sunken)",
-      }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
-          {label}
-        </span>
-        <span className="text-[16px] font-semibold">{value}</span>
-      </div>
-      {sub ? <div className="text-tertiary mt-1 text-[12px] leading-snug">{sub}</div> : null}
-      {rightNote ? (
-        <div className="text-tertiary mt-1 text-right text-[12px]">{rightNote}</div>
-      ) : null}
-    </div>
-  );
-}
-
-/* ── the dashboard, once data is present ──────────────────────────────────── */
 
 function DashboardView({ data }: { data: Dashboard }) {
-  const [tab, setTab] = useState<Tab>("AI Productivity");
   const { top, ai, productivity, handled, counts } = data;
 
-  const valueDelivered =
-    ai.value_delivered >= 1000
-      ? `$${(ai.value_delivered / 1000).toFixed(0)}K`
-      : `$${ai.value_delivered}`;
+  const aiTrend = useMemo(() => productivity.series.map((p) => p.ai), [productivity.series]);
+  const teamTrend = useMemo(() => productivity.series.map((p) => p.team), [productivity.series]);
 
-  const aiCards: {
-    icon: LucideIcon;
-    label: string;
-    value: React.ReactNode;
-    chip: string;
-    sub?: string;
-    delta?: Delta;
-  }[] = [
-    {
-      icon: TrendingUp,
-      label: "Value delivered",
-      value: valueDelivered,
-      chip: "last 30 days",
-      delta: { dir: "up", text: "4.1% vs previous period" },
-    },
-    {
-      icon: Clock,
-      label: "Time saved",
-      value: `${ai.time_saved_hrs} hrs`,
-      chip: "last 30 days",
-      delta: { dir: "up", text: "4.1% vs previous period" },
-    },
-    {
-      icon: Zap,
-      label: "AI hours worked",
-      value: `${ai.ai_hours} hrs`,
-      chip: "last 30 days",
-      delta: { dir: "down", text: "2.1% vs previous period" },
-    },
-    {
-      icon: Users,
-      label: "Contacts in AI conversations",
-      value: ai.contacts_in_ai.toLocaleString(),
-      chip: "Live now",
-      sub: "No change vs previous period",
-    },
-    {
-      icon: Ticket,
-      label: "Tickets created by AI",
-      value: ai.tickets_by_ai.toLocaleString(),
-      chip: "last 30 days",
-      delta: { dir: "down", text: "1.8% vs previous period" },
-    },
-    {
-      icon: PhoneOff,
-      label: "Missed calls prevented",
-      value: ai.missed_calls_prevented.toLocaleString(),
-      chip: "last 30 days",
-      delta: { dir: "up", text: "29.6% vs previous period" },
-    },
-  ];
-
-  const channels: { label: string; share: number; color: string }[] = [
-    { label: "Phone", share: 46, color: "var(--accent)" },
-    { label: "SMS", share: 28, color: "#7c3aed" },
-    { label: "Email", share: 18, color: "#0891b2" },
-    { label: "Forms", share: 8, color: "#16a34a" },
+  /* Fixed slot order — colour follows the channel, never its size, so filtering
+     or a quiet week never repaints the others. */
+  const channels: MixItem[] = [
+    { label: "Calls", value: data.channels.calls, color: "var(--chart-1)" },
+    { label: "SMS", value: data.channels.sms_in + data.channels.sms_out, color: "var(--chart-2)" },
+    { label: "Email", value: data.channels.email, color: "var(--chart-3)" },
+    { label: "Fax", value: data.channels.fax, color: "var(--chart-4)" },
   ];
 
   return (
     <div className="flex flex-col gap-6">
-      {/* top row: headline KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi
-          icon={Bot}
-          label="AI managed conversations"
-          value={`${top.ai_managed_pct}% AI`}
-          sub="Productivity coverage"
-        />
-        <Kpi
-          icon={MessageSquare}
-          label="Support volume"
-          value={top.support_volume.toLocaleString()}
-          sub="Contacts, conversations, tickets"
-        />
-        <Kpi
-          icon={Phone}
-          label="Most active number"
-          value={top.most_active_number}
-          sub={`${top.inbound_events.toLocaleString()} inbound events`}
-        />
-        <Kpi
-          icon={Ticket}
-          label="Open tickets"
-          value={counts.open_tickets.toLocaleString()}
-          sub="Awaiting resolution"
-        />
-      </div>
-
-      {/* segmented tabs */}
-      <div className="seg">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={tab === t ? "active" : ""}
-            onClick={() => setTab(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {/* ── AI Productivity ─────────────────────────────────────────────── */}
-      {tab === "AI Productivity" && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-start gap-2">
-            <Sparkles size={16} strokeWidth={1.9} style={{ color: "var(--accent-text)", marginTop: 1 }} />
-            <div>
-              <h2 className="text-[15px] font-semibold leading-none">AI Productivity</h2>
-              <p className="hint mt-1.5">AI contribution for the last 30 days.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {aiCards.map((c) => (
-              <Kpi
-                key={c.label}
-                icon={c.icon}
-                label={c.label}
-                value={c.value}
-                chip={c.chip}
-                sub={c.sub}
-                delta={c.delta}
-              />
-            ))}
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-            <SectionCard
-              title="Conversation productivity"
-              description={`${productivity.managed} of ${productivity.total} conversations managed by AI.`}
-            >
-              <AreaChart series={data.productivity.series} height={300} />
-            </SectionCard>
-
-            <SectionCard
-              title="What AI handled"
-              description="Based on AI conversations, team replies, and tool activity."
-            >
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-secondary">AI handled</span>
-                <span className="font-medium">
-                  {handled.ai_pct}% AI / {handled.team_pct}% team
-                </span>
-              </div>
-              <div className="bar mt-2">
-                <span style={{ width: `${handled.ai_pct}%` }} />
-              </div>
-
-              <div className="mt-5 flex flex-col gap-2.5">
-                <MiniStat
-                  label="No escalation"
-                  value={handled.no_escalation.toLocaleString()}
-                  sub="AI conversations resolved without team follow up"
-                />
-                <MiniStat
-                  label="Tool actions"
-                  value={handled.tool_actions.toLocaleString()}
-                  sub="Integration work completed by AI"
-                />
-                <MiniStat
-                  label="First response"
-                  value={`${handled.first_response_s}s`}
-                  rightNote="Team baseline 6m"
-                />
-              </div>
-            </SectionCard>
-          </div>
-        </div>
-      )}
-
-      {/* ── Support ─────────────────────────────────────────────────────── */}
-      {tab === "Support" && (
-        <div className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Kpi
-              icon={Ticket}
+      {/* ── the lead ── */}
+      <Card>
+        <CardContent className="dash-lead">
+          <HeroFigure
+            label="Conversations Veyra carried"
+            value={`${top.ai_managed_pct}%`}
+            meter={top.ai_managed_pct}
+            sub={`${productivity.managed.toLocaleString()} of ${productivity.total.toLocaleString()} conversations had no teammate assigned. The rest went to your team.`}
+          />
+          <StatStrip>
+            <StatTile
+              label="Support volume"
+              value={compact(top.support_volume)}
+              sub="Contacts, conversations and tickets"
+            />
+            <StatTile
               label="Open tickets"
               value={counts.open_tickets.toLocaleString()}
               sub="Awaiting resolution"
             />
-            <Kpi
-              icon={Ticket}
-              label="Total tickets"
-              value={counts.tickets.toLocaleString()}
-              sub="All time"
+            <StatTile
+              label="Busiest number"
+              value={top.most_active_number}
+              sub={`${compact(top.inbound_events)} inbound events`}
             />
-            <Kpi
-              icon={Users}
-              label="Total contacts"
-              value={counts.contacts.toLocaleString()}
-              sub="People in your workspace"
-            />
-          </div>
-          <p className="text-secondary text-sm">
-            Support volume {top.support_volume.toLocaleString()} across contacts, conversations, and
-            tickets.
-          </p>
-        </div>
-      )}
+          </StatStrip>
+        </CardContent>
+      </Card>
 
-      {/* ── Channels ────────────────────────────────────────────────────── */}
-      {tab === "Channels" && (
-        <SectionCard
-          title="Channel activity"
-          description={`${top.inbound_events.toLocaleString()} inbound events across your channels.`}
-        >
-          <div className="flex flex-col gap-4">
-            {channels.map((c) => {
-              const count = Math.round((top.inbound_events * c.share) / 100);
-              return (
-                <div key={c.label}>
-                  <div className="mb-1.5 flex items-center justify-between text-[13px]">
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ background: c.color }}
-                      />
-                      <span className="font-medium">{c.label}</span>
-                    </span>
-                    <span className="text-tertiary">
-                      {count.toLocaleString()} events · {c.share}%
-                    </span>
-                  </div>
-                  <div className="bar">
-                    <span style={{ width: `${c.share}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </SectionCard>
-      )}
+      <Tabs defaultValue="ai">
+        <TabsList variant="line">
+          <TabsTrigger value="ai">AI productivity</TabsTrigger>
+          <TabsTrigger value="support">Support</TabsTrigger>
+          <TabsTrigger value="channels">Channels</TabsTrigger>
+          <TabsTrigger value="team">Team</TabsTrigger>
+        </TabsList>
 
-      {/* ── Team ────────────────────────────────────────────────────────── */}
-      {tab === "Team" && (
-        <div className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Kpi icon={Ticket} label="Open tickets" value={counts.open_tickets.toLocaleString()} sub="Across the team" />
-            <Kpi icon={Users} label="Total contacts" value={counts.contacts.toLocaleString()} sub="Everyone Vera has talked to" />
-          </div>
-          <SectionCard
-            title="Team workload"
-            description="See who is handling what, and balance the load across the team."
-          >
-            <p className="text-secondary text-sm">
-              Open the team view to see each member's open tickets and active conversations, and reassign in a click.
-            </p>
-            <Link href="/desk/team" className="btn btn-secondary btn-sm mt-4">
-              Open team view
-              <ArrowUpRight size={15} strokeWidth={2} />
-            </Link>
-          </SectionCard>
-        </div>
-      )}
+        {/* ── AI productivity ── */}
+        <TabsContent value="ai" className="flex flex-col gap-4 pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Who handled the conversation</CardTitle>
+              <CardDescription>
+                Conversations per day over the last 30 days. Both series count the same thing, so
+                they share one axis.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TrendArea data={productivity.series} height={264} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>What Veyra did on the line</CardTitle>
+              <CardDescription>Counted across everything on record, not just the window above.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="dash-grid">
+                <StatTile
+                  label="Calls the agent held"
+                  value={compact(ai.calls_handled)}
+                  sub="Calls where Veyra carried the line"
+                  trend={aiTrend}
+                  trendColor="var(--chart-1)"
+                />
+                <StatTile label="Talk time" value={`${compact(ai.talk_minutes)} min`} sub="Total connected duration" />
+                <StatTile label="Inbound answered" value={`${ai.answered_pct}%`} sub="Inbound calls that completed" />
+                <StatTile
+                  label="Handled alone"
+                  value={compact(ai.contacts_in_ai)}
+                  sub="No teammate assigned yet"
+                  trend={teamTrend}
+                  trendColor="var(--chart-2)"
+                />
+                <StatTile label="Tickets raised by Veyra" value={compact(ai.tickets_by_ai)} sub="Filed from a conversation" />
+                <StatTile label="Missed inbound" value={compact(ai.missed_calls)} sub="No answer, busy, or failed" />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Support ── */}
+        <TabsContent value="support" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Support load</CardTitle>
+              <CardDescription>
+                {compact(top.support_volume)} across contacts, conversations and tickets.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5">
+              <StatStrip>
+                <StatTile label="Open tickets" value={counts.open_tickets.toLocaleString()} sub="Awaiting resolution" />
+                <StatTile label="All tickets" value={compact(counts.tickets)} sub="Filed all time" />
+                <StatTile label="Contacts" value={compact(counts.contacts)} sub="People in this workspace" />
+                <StatTile label="Leads" value={compact(counts.leads)} sub="In a pipeline" />
+              </StatStrip>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/desk/tickets" className="btn btn-secondary btn-sm">
+                  Open tickets <ArrowUpRight size={14} strokeWidth={2} />
+                </Link>
+                <Link href="/desk/contacts" className="btn btn-ghost btn-sm">
+                  Browse contacts <ArrowUpRight size={14} strokeWidth={2} />
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Channels ── */}
+        <TabsContent value="channels" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Channel mix</CardTitle>
+              <CardDescription>Every call, message, email and fax on record, by channel.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <BarMix items={channels} unit="total" />
+              {data.channels.email_unread > 0 && (
+                <p className="text-secondary text-[13px]">
+                  <Badge variant="secondary">{data.channels.email_unread} unread</Badge>{" "}
+                  email{data.channels.email_unread === 1 ? "" : "s"} waiting in the inbox.{" "}
+                  <Link href="/desk/inbox" className="text-accent">Open the inbox</Link>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Team ── */}
+        <TabsContent value="team" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Team workload</CardTitle>
+              <CardDescription>Who is holding what, and where to rebalance.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5">
+              <StatStrip>
+                <StatTile label="Open tickets" value={counts.open_tickets.toLocaleString()} sub="Across the team" />
+                <StatTile label="Contacts" value={compact(counts.contacts)} sub="Everyone Veyra has talked to" />
+                <StatTile
+                  label="Split"
+                  value={`${handled.ai_pct}/${handled.team_pct}`}
+                  sub="Veyra vs team, by conversation"
+                />
+              </StatStrip>
+              <Link href="/desk/team" className="btn btn-secondary btn-sm self-start">
+                Open team view <ArrowUpRight size={14} strokeWidth={2} />
+              </Link>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
-
-/* ── page ─────────────────────────────────────────────────────────────────── */
 
 export default function DeskDashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
@@ -469,51 +238,47 @@ export default function DeskDashboardPage() {
     let alive = true;
     api
       .get("/api/desk/dashboard")
-      .then((d) => {
-        if (alive) setData(d as Dashboard);
-      })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : "Something went wrong");
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
+      .then((d) => { if (alive) setData(d as Dashboard); })
+      .catch((e: unknown) => { if (alive) setError(e instanceof Error ? e.message : "Something went wrong"); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
   }, []);
 
   return (
     <div>
       <PageHeader
         title="Overview"
-        description="AI value, support, channel activity and health, and sales flow for the selected window."
+        description="What Veyra handled, what your team handled, and where the volume came from."
         actions={
           <div className="flex items-center gap-2.5">
             <span className="text-tertiary hidden items-center gap-1.5 text-[12.5px] sm:inline-flex">
-              <RefreshCw size={13} strokeWidth={1.9} />
-              Updated just now
+              <RefreshCw size={13} strokeWidth={1.9} /> Updated just now
             </span>
-            <Chip icon={CalendarDays}>Last 30 days</Chip>
+            <Badge variant="outline" className="gap-1.5">
+              <CalendarDays size={13} /> Last 30 days
+            </Badge>
           </div>
         }
       />
 
       {loading ? (
-        <div className="flex justify-center py-24">
+        <div className="dash-skeleton" aria-busy>
           <Spinner size={22} />
+          <span>Counting your calls, messages and tickets…</span>
         </div>
       ) : !data ? (
-        <div className="card p-6">
-          <p className="text-secondary text-sm">
-            We could not load your dashboard just now. Please refresh in a moment.
-            {error ? <span className="text-tertiary"> {error}</span> : null}
-          </p>
-        </div>
+        <Card>
+          <CardContent>
+            <p className="text-secondary text-sm">
+              We could not load your dashboard just now. Please refresh in a moment.
+              {error ? <span className="text-tertiary"> {error}</span> : null}
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <>
           {data.sample && (
-            <p className="mb-6 text-[13px]" style={{ color: "var(--text-tertiary)" }}>
+            <p className="mb-5 text-[13px]" style={{ color: "var(--text-tertiary)" }}>
               Showing sample data until your phone line is live.
             </p>
           )}

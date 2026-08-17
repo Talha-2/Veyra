@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { PageHeader, EmptyState, Spinner, Modal } from "@/components/ui";
+import { PageHeader, EmptyState, Spinner, Modal, TableSkeleton } from "@/components/ui";
 import {
   Avatar,
   AssigneePicker,
@@ -405,8 +405,8 @@ export default function TicketsPage() {
       {/* ── list view ─────────────────────────────────────────────────────── */}
       {view === "list" &&
         (loading && rows.length === 0 ? (
-          <div className="flex items-center justify-center py-24">
-            <Spinner size={20} />
+          <div className="card" aria-busy>
+            <TableSkeleton rows={9} columns={[30, 20, 13, 12, 15, 12]} />
           </div>
         ) : rows.length === 0 ? (
           <div className="card">

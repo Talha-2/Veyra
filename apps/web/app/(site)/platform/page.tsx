@@ -26,7 +26,7 @@ const FEATURES: Feature[] = [
     id: "voice",
     flip: false,
     title: "Agents that hold a real call",
-    body: "Vera answers on LiveKit, transcribes with Deepgram, and speaks with Cartesia, so replies land in well under a second. Callers can barge in mid-sentence, and the agent follows anyone who switches languages without a config change.",
+    body: "Veyra answers on LiveKit, transcribes with Deepgram, and speaks with Cartesia, so replies land in well under a second. Callers can barge in mid-sentence, and the agent follows anyone who switches languages without a config change.",
     bullets: [
       "Sub-second voice-to-voice on live calls",
       "Barge-in driven by semantic turn detection",
@@ -111,7 +111,7 @@ export default function PlatformPage() {
       {/* ── hero ── */}
       <section className="band" style={{ paddingTop: "clamp(4rem, 8vw, 6.5rem)" }}>
         <div className="wrap text-center">
-          <h1 className="display-hero mx-auto max-w-[48rem]" style={{ textWrap: "balance" }}>
+          <h1 className="display-hero mx-auto max-w-[64rem]" style={{ textWrap: "balance" }}>
             One agent. Every way your customers reach you.
           </h1>
           <p className="lead-lg mx-auto mt-7 max-w-[54ch]">

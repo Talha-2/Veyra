@@ -322,10 +322,10 @@ PROVIDERS = [
     {
         "id": "gemini", "name": "Google Gemini",
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
-        "model": "gemini-2.0-flash",
-        "models": ["gemini-2.0-flash", "gemini-2.0-flash-lite"],
+        "model": "gemini-2.5-flash",
+        "models": ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
         "free": "generous daily free tier",
-        "note": "OpenAI compatible endpoint, quick to obtain with a Google account.",
+        "note": "Native tool calling on a free tier, fast and multilingual. The best free option to A B against OpenAI.",
         "key_url": "https://aistudio.google.com/apikey",
     },
     {

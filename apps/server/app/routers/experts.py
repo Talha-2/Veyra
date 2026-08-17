@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,6 +20,8 @@ from ..db import get_session, new_id, now
 from ..experts.models import Expert, ExpertRun
 from ..experts.runtime import create_run, execute_run
 from ..experts.schedule import compute_next_run, describe
+
+logger = logging.getLogger("voice-agent.experts")
 
 router = APIRouter(prefix="/api/experts", tags=["experts"])
 
@@ -209,6 +212,14 @@ async def app_event(payload: dict, session: Session = Depends(get_session)):
 
     if not slug:
         raise HTTPException(400, "No trigger slug on the event")
+
+    # email events also land in the Desk inbox (independent of expert runs)
+    try:
+        from . import desk_email
+
+        desk_email.ingest_trigger_event(slug, data if isinstance(data, dict) else {}, session)
+    except Exception as exc:  # ingestion must never break expert dispatch
+        logger.warning("desk email ingest failed: %s", exc)
 
     started = []
     for e in session.exec(select(Expert)).all():

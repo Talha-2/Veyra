@@ -44,7 +44,7 @@ const PRODUCTS: { tag: string; title: string; body: string; metric: string; href
     href: "/integrations",
   },
   {
-    tag: "vera desk",
+    tag: "veyra desk",
     title: "One inbox for every channel",
     body: "Calls, texts, and email land in a single thread with tickets, assignment, and a team workload view.",
     metric: "one thread",
@@ -88,9 +88,9 @@ export default function Home() {
       {/* ── hero: the headline whispers, the spectrogram speaks ── */}
       <section style={{ paddingTop: "clamp(4.5rem, 9vw, 7.5rem)" }}>
         <div className="wrap text-center">
-          <h1 className="display-hero rise mx-auto max-w-[56rem]" style={{ textWrap: "balance" }}>
+          <h1 className="display-hero rise mx-auto max-w-[64rem]" style={{ textWrap: "balance" }}>
             Your customers reach out.
-            <br className="hidden md:inline" /> Vera answers, calls, and closes.
+            <br className="hidden md:inline" /> Veyra answers, calls, and closes.
           </h1>
           <p
             className="lead-lg rise mx-auto mt-7 max-w-[52ch]"
@@ -112,7 +112,7 @@ export default function Home() {
           </div>
           <div className="rise mt-12" style={{ ["--rise-delay" as string]: "270ms" }}>
             <a href="#demo" className="console-pill">
-              Talk to Vera
+              Talk to Veyra
               <span className="dotgrid" aria-hidden>
                 <i /><i /><i /><i />
               </span>
@@ -129,7 +129,7 @@ export default function Home() {
       <section id="demo" className="band band--line mt-16">
         <div className="wrap">
           <div className="mx-auto max-w-[720px] text-center">
-            <h2 className="section-title">Talk to Vera, live.</h2>
+            <h2 className="section-title">Talk to Veyra, live.</h2>
             <p className="lead mx-auto mt-4 max-w-[48ch]">
               A real microphone call with barge-in, streaming transcription, and a per-turn
               latency readout. Not a recording.
@@ -138,7 +138,7 @@ export default function Home() {
           <div className="console demo-frame mx-auto mt-10" style={{ maxWidth: 960 }}>
             <div className="console__bar">
               <span className="console__dot" />
-              talk to vera — live session
+              talk to veyra — live session
               <span className="spacer" />
               deepgram → agent → cartesia
             </div>
@@ -218,7 +218,7 @@ export default function Home() {
           <h2 className="section-title max-w-[24ch]">Most agents demo well and die on real calls.</h2>
           <p className="lead mt-5 max-w-[58ch]">
             Real callers ramble, interrupt, have accents, and phone in during provider outages.
-            Vera treats every one of those as a core concern, not an afterthought.
+            Veyra treats every one of those as a core concern, not an afterthought.
           </p>
           <div className="rows mt-12">
             {RELIABILITY.map((r) => (
@@ -251,7 +251,7 @@ export default function Home() {
       {/* ── close ── */}
       <section className="band band--line">
         <div className="wrap-tight text-center">
-          <h2 className="section-title mx-auto max-w-[18ch]">Put your conversations on Vera.</h2>
+          <h2 className="section-title mx-auto max-w-[18ch]">Put your conversations on Veyra.</h2>
           <p className="lead mx-auto mt-5 max-w-[46ch]">
             Build voice and chat agents, provision real numbers, and wire your tools — or describe
             your business and approve what the deep agent builds.
