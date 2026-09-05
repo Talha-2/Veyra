@@ -25,10 +25,10 @@ type Item = { label: string; hint: string; icon: any; href: string; keywords?: s
 
 const NAV: Item[] = [
   { label: "Overview", hint: "Dashboard", icon: LayoutDashboard, href: "/studio/overview", keywords: "home dashboard stats" },
-  { label: "Experts", hint: "Autonomous agents", icon: Sparkles, href: "/studio/experts", keywords: "agent autonomous schedule cron" },
-  { label: "Workflows", hint: "Visual node builder", icon: Workflow, href: "/studio/workflows", keywords: "graph nodes flow ability" },
-  { label: "Knowledge Base", hint: "Documents and RAG", icon: BookOpen, href: "/studio/knowledge", keywords: "docs files rag upload" },
-  { label: "Deep Agent", hint: "Build from a prompt", icon: Bot, href: "/studio/agent", keywords: "chat harness assistant" },
+  { label: "Agent", hint: "Build from a prompt", icon: Bot, href: "/studio/agent", keywords: "deep agent harness assistant build" },
+  { label: "Skills", hint: "Knowledge and capabilities", icon: Sparkles, href: "/studio/knowledge", keywords: "knowledge tools integrations voice" },
+  { label: "Sub-agents", hint: "Scheduled and triggered specialists", icon: Workflow, href: "/studio/experts", keywords: "experts autonomous schedule cron webhook" },
+  { label: "Advanced flows", hint: "Deterministic visual paths", icon: Workflow, href: "/studio/workflows", keywords: "workflow graph nodes flow ability advanced" },
   { label: "Integrations", hint: "Apps, actions, MCP", icon: Plug, href: "/studio/integrations", keywords: "composio oauth tools mcp" },
   { label: "Voice Tuning", hint: "STT, TTS, turn taking", icon: SlidersHorizontal, href: "/studio/tuning", keywords: "voice model latency test compare" },
   { label: "Developers", hint: "API keys and webhooks", icon: Code2, href: "/studio/developers", keywords: "api key webhook rest v1" },
@@ -36,8 +36,8 @@ const NAV: Item[] = [
 ];
 
 const CREATE: Item[] = [
-  { label: "New Expert", hint: "Autonomous agent", icon: Plus, href: "/studio/experts?new=1", keywords: "create add expert agent" },
-  { label: "New Workflow", hint: "Visual node graph", icon: Plus, href: "/studio/workflows?new=1", keywords: "create add workflow" },
+  { label: "New sub-agent", hint: "Scheduled or triggered specialist", icon: Plus, href: "/studio/experts?new=1", keywords: "create add expert automation schedule" },
+  { label: "New advanced flow", hint: "Deterministic visual path", icon: Plus, href: "/studio/workflows?new=1", keywords: "create add workflow" },
   { label: "Add knowledge", hint: "Upload or write a doc", icon: Plus, href: "/studio/knowledge?new=1", keywords: "create add document upload" },
   { label: "Create API key", hint: "For the REST API", icon: Plus, href: "/studio/developers?new=1", keywords: "create add key token" },
 ];

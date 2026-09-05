@@ -54,11 +54,11 @@ export default function WorkflowsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title="Workflows"
-        description="Visual conversation flows. Chain Ask, Act, Speak, and Condition nodes into a workflow, then attach it to the voice agent so it follows the flow on calls."
+        title="Advanced flows"
+        description="Deterministic conversation paths for cases that need exact scripted steps, branching, or structured data. Your Agent remains the primary way to build behavior."
         actions={
-          <button className="btn btn-primary" onClick={openGallery}>
-            <Plus size={16} /> Create workflow
+            <button className="btn btn-primary" onClick={openGallery}>
+            <Plus size={16} /> Create advanced flow
           </button>
         }
       />
@@ -67,7 +67,7 @@ export default function WorkflowsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-36 w-full rounded-[var(--radius-md)]" />)}</div>
       ) : items.length === 0 ? (
         <div className="card">
-          <EmptyState icon={Workflow} title="No workflows yet" body="Start from a template built around what actually works on calls, or from a blank flow and wire it yourself." action={<button className="btn btn-primary" onClick={openGallery}><Plus size={16} /> Create workflow</button>} />
+          <EmptyState icon={Workflow} title="No advanced flows yet" body="Most behavior belongs in your Agent and its skills. Use an advanced flow when a conversation needs deterministic steps, branches, or exact scripted lines." action={<button className="btn btn-primary" onClick={openGallery}><Plus size={16} /> Create advanced flow</button>} />
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

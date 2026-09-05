@@ -26,13 +26,13 @@ import { Modal, Spinner, StatusBadge } from "@/components/ui";
 type TriggerKind = "chat" | "events" | "schedule" | "external";
 const TRIGGERS: { kind: TriggerKind; label: string; icon: any; colour: string; blurb: string }[] = [
   { kind: "chat", label: "Chat", icon: MessageSquare, colour: "#2563eb",
-    blurb: "Someone messages the expert and it answers in the moment." },
+    blurb: "A conversation reaches this specialist directly." },
   { kind: "events", label: "Product events", icon: Zap, colour: "#e96b34",
-    blurb: "The product itself wakes the expert: a text arrives, a call ends, a lead is filed." },
+    blurb: "The product wakes this specialist when a text arrives, a call ends, or a lead is filed." },
   { kind: "schedule", label: "Schedule", icon: Calendar, colour: "#0d9488",
-    blurb: "Runs on a clock with no one watching. Give it a goal it can finish alone." },
+    blurb: "Runs on a clock with no one watching. Give this specialist a goal it can finish alone." },
   { kind: "external", label: "Webhook", icon: Webhook, colour: "#7c3aed",
-    blurb: "Another system posts to a secret URL and the expert runs on that payload." },
+    blurb: "Another system posts to a secret URL and this specialist runs on that payload." },
 ];
 
 const TAB_KEYS = ["instructions", "triggers", "tools", "runs"] as const;
@@ -157,20 +157,20 @@ export default function ExpertEditor() {
       {/* header: identity left, what fires it in the middle, actions right */}
       <div className="exp-head">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/studio/experts" className="btn btn-ghost btn-sm"><ArrowLeft size={15} /> Experts</Link>
+          <Link href="/studio/experts" className="btn btn-ghost btn-sm"><ArrowLeft size={15} /> Sub-agents</Link>
           <input
             className="exp-name"
             value={e.name}
             onChange={(ev) => set({ name: ev.target.value })}
-            placeholder="Expert name"
+            placeholder="Sub-agent name"
           />
           <span className={`badge ${e.status === "active" ? "badge-success" : ""}`}>
             {e.status === "active" ? "active" : "inactive"}
           </span>
         </div>
 
-        {/* the centre control: what makes this expert run */}
-        <button className="exp-trigger-btn" onClick={() => setTab("triggers")} title="Configure what starts this expert">
+        {/* the centre control: what makes this sub-agent run */}
+        <button className="exp-trigger-btn" onClick={() => setTab("triggers")} title="Configure what starts this sub-agent">
           <Zap size={14} />
           {e.triggers.length === 0 ? (
             <span className="exp-trigger-btn__empty">No trigger set</span>
@@ -224,11 +224,11 @@ export default function ExpertEditor() {
           <div className="min-w-0 space-y-5">
             <div>
               <label className="label">Description</label>
-              <textarea className="textarea min-h-[70px]" value={e.description} onChange={(ev) => set({ description: ev.target.value })} placeholder="What this expert automates." />
+              <textarea className="textarea min-h-[70px]" value={e.description} onChange={(ev) => set({ description: ev.target.value })} placeholder="What this sub-agent automates." />
             </div>
             <div>
               <label className="label">System prompt</label>
-              <textarea className="textarea min-h-[240px]" value={e.system_prompt} onChange={(ev) => set({ system_prompt: ev.target.value })} placeholder="You are an expert that... Define its role, rules, tone, and how to use its tools." />
+              <textarea className="textarea min-h-[240px]" value={e.system_prompt} onChange={(ev) => set({ system_prompt: ev.target.value })} placeholder="You are a specialist sub-agent that... Define its role, rules, tone, and how to use its tools." />
               <p className="hint mt-1.5">Who it is and how it behaves. This applies on every run.</p>
             </div>
             <div>

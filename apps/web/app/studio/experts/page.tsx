@@ -35,11 +35,11 @@ export default function ExpertsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title="Experts"
-        description="Autonomous agents that run on chat, a schedule, or an external trigger, using your connected tools to do real work."
+        title="Sub-agents"
+        description="Dedicated specialists that run beside your Agent on schedules, product events, or webhooks. Keep front-desk behavior in the Agent; use Sub-agents for focused operational work."
         actions={
           <button className="btn btn-primary" onClick={create} disabled={creating}>
-            {creating ? <Spinner size={16} /> : <Plus size={16} />} Add expert
+            {creating ? <Spinner size={16} /> : <Plus size={16} />} Add sub-agent
           </button>
         }
       />
@@ -58,9 +58,9 @@ export default function ExpertsPage() {
         <div className="card">
           <EmptyState
             icon={Sparkles}
-            title="No experts yet"
-            body="Create an expert to automate a recurring task such as a morning digest, a lead qualifier, or a report generator, powered by your integrations."
-            action={<button className="btn btn-primary" onClick={create}><Plus size={16} /> Add expert</button>}
+            title="No sub-agents yet"
+            body="Create a dedicated specialist for recurring or event-driven work such as a morning digest, lead follow-up, or report generation."
+            action={<button className="btn btn-primary" onClick={create}><Plus size={16} /> Add sub-agent</button>}
           />
         </div>
       ) : (

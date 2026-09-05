@@ -26,10 +26,10 @@ type Message =
 type Thread = { id: string; title: string; updated_at: string };
 
 const EXPERT_META: Record<string, { label: string; color: string; icon: any }> = {
-  orchestrator: { label: "Main", color: "var(--accent-text)", icon: Sparkles },
-  "workflow-builder": { label: "Workflow Builder", color: "#2563eb", icon: Workflow },
-  "business-manager": { label: "Business Manager", color: "#0d9488", icon: Building2 },
-  "expert-builder": { label: "Expert Builder", color: "#d946ef", icon: Bot },
+  orchestrator: { label: "Agent", color: "var(--accent-text)", icon: Sparkles },
+  "workflow-builder": { label: "Flow specialist", color: "#2563eb", icon: Workflow },
+  "business-manager": { label: "Business specialist", color: "#0d9488", icon: Building2 },
+  "expert-builder": { label: "Sub-agent specialist", color: "#d946ef", icon: Bot },
 };
 
 /* Tool results are JSON. Show them as tidy key/value or list rows — the "dropdown
@@ -68,12 +68,12 @@ function ToolResult({ args, result }: { args?: any; result?: any }) {
 }
 
 const TOOL_LABELS: Record<string, string> = {
-  task: "delegate", write_todos: "plan", ability_list: "list workflows",
-  ability_from_template: "start from template", ability_create: "create workflow",
-  ability_update: "update workflow", ability_compiled: "check workflow", ability_deploy: "deploy workflow",
+  task: "delegate", write_todos: "plan", ability_list: "list advanced flows",
+  ability_from_template: "start advanced flow", ability_create: "create advanced flow",
+  ability_update: "update advanced flow", ability_compiled: "check advanced flow", ability_deploy: "publish advanced flow",
   integration_actions: "list actions", integration_apps: "browse apps", integration_app_tools: "read tool params",
   integration_connections: "list connections", integration_execute: "run action",
-  expert_list: "list experts", expert_create: "create expert", expert_update: "update expert",
+  expert_list: "list sub-agents", expert_create: "create sub-agent", expert_update: "update sub-agent",
   business_get: "read business", business_update: "update business",
   kb_list: "list knowledge", kb_create: "add knowledge", kb_search: "search knowledge",
   voice_config_get: "read voice config", voice_config_update: "tune voice", voices_list: "list voices",
@@ -127,10 +127,10 @@ function Handoff({ agent }: { agent: string }) {
 }
 
 const SUGGESTIONS = [
-  "Build an appointment-booking workflow: greet, collect name and preferred time, then deploy it.",
-  "Set up the business profile and a knowledge base for a dental clinic (services, hours, insurance).",
-  "Create an Expert that triages inbound emails and drafts replies using the connected tools.",
-  "Review everything configured — workflows, experts, business profile, voice tuning — and tell me what's missing.",
+  "Set up my front-desk Agent for a dental clinic: services, hours, insurance, and appointment booking.",
+  "Give my Agent a skill for answering questions from our pricing and policies.",
+  "Create a Sub-agent that reviews new leads every morning and drafts follow-up emails.",
+  "Review my Agent, its skills, and Sub-agents. Tell me what is missing before I publish.",
 ];
 
 export default function DeepAgentPage() {
@@ -140,7 +140,7 @@ export default function DeepAgentPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeExpert, setActiveExpert] = useState("");
-  const [ability, setAbility] = useState<any | null>(null); // the workflow being built
+  const [ability, setAbility] = useState<any | null>(null); // an advanced flow being built
   const [publishing, setPublishing] = useState(false);
   const [sideOpen, setSideOpen] = useState(true);
   const [fullAccess, setFullAccess] = useState(true);
@@ -289,7 +289,7 @@ export default function DeepAgentPage() {
     if (!ability) return;
     setPublishing(true);
     try {
-      const r = await api.post(`/api/abilities/${ability.id}/deploy`, { note: "Published from Deep Agent" });
+      const r = await api.post(`/api/abilities/${ability.id}/deploy`, { note: "Published from Agent" });
       toast.success(`Published — live v${r.deployed}`);
       refreshAbility();
     } catch (e: any) {
@@ -352,8 +352,8 @@ export default function DeepAgentPage() {
         {empty ? (
           <div className="da-empty">
             <LogoMark size={40} />
-            <h2 className="da-empty__title">What should we build?</h2>
-            <p className="da-empty__sub">An autonomous builder. It delegates to Workflow Builder, Business Manager, and Expert Builder to build and deploy your voice agent.</p>
+            <h2 className="da-empty__title">Shape your Agent</h2>
+            <p className="da-empty__sub">Your Agent handles the front desk with universal skills. Ask it to add knowledge, connect tools, tune voice, or create a Sub-agent for scheduled and triggered work.</p>
             <div className="da-empty__composer"><Composer hero /></div>
             <div className="da-accessrow center">
               <button className={`da-access ${fullAccess ? "full" : ""}`} onClick={() => setFullAccess((v) => !v)}>
@@ -447,7 +447,7 @@ export default function DeepAgentPage() {
         )}
       </main>
 
-      {/* ── right: live workflow visualizer + publish ── */}
+      {/* ── right: live advanced-flow visualizer + publish ── */}
       {ability && (
         <aside className="da-viz">
           <div className="da-viz__head">
@@ -463,7 +463,7 @@ export default function DeepAgentPage() {
               <div className="da-viz__live"><CheckCircle2 size={14} style={{ color: "var(--success)" }} /> Live · v{ability.live_version}</div>
             ) : (
               <button className="btn btn-primary w-full" onClick={publish} disabled={publishing}>
-                {publishing ? <Spinner size={15} /> : <Rocket size={15} />} Publish this workflow
+                {publishing ? <Spinner size={15} /> : <Rocket size={15} />} Publish advanced flow
               </button>
             )}
           </div>

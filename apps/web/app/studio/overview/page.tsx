@@ -71,7 +71,7 @@ export default function OverviewPage() {
 
   const stats: Stat[] = [
     { label: "Knowledge docs", value: String(docs.length), sub: `${readyDocs} indexed and ready`, icon: BookOpen, href: "/studio/knowledge" },
-    { label: "Workflows", value: String(wfs.length), sub: `${enabledWf} enabled`, icon: GitBranch, href: "/studio/workflows" },
+    { label: "Advanced flows", value: String(wfs.length), sub: `${enabledWf} enabled`, icon: GitBranch, href: "/studio/workflows" },
     { label: "Integrations", value: String(integTotal), sub: `${integ.conns} apps · ${integ.actions} actions · ${integ.mcp} MCP`, icon: Plug, href: "/studio/integrations" },
     { label: "Eval pass rate", value: passRate === null ? "n/a" : `${passRate}%`, sub: `${doneEvals.length} runs scored`, icon: FlaskConical, href: "/studio/evals", accent: true },
   ];
@@ -80,7 +80,7 @@ export default function OverviewPage() {
     { label: "Add knowledge", desc: "Upload or write a document", icon: Plus, href: "/studio/knowledge" },
     { label: "Connect an app", desc: "Gmail, Calendar, Slack", icon: Plug, href: "/studio/integrations" },
     { label: "Tune the voice", desc: "STT, TTS, turn taking", icon: SlidersHorizontal, href: "/studio/tuning" },
-    { label: "Ask the deep agent", desc: "Build it all from a prompt", icon: Bot, href: "/studio/agent" },
+    { label: "Shape the Agent", desc: "Build behavior from a prompt", icon: Bot, href: "/studio/agent" },
   ];
 
   return (

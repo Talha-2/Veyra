@@ -36,9 +36,9 @@ const NAV_GROUPS = [
     label: "Build",
     items: [
       { href: "/studio/overview", label: "Overview", icon: LayoutDashboard, count: null },
-      { href: "/studio/workflows", label: "Workflows", icon: Workflow, count: "workflows" },
-      { href: "/studio/experts", label: "Experts", icon: Sparkles, count: "experts" },
-      { href: "/studio/knowledge", label: "Knowledge Base", icon: BookOpen, count: "docs" },
+      { href: "/studio/agent", label: "Agent", icon: Bot, count: null },
+      { href: "/studio/knowledge", label: "Skills", icon: Sparkles, count: "docs" },
+      { href: "/studio/experts", label: "Sub-agents", icon: Workflow, count: "experts" },
     ],
   },
   {
@@ -61,8 +61,7 @@ const NAV_GROUPS = [
   {
     label: "Develop",
     items: [
-      { href: "/studio/agent", label: "Deep Agent", icon: Bot, count: null },
-      { href: "/studio/developers", label: "API and webhooks", icon: Code2, count: null },
+      { href: "/studio/developers", label: "Publish", icon: Code2, count: null },
     ],
   },
 ];
