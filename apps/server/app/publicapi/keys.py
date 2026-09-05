@@ -66,6 +66,19 @@ def key_out(k: ApiKey) -> dict:
     }
 
 
+def require_widget_key(authorization: str = Header(default="")) -> ApiKey:
+    """FastAPI dependency for browser-facing endpoints (the chat widget).
+
+    Accepts a publishable key (scope "widget" — safe to ship in page source)
+    or a full secret key. This is the first consumer of the z360_pk_live_
+    keys that have been minted-but-unverified since the key system shipped."""
+    key = require_api_key(authorization)
+    scopes = (key.scopes or "").split(",")
+    if "widget" in scopes or key.prefix.startswith("z360_sk_"):
+        return key
+    raise HTTPException(403, "This key cannot be used for chat")
+
+
 def require_api_key(authorization: str = Header(default="")) -> ApiKey:
     """FastAPI dependency for /v1 endpoints. Verifies the Bearer key."""
     if not authorization.lower().startswith("bearer "):

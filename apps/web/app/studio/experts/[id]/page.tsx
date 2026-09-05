@@ -23,10 +23,12 @@ import { Modal, Spinner, StatusBadge } from "@/components/ui";
 /* Chat, schedule and webhook are not three flavours of the same switch: one is
    a conversation, one is a clock, one is an inbound request with a secret URL.
    They get separate cards, their own names, and their own configuration. */
-type TriggerKind = "chat" | "schedule" | "external";
+type TriggerKind = "chat" | "events" | "schedule" | "external";
 const TRIGGERS: { kind: TriggerKind; label: string; icon: any; colour: string; blurb: string }[] = [
   { kind: "chat", label: "Chat", icon: MessageSquare, colour: "#2563eb",
     blurb: "Someone messages the expert and it answers in the moment." },
+  { kind: "events", label: "Product events", icon: Zap, colour: "#e96b34",
+    blurb: "The product itself wakes the expert: a text arrives, a call ends, a lead is filed." },
   { kind: "schedule", label: "Schedule", icon: Calendar, colour: "#0d9488",
     blurb: "Runs on a clock with no one watching. Give it a goal it can finish alone." },
   { kind: "external", label: "Webhook", icon: Webhook, colour: "#7c3aed",
@@ -47,6 +49,7 @@ export default function ExpertEditor() {
   const router = useRouter();
   const [e, setE] = useState<ExpertRow | null>(null);
   const [tools, setTools] = useState<ToolRef[]>([]);
+  const [eventCatalog, setEventCatalog] = useState<{ type: string; label: string; desc: string }[]>([]);
   const [runs, setRuns] = useState<ExpertRunRow[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -61,6 +64,12 @@ export default function ExpertEditor() {
 
   useEffect(() => {
     api.get(`/api/experts/${id}`).then(setE).catch((err) => setError(err.message));
+    // which product events can wake an expert (labels come from the server's
+    // single event catalog, so this picker can never drift from reality)
+    api.get("/api/dev/events").then((d) => {
+      const wakeable = new Set(d.wakeable || []);
+      setEventCatalog((d.catalog || []).filter((ev: { type: string }) => wakeable.has(ev.type)));
+    }).catch(() => {});
     // available tools = KB + active composio connections + custom actions + mcp
     Promise.allSettled([
       api.get("/api/integrations/connections"),
@@ -309,6 +318,41 @@ export default function ExpertEditor() {
 
                     {t.kind === "chat" && (
                       <p className="hint mt-3">Reachable from Deep Agent and any chat surface you attach. Runs use the system prompt, not the goal.</p>
+                    )}
+
+                    {t.kind === "events" && (
+                      <div className="mt-3">
+                        <label className="label">Wake on</label>
+                        <div className="mt-1 flex flex-col gap-1">
+                          {eventCatalog.map((ev) => {
+                            const types: string[] = meta.types || [];
+                            const checked = types.includes(ev.type);
+                            return (
+                              <label key={ev.type} className="evt-row" data-on={checked || undefined}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() =>
+                                    setMeta({ types: checked ? types.filter((x) => x !== ev.type) : [...types, ev.type] })
+                                  }
+                                />
+                                <span className="min-w-0">
+                                  <span className="flex items-baseline gap-2">
+                                    <span className="text-[13px] font-medium">{ev.label}</span>
+                                    <span className="mono text-[10.5px]" style={{ color: "var(--text-tertiary)" }}>{ev.type}</span>
+                                  </span>
+                                  <span className="block text-[12px]" style={{ color: "var(--text-secondary)" }}>{ev.desc}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                          {eventCatalog.length === 0 && <p className="hint">Event catalog unavailable — is the server up?</p>}
+                        </div>
+                        <p className="hint mt-2">
+                          The event payload arrives as the run input. The expert works it with its tools —
+                          reply, file a ticket, update the contact — and the run shows up in Executions.
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}

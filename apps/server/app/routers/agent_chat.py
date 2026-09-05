@@ -36,7 +36,7 @@ async def chat(req: ChatRequest):
 class BuildRequest(BaseModel):
     message: str = Field(min_length=1)
     thread_id: str = ""  # reuse to continue a conversation; blank starts a new one
-    full_access: bool = True  # True = auto-approve actions; False = pause for approval
+    full_access: bool = False  # True = auto-approve actions; False = pause for approval
 
 
 class ResumeRequest(BaseModel):

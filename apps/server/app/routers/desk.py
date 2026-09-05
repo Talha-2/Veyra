@@ -14,7 +14,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -31,6 +31,7 @@ from ..db import (
     Reminder,
     SmsMessage,
     TeamMember,
+    WebChatMessage,
     Ticket,
     CONTACT_STAGES,
     LEAD_SOURCES,
@@ -672,6 +673,12 @@ def create_ticket(req: TicketIn, session: Session = Depends(get_session)):
     session.add(t)
     session.commit()
     session.refresh(t)
+    from .. import events
+
+    events.publish("ticket.created", {
+        "object": "ticket", "id": t.id, "subject": t.subject,
+        "contact_id": t.contact_id, "channel": t.channel, "priority": t.priority,
+    })
     return _ticket_out(t, _members_map(session))
 
 
@@ -905,6 +912,14 @@ def inbox(
         b["last_kind"] = "email"
         if e.unread:
             b["unread"] = b.get("unread", 0) + 1
+    for w in session.exec(select(WebChatMessage).order_by(WebChatMessage.created_at.asc())).all():
+        b = bucket(w.session_id)
+        b["channels"].add("webchat")
+        b["count"] += 1
+        who = "You: " if (w.direction == "outbound" and not w.agent_id) else ("AI: " if w.direction == "outbound" else "")
+        b["last_text"] = (who + w.body)[:90]
+        b["last_at"] = w.created_at.isoformat()
+        b["last_kind"] = "webchat"
     for f in session.exec(select(FaxMessage).order_by(FaxMessage.created_at.asc())).all():
         b = bucket(f.counterparty)
         b["channels"].add("fax")
@@ -934,7 +949,7 @@ def inbox(
             continue
         if assignee and assignee != "unassigned" and assignee not in assignee_ids:
             continue
-        name = contact.name if contact else peer
+        name = contact.name if contact else ("Website visitor" if peer.startswith("wc_") else peer)
         if ql and ql not in f"{name} {peer} {b['last_text']}".lower():
             continue
         out.append({
@@ -1062,6 +1077,9 @@ def conversation(peer: str, session: Session = Depends(get_session)):
             "status": e.status, "unread": e.unread, "error": e.error,
             "at": e.created_at.isoformat(),
         })
+    for w in session.exec(select(WebChatMessage).where(WebChatMessage.session_id == peer)).all():
+        timeline.append({"kind": "webchat", "id": w.id, "direction": w.direction, "body": w.body,
+                         "agent_id": w.agent_id, "at": w.created_at.isoformat()})
     for f in session.exec(select(FaxMessage).where(FaxMessage.counterparty == peer)).all():
         timeline.append({"kind": "fax", "id": f.id, "direction": f.direction,
                          "media_url": f.media_url, "pages": f.pages, "status": f.status,
@@ -1078,7 +1096,10 @@ def conversation(peer: str, session: Session = Depends(get_session)):
 
     last = timeline[-1]["at"] if timeline else now().isoformat()
     conv = _ensure_conv(session, peer, contact.id if contact else None, last)
-    fallback = {"name": peer, "phone": "" if "@" in peer else peer, "email": peer.lower() if "@" in peer else ""}
+    if peer.startswith("wc_"):
+        fallback = {"name": "Website visitor", "phone": "", "email": ""}
+    else:
+        fallback = {"name": peer, "phone": "" if "@" in peer else peer, "email": peer.lower() if "@" in peer else ""}
     return {
         "peer": peer,
         "contact": _contact_out(contact) if contact else fallback,
@@ -1086,6 +1107,26 @@ def conversation(peer: str, session: Session = Depends(get_session)):
         "sidebar": sidebar,
         "conversation": _conv_meta(conv, mmap),
     }
+
+
+class WebChatSend(BaseModel):
+    body: str
+
+
+@router.post("/webchat/{peer}/send")
+def webchat_send(peer: str, req: WebChatSend, session: Session = Depends(get_session)):
+    """A human replies to a website-chat thread from the Desk. The widget picks
+    the message up on its next history poll — same thread, no new channel."""
+    body = req.body.strip()
+    if not body:
+        raise _err(422, "Empty message")
+    if not peer.startswith("wc_"):
+        raise _err(422, "Not a web chat thread")
+    m = WebChatMessage(id=new_id("wm"), session_id=peer, direction="outbound", body=body, agent_id="")
+    session.add(m)
+    session.commit()
+    return {"id": m.id, "kind": "webchat", "direction": "outbound", "body": m.body,
+            "agent_id": "", "at": m.created_at.isoformat()}
 
 
 @router.post("/inbox/{peer}/read")
@@ -1122,12 +1163,41 @@ class LeadIntake(BaseModel):
     phone: str = ""
     company: str = ""
     message: str = ""
+    topic: str = ""  # what the inquiry is about, e.g. "Demo request"
     source: str = "form"
     tags: list[str] = []
+    website: str = ""  # honeypot — real forms render it hidden and leave it empty
+
+
+# the public site posts here unauthenticated, so keep a small per-IP throttle:
+# enough for any human, cheap to hold in memory, resets on restart
+_INTAKE_WINDOW_SEC = 3600
+_INTAKE_MAX_PER_WINDOW = 20
+_intake_hits: dict[str, list[float]] = {}
+
+
+def _intake_throttled(ip: str) -> bool:
+    import time
+
+    cutoff = time.monotonic() - _INTAKE_WINDOW_SEC
+    hits = [t for t in _intake_hits.get(ip, []) if t > cutoff]
+    if len(hits) >= _INTAKE_MAX_PER_WINDOW:
+        _intake_hits[ip] = hits
+        return True
+    hits.append(time.monotonic())
+    _intake_hits[ip] = hits
+    return False
 
 
 @router.post("/leads/intake")
-def lead_intake(req: LeadIntake, session: Session = Depends(get_session)):
+def lead_intake(req: LeadIntake, request: Request, session: Session = Depends(get_session)):
+    # bots fill every field, including the hidden one; accept and drop silently
+    # so scripts get no signal to iterate against
+    if req.website.strip():
+        return {"ok": True, "contact_id": None, "ticket_id": None}
+    ip = request.client.host if request.client else "unknown"
+    if _intake_throttled(ip):
+        raise _err(429, "Too many submissions. Try again later.")
     if not (req.email or req.phone or req.name):
         raise _err(422, "A lead needs at least a name, email, or phone.")
     c = _find_contact(session, req.phone, req.email)
@@ -1157,17 +1227,17 @@ def lead_intake(req: LeadIntake, session: Session = Depends(get_session)):
 
     ticket_id = None
     if req.message.strip():
-        t = Ticket(id=new_id("tk"), subject=f"New lead from {req.source} — {c.name or c.email or c.phone}",
+        t = Ticket(id=new_id("tk"),
+                   subject=f"{req.topic or 'Website inquiry'} — {c.name or c.email or c.phone}",
                    body=req.message, contact_id=c.id, channel="form", priority="normal",
-                   type="New Appointment", creator="Veyra AI")
+                   type=req.topic or "Website inquiry", creator="Veyra AI")
         session.add(t)
         session.commit()
         ticket_id = t.id
 
-    try:
-        from ..publicapi import webhooks as out_hooks
+    from .. import events
 
-        out_hooks.emit("lead.created", {"object": "contact", "id": c.id, "source": req.source})
-    except Exception:
-        pass
+    events.publish("lead.created", {"object": "contact", "id": c.id, "name": c.name, "email": c.email, "phone": c.phone, "source": req.source, "message": req.message[:500]})
+    if ticket_id:
+        events.publish("ticket.created", {"object": "ticket", "id": ticket_id, "contact_id": c.id, "channel": "form"})
     return {"ok": True, "contact_id": c.id, "ticket_id": ticket_id}

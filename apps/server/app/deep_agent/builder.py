@@ -171,7 +171,7 @@ async def expert_update(expert_id: str, body: dict) -> Any:
 
 async def expert_run(expert_id: str, message: str) -> Any:
     """Run an expert once with a message. Returns a run id; read it back with expert_run_get for the trace."""
-    return await _req("POST", f"/api/experts/{expert_id}/run", json={"message": message})
+    return await _req("POST", f"/api/experts/{expert_id}/run", json={"input": message})
 
 async def expert_run_get(run_id: str) -> Any:
     """Get an expert run's step trace (thought / tool_call / tool_result / final)."""
@@ -315,7 +315,15 @@ def _resolve_model(spec: str):
         from langchain_openai import ChatOpenAI
         model_id = spec.split(":", 1)[-1] if spec.startswith("openai:") else spec
         return ChatOpenAI(model=model_id, base_url=base, api_key=key, temperature=0.3)
-    return spec
+    if os.getenv("DEEP_AGENT_MODEL"):
+        return spec  # explicit override, deepagents 'provider:model' form
+    # otherwise follow the platform resolver (studio config → env → x.ai)
+    try:
+        from .. import llm as _resolver
+
+        return _resolver.langchain_model(temperature=0.3)
+    except Exception:
+        return spec
 
 
 def get_agent():

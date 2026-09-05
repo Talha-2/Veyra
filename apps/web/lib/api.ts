@@ -204,7 +204,7 @@ export type ExpertRow = {
   goal: string;
   triggers: string[];
   schedule: Record<string, any>;
-  trigger_meta?: Record<string, { name?: string }>;
+  trigger_meta?: Record<string, { name?: string; types?: string[] }>;
   app_trigger?: { toolkit?: string; slug?: string; name?: string; config?: Record<string, any> };
   schedule_label: string;
   reasoning: string;

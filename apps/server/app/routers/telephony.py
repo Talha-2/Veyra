@@ -724,12 +724,9 @@ async def telnyx_fax(request: Request, session: Session = Depends(get_session)):
             pages=int(payload.get("page_count") or 0), status="received",
         ))
         session.commit()
-        try:
-            from ..publicapi import webhooks as out_hooks
+        from .. import events
 
-            out_hooks.emit("fax.received", {"object": "fax", "from": from_number, "to": to_number})
-        except Exception:
-            pass
+        events.publish("fax.received", {"object": "fax", "from": from_number, "to": to_number})
     elif etype.startswith("fax."):
         # fax.queued / fax.media.processed / fax.sending / fax.delivered / fax.failed
         f = session.exec(select(FaxMessage).where(FaxMessage.provider_sid == sid)).first() if sid else None
@@ -874,12 +871,9 @@ async def twilio_sms(
     session.add(inbound)
     session.commit()
 
-    try:
-        from ..publicapi import webhooks as out_hooks
+    from .. import events
 
-        out_hooks.emit("message.received", {"object": "message", "from": From, "to": To, "body": Body})
-    except Exception:
-        pass
+    events.publish("message.received", {"object": "message", "channel": "sms", "from": From, "to": To, "body": Body})
 
     reply_xml = ""
     if num and num.sms_autoreply and Body.strip():
@@ -970,12 +964,9 @@ async def telnyx_sms(request: Request, session: Session = Depends(get_session)):
             provider_sid=payload.get("id", ""), body=body, status="received",
         ))
         session.commit()
-        try:
-            from ..publicapi import webhooks as out_hooks
+        from .. import events
 
-            out_hooks.emit("message.received", {"object": "message", "from": from_number, "to": to_number, "body": body})
-        except Exception:
-            pass
+        events.publish("message.received", {"object": "message", "channel": "sms", "from": from_number, "to": to_number, "body": body})
         if num and num.sms_autoreply and body.strip():
             reply = await _autoreply(session, num, from_number, to_number, body, provider="telnyx")
             if reply:

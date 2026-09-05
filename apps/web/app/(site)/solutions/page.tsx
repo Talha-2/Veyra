@@ -1,10 +1,18 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Veyra Solutions — Healthcare, Home Services & More",
+  description:
+    "A front desk that never sends patients to voicemail. Follow-up the second a lead lands. Six industries, one agent underneath.",
+};
+
 /* Solutions — how Veyra is used across industries. Console cards with mono
    industry tags; the common thread as hairline rows. */
 
-const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/contact";
+const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/start";
 const bookProps = CALENDAR_URL.startsWith("http")
   ? { target: "_blank", rel: "noopener noreferrer" as const }
   : {};

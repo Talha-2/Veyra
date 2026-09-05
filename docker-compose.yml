@@ -4,6 +4,9 @@ services:
     env_file: .env
     environment:
       DATA_DIR: /data
+      # set DATABASE_URL (e.g. the Supabase session-pooler URI) to run on
+      # managed Postgres; unset it and the server stays on the SQLite volume
+      DATABASE_URL: ${DATABASE_URL:-}
     ports:
       - "8000:8000"
     volumes:

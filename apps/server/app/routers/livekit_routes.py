@@ -176,10 +176,11 @@ def save_transcript(t: TranscriptIn, session: Session = Depends(get_session)):
     session.add(row)
     session.commit()
 
-    # the call is over and the transcript is durable: tell the developer's webhook
-    from ..publicapi import webhooks
+    # the call is over and the transcript is durable: tell the developer's
+    # webhooks AND wake any agents subscribed to call.ended
+    from .. import events
 
-    webhooks.emit("call.ended", {
+    events.publish("call.ended", {
         "object": "call", "id": row.id, "room": row.room,
         "turns": len(t.items), "metrics": t.metrics,
     })

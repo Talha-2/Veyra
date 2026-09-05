@@ -9,6 +9,7 @@ from .routers import (
     abilities,
     business,
     agent_chat,
+    chat,
     auth,
     desk,
     desk_email,
@@ -61,6 +62,7 @@ app.include_router(evals.router)
 app.include_router(telephony.router)
 app.include_router(desk.router)
 app.include_router(desk_email.router)
+app.include_router(chat.router)
 
 
 @app.get("/api/health")

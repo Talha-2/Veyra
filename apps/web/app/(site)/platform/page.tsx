@@ -4,10 +4,18 @@ import {
   ConsoleMock, InboxMock, IntegrationGrid, TelephonyMock, TranscriptMock, WorkflowMock,
 } from "@/components/site/graphics";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "The Veyra Platform — One Agent, Every Channel",
+  description:
+    "Voice, phone, chat, and SMS on one grounded agent. Build it visually or let the deep agent build it for you, behind approval gates.",
+};
+
 /* Platform tour — deeper than the home page. Six product sections on Iron
    hairlines, each proven by its own console. */
 
-const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/contact";
+const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/start";
 const bookProps = CALENDAR_URL.startsWith("http")
   ? { target: "_blank", rel: "noopener noreferrer" as const }
   : {};

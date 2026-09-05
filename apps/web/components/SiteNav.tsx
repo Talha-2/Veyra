@@ -17,7 +17,7 @@ const LINKS: [string, string][] = [
   ["Company", "/company"],
 ];
 
-const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/contact";
+const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/start";
 
 export default function SiteNav() {
   const [open, setOpen] = useState(false);

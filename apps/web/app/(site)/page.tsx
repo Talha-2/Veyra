@@ -7,7 +7,7 @@ import { ConsoleMock, Spectro } from "@/components/site/graphics";
    the color, the Ember/Mint pair carries the action. Sections below the
    fold sit on Iron hairlines. */
 
-const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/contact";
+const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/start";
 const bookProps = CALENDAR_URL.startsWith("http")
   ? { target: "_blank", rel: "noopener noreferrer" as const }
   : {};

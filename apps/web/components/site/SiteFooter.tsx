@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
-const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/contact";
+const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/start";
 const bookProps = CALENDAR_URL.startsWith("http")
   ? { target: "_blank", rel: "noopener noreferrer" as const }
   : {};
@@ -44,6 +44,8 @@ export default function SiteFooter() {
               </Link>
             </div>
           </div>
+          {/* the public footer never deep-links into the authenticated app —
+              Studio/Desk are shown via /platform anchors, not routed into */}
           <Col
             head="Product"
             links={[
@@ -57,29 +59,19 @@ export default function SiteFooter() {
             ]}
           />
           <Col
-            head="Studio"
-            links={[
-              ["Overview", "/studio/overview"],
-              ["Workflows", "/studio/workflows"],
-              ["Knowledge base", "/studio/knowledge"],
-              ["Telephony", "/studio/telephony"],
-              ["Evals", "/studio/evals"],
-            ]}
-          />
-          <Col
             head="Company"
             links={[
               ["About", "/company"],
               ["Contact", "/contact"],
-              ["Docs", "/studio/developers"],
+              ["Get started", "/start"],
             ]}
           />
           <Col
             head="Legal"
             links={[
               ["Security", "/security"],
-              ["Privacy", "#"],
-              ["Terms", "#"],
+              ["Privacy", "/privacy"],
+              ["Terms", "/terms"],
             ]}
           />
         </div>

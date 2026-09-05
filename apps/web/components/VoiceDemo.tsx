@@ -85,11 +85,13 @@ export default function VoiceDemo() {
 
           {/* pipeline chips */}
           <div className="mono flex flex-wrap items-center justify-center gap-2 text-[11px]" style={{ color: "var(--stage-text-muted)" }}>
-            <span className="pipe-chip">Deepgram STT</span>
+            {/* names the stack the worker actually runs (apps/agent/backend.py
+                defaults) — keep in sync with runtime, or nothing */}
+            <span className="pipe-chip">Deepgram nova-3</span>
             <span>→</span>
-            <span className="pipe-chip">GPT-4.1 nano</span>
+            <span className="pipe-chip">Grok realtime</span>
             <span>→</span>
-            <span className="pipe-chip">Cartesia voice</span>
+            <span className="pipe-chip">ElevenLabs flash</span>
           </div>
 
           <button className="btn-ember" onClick={start} disabled={connecting} style={connecting ? { opacity: 0.7 } : undefined}>

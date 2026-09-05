@@ -16,11 +16,9 @@ from ..publicapi.webhooks import WebhookEndpoint, endpoint_out, new_secret
 
 router = APIRouter(prefix="/api/dev", tags=["developer"])
 
-EVENT_TYPES = [
-    "run.started", "run.completed", "run.failed",
-    "call.started", "call.ended",
-    "tool.called",
-]
+# the single event catalog lives on the bus so this list can never drift
+# from what the server actually emits
+from ..events import EVENT_TYPE_NAMES as EVENT_TYPES
 
 
 # ── API keys ─────────────────────────────────────────────────────────────
@@ -64,7 +62,12 @@ class WebhookRequest(BaseModel):
 
 @router.get("/events")
 def event_types():
-    return {"events": EVENT_TYPES}
+    """One catalog for both consumers: 'events' stays the plain name list the
+    webhooks UI multiselect reads; 'catalog' adds labels + descriptions and
+    'wakeable' marks which events may wake agents (the trigger picker)."""
+    from ..events import AGENT_WAKEABLE, EVENT_TYPES as CATALOG
+
+    return {"events": EVENT_TYPES, "catalog": CATALOG, "wakeable": AGENT_WAKEABLE}
 
 
 @router.get("/webhooks")

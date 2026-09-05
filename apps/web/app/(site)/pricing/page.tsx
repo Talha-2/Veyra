@@ -1,6 +1,28 @@
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Veyra Pricing — Start Free, $99/mo Growth",
+  description:
+    "Start free, no credit card. $99 a month when Veyra is answering real calls. Voice minutes, numbers, and SMS pass through at provider cost.",
+};
+
+/* The committed pricing story as structured data — changes here and in the
+   plan cards must move together (packet open decision 5). */
+const PRICING_LD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Veyra",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  offers: [
+    { "@type": "Offer", name: "Starter", price: "0", priceCurrency: "USD" },
+    { "@type": "Offer", name: "Growth", price: "99", priceCurrency: "USD" },
+  ],
+};
+
 /* Pricing — three Carbon plans on hairlines, usage passed through at cost,
    questions as list rows. */
 
@@ -90,6 +112,10 @@ const FAQS: [string, string][] = [
 export default function PricingPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(PRICING_LD) }}
+      />
       {/* ── hero ── */}
       <section className="band" style={{ paddingTop: "clamp(4rem, 8vw, 6.5rem)" }}>
         <div className="wrap text-center">

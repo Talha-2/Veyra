@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About Veyra",
+  description:
+    "Most voice agents demo well and die on real calls. We build for p95, ground answers in your business, and degrade to a human on purpose.",
+};
+
 /* Company — why Veyra exists, how we build, what it runs on. Story in light
    type, principles as hairline rows, the stack as a quiet strip. */
 

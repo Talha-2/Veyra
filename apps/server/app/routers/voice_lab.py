@@ -281,10 +281,10 @@ def _provider_status() -> list[dict]:
 
 
 def _llm_conf() -> tuple[str, str, str]:
-    base = (os.getenv("LLM_BASE_URL") or "https://api.x.ai/v1").rstrip("/")
-    key = os.getenv("LLM_API_KEY") or settings.xai_api_key
-    model = os.getenv("LLM_MODEL") or settings.xai_realtime_model
-    return base, key, model
+    # one resolver for the whole platform (studio config → env → default)
+    from .. import llm as _resolver
+
+    return _resolver.llm_conf()
 
 
 # Any OpenAI compatible endpoint works, so switching provider is a base URL and

@@ -1,13 +1,16 @@
-"use client";
-
-import { useState } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, Send } from "lucide-react";
-import { Spinner } from "@/components/ui";
+import { ArrowRight } from "lucide-react";
+import { InquiryForm } from "@/components/site/InquiryForm";
 
-/* Contact — the pitch beside a console form. */
+/* Contact — the pitch beside a console form. The form files straight into
+   Veyra Desk (contact + lead + ticket) through the public intake endpoint. */
 
-type Status = "idle" | "sending" | "sent";
+export const metadata: Metadata = {
+  title: "Contact Veyra",
+  description:
+    "Tell us what you're building. A person reads every message and replies within one business day.",
+};
 
 const REACH: { tag: string; label: string; node: React.ReactNode; sub: string }[] = [
   {
@@ -23,7 +26,11 @@ const REACH: { tag: string; label: string; node: React.ReactNode; sub: string }[
   {
     tag: "demo",
     label: "Book a live demo",
-    node: <span>Grab a slot and we will walk Veyra through your exact workflows.</span>,
+    node: (
+      <Link href="/start" style={{ color: "var(--accent)" }}>
+        Tell us your use case and pick a focus
+      </Link>
+    ),
     sub: "Same day where we can, no strings.",
   },
   {
@@ -39,22 +46,6 @@ const REACH: { tag: string; label: string; node: React.ReactNode; sub: string }[
 ];
 
 export default function ContactPage() {
-  const [status, setStatus] = useState<Status>("idle");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [company, setCompany] = useState("");
-  const [message, setMessage] = useState("");
-
-  const sending = status === "sending";
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (sending) return;
-    setStatus("sending");
-    // No backend here — simulate a successful send locally.
-    setTimeout(() => setStatus("sent"), 800);
-  }
-
   return (
     <>
       <section className="band" style={{ paddingTop: "clamp(3.5rem, 7vw, 6rem)" }}>
@@ -93,110 +84,7 @@ export default function ContactPage() {
                 contact — new message
               </div>
               <div className="console__body" style={{ padding: "clamp(20px, 3vw, 28px)" }}>
-                {status === "sent" ? (
-                  <div className="flex flex-col items-center py-10 text-center">
-                    <span className="check-sq" style={{ width: 44, height: 44, borderRadius: "var(--radius-md)" }}>
-                      <Check size={22} strokeWidth={2.4} />
-                    </span>
-                    <h2 className="mt-6 text-[24px]" style={{ fontWeight: 300, letterSpacing: "-0.02em" }}>
-                      Thanks — we will be in touch.
-                    </h2>
-                    <p className="mt-3 max-w-sm text-[14.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Your note is in. Expect a reply within one business day, from a real person
-                      who has read it.
-                    </p>
-                    <Link href="/" className="btn-mint mt-8">
-                      Back to site
-                    </Link>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} aria-busy={sending}>
-                    <div className="mb-5">
-                      <label className="field-label" htmlFor="cf-name">
-                        Name
-                      </label>
-                      <input
-                        id="cf-name"
-                        name="name"
-                        className="field"
-                        type="text"
-                        autoComplete="name"
-                        placeholder="Jordan Rivera"
-                        required
-                        disabled={sending}
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="mb-5">
-                      <label className="field-label" htmlFor="cf-email">
-                        Work email
-                      </label>
-                      <input
-                        id="cf-email"
-                        name="email"
-                        className="field"
-                        type="email"
-                        autoComplete="email"
-                        placeholder="jordan@company.com"
-                        required
-                        disabled={sending}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="mb-5">
-                      <label className="field-label" htmlFor="cf-company">
-                        Company <span style={{ color: "var(--text-tertiary)" }}>(optional)</span>
-                      </label>
-                      <input
-                        id="cf-company"
-                        name="company"
-                        className="field"
-                        type="text"
-                        autoComplete="organization"
-                        placeholder="Acme Inc."
-                        disabled={sending}
-                        value={company}
-                        onChange={(e) => setCompany(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="mb-7">
-                      <label className="field-label" htmlFor="cf-message">
-                        What are you building?
-                      </label>
-                      <textarea
-                        id="cf-message"
-                        name="message"
-                        className="field"
-                        rows={4}
-                        placeholder="A voice agent that books appointments and answers billing questions after hours."
-                        disabled={sending}
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                      />
-                    </div>
-
-                    <button type="submit" className="btn-ember w-full" disabled={sending}>
-                      {sending ? (
-                        <>
-                          <Spinner size={14} /> Sending
-                        </>
-                      ) : (
-                        <>
-                          <Send size={14} /> Send message
-                        </>
-                      )}
-                    </button>
-
-                    <p className="mt-4 text-center text-[12.5px]" style={{ color: "var(--text-tertiary)" }}>
-                      We will only use this to reply. No lists, no noise.
-                    </p>
-                  </form>
-                )}
+                <InquiryForm />
               </div>
             </div>
           </div>

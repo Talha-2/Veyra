@@ -34,4 +34,7 @@ composio>=0.17
 mcp>=1.2
 # Deep agent (LangChain deepagents harness)
 deepagents>=0.6.12
+langgraph>=0.2  # imported directly (agent_chat, builder); pin it, not just transitively
 langchain-openai>=0.3
+psycopg[binary]
+langgraph-checkpoint-postgres>=2

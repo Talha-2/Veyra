@@ -1,20 +1,21 @@
-"""Expert runtime — the agentic executor.
+"""Expert runtime — run records, tool building, and the engine dispatch.
 
-A controlled plan→act→observe loop (LangGraph-style state machine, implemented
-directly so the platform owns it end-to-end): the LLM plans and calls tools,
-the runtime executes them against the Integrations layer (Composio apps, custom
-HTTP actions, knowledge base), feeds results back, and iterates to a final
-result. Every step is recorded so runs are fully inspectable.
+Since the architecture pivot (docs/architecture-pivot.md, D2) every run drives
+the unified LangGraph deep-agent harness (experts/harness.py) — the same
+engine as the studio builder copilot. This module keeps the run bookkeeping
+(create/execute/finish), the tool construction shared by both engines
+(_build_tools: KB + Composio + custom actions), and the legacy hand-rolled
+loop as a fallback for pre-flight infrastructure failures only
+(UNIFIED_HARNESS=0 forces it).
 
-Reasoning level bounds the loop depth and temperature. The LLM is provider-
-agnostic (LLM_BASE_URL/LLM_API_KEY/LLM_MODEL env override → any OpenAI-compatible
-model, e.g. Groq; falls back to xAI).
+Reasoning level bounds depth and temperature on both engines. The model comes
+from the platform's one resolver (app/llm.py: studio config → env → default).
 """
 
 from __future__ import annotations
 
 import json
-import os
+import logging
 
 import anyio
 from openai import AsyncOpenAI
@@ -27,6 +28,8 @@ from ..integrations.actions import action_tool_schema, execute_action
 from ..integrations.models import CustomAction
 from ..rag import store
 from .models import Expert, ExpertRun
+
+logger = logging.getLogger("experts.runtime")
 
 REASONING = {
     "fast": {"rounds": 4, "temperature": 0.3},
@@ -49,10 +52,10 @@ KB_TOOL = {
 
 
 def _llm() -> tuple[AsyncOpenAI, str]:
-    base_url = os.getenv("LLM_BASE_URL") or "https://api.x.ai/v1"
-    api_key = os.getenv("LLM_API_KEY") or settings.xai_api_key
-    model = os.getenv("LLM_MODEL") or settings.xai_agent_model
-    return AsyncOpenAI(base_url=base_url, api_key=api_key), model
+    # one resolver for the whole platform (studio config → env → default)
+    from .. import llm as _resolver
+
+    return _resolver.client(), _resolver.model()
 
 
 def _clip(obj, n: int = 6000) -> str:
@@ -161,6 +164,29 @@ async def run_expert(session: Session, expert: Expert, trigger: str, input_text:
 
 
 async def _drive(session: Session, run: ExpertRun, expert: Expert) -> None:
+    """Every Expert run goes through the shared deep-agent harness.
+
+    A failed model or tool run is recorded as an error. Retrying through a
+    second engine would duplicate side effects and make the product behave
+    differently depending on which entry point woke the agent.
+    """
+    from . import harness
+
+    try:
+        final, steps, tokens = await harness.drive(session, run, expert)
+        run.result = final
+        run.status = "done"
+        run.tokens += tokens
+        _finish(session, run, expert, steps)
+    except Exception as exc:  # the model was engaged or the graph failed
+        logger.exception("deep-agent run failed: %s", run.id)
+        run.status = "error"
+        run.error = str(exc)[:1000]
+        _finish(session, run, expert, [{"type": "error", "text": run.error}])
+    return run
+
+
+async def _drive_legacy(session: Session, run: ExpertRun, expert: Expert) -> None:
     input_text = run.input
     steps: list[dict] = []
     cfg = REASONING.get(expert.reasoning, REASONING["balanced"])
@@ -217,6 +243,14 @@ async def _drive(session: Session, run: ExpertRun, expert: Expert) -> None:
         run.error = str(exc)[:1000]
         steps.append({"type": "error", "text": run.error})
 
+    _finish(session, run, expert, steps)
+    return run
+
+
+def _finish(session: Session, run: ExpertRun, expert: Expert, steps: list[dict]) -> None:
+    """Shared bookkeeping for both engines: persist the trace, stamp the times,
+    and put the run's lifecycle on the event bus (webhooks only — run.* events
+    never wake agents)."""
     run.steps_json = json.dumps(steps, default=str)
     run.ended_at = now()
     expert.last_run_at = now()
@@ -224,15 +258,13 @@ async def _drive(session: Session, run: ExpertRun, expert: Expert) -> None:
     session.add(expert)
     session.commit()
 
-    # fire an outbound webhook for the run lifecycle (best-effort)
     try:
-        from ..publicapi import webhooks
+        from .. import events
 
-        webhooks.emit(
+        events.publish(
             "run.completed" if run.status == "done" else "run.failed",
             {"object": "run", "id": run.id, "agent_id": expert.id, "status": run.status,
              "result": (run.result or "")[:2000], "error": run.error},
         )
     except Exception:
         pass
-    return run

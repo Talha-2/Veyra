@@ -1,6 +1,7 @@
 import localFont from "next/font/local";
 import SiteNav from "@/components/SiteNav";
 import SiteFooter from "@/components/site/SiteFooter";
+import { ChatLauncher } from "@/components/site/ChatLauncher";
 
 /* Marketing-site chrome. The site subtree reads in Inter (the seasonSans
    stand-in) and Geist Mono; both are registered here so app surfaces keep
@@ -35,13 +36,39 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 verdict, and DESIGN.md
 -->`;
 
+/* Site-wide structured data: who Veyra is and what the site is. Per-page
+   JSON-LD (pricing offer, contact page) belongs to those pages. */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://veyra.vercel.app";
+const ORG_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      name: "Veyra",
+      url: SITE_URL,
+      description:
+        "AI voice and chat agents that answer, call, and close — one grounded brain across voice, chat, phone, and SMS.",
+    },
+    {
+      "@type": "WebSite",
+      name: "Veyra",
+      url: SITE_URL,
+    },
+  ],
+};
+
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`site-shell ${inter.variable} ${geistMono.variable}`}>
       <div hidden aria-hidden dangerouslySetInnerHTML={{ __html: CONTRACT }} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_LD) }}
+      />
       <SiteNav />
       <main>{children}</main>
       <SiteFooter />
+      <ChatLauncher />
     </div>
   );
 }

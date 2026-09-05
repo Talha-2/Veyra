@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Security at Veyra",
+  description:
+    "Server-side credentials, signed webhooks, least-privilege scopes, no training on your conversations, and failure modes that degrade to a human.",
+};
+
 /* Security / trust — control rows on hairlines, the credentials guarantee
    as a console panel, and the failure-direction posture. */
 

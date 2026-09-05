@@ -9,7 +9,7 @@
    console palette (Ember / Mint / semantic hues). */
 
 import { useMemo } from "react";
-import { Mail, MessageSquare, Phone, Printer } from "lucide-react";
+import { Mail, MessageCircle, MessageSquare, Phone, Printer } from "lucide-react";
 import { Avatar, type Member } from "./kit";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +55,7 @@ const CHANNEL_META: Record<string, ChannelMeta> = {
   call: { label: "Voice", toneVar: "--voice-agent", Icon: Phone },
   email: { label: "Email", toneVar: "--warning", Icon: Mail },
   fax: { label: "Fax", toneVar: "--chart-4", Icon: Printer },
+  webchat: { label: "Chat", toneVar: "--chart-2", Icon: MessageCircle },
 };
 const DEFAULT_CHANNEL_META: ChannelMeta = { label: "?", toneVar: "--text-tertiary", Icon: MessageSquare };
 

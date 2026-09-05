@@ -19,7 +19,8 @@ export type Row = {
 };
 
 export type TimelineItem = {
-  kind: "sms" | "call" | "email" | "fax";
+  kind: "sms" | "call" | "email" | "fax" | "webchat";
+  agent_id?: string;
   id: string;
   direction: "inbound" | "outbound";
   at: string;

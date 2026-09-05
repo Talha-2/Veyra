@@ -332,4 +332,11 @@ def ingest_trigger_event(slug: str, data: dict, session: Session) -> bool:
     if stored:
         session.commit()
         logger.info("email ingested from trigger %s (%s)", slug, stored.counterparty)
+        if direction == "inbound":
+            from .. import events
+
+            events.publish("email.received", {
+                "object": "email", "from": n["from_addr"], "to": n["to_addr"] or account_email,
+                "subject": n["subject"], "snippet": n["snippet"][:500],
+            })
     return bool(stored)

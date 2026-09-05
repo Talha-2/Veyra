@@ -2,6 +2,7 @@
 transcripts, and eval runs. Vectors live in LanceDB (see rag/store.py)."""
 
 import json
+import os
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -189,6 +190,24 @@ class SmsMessage(SQLModel, table=True):
     body: str = ""
     status: str = "queued"  # queued|sent|delivered|received|failed|undelivered
     error: str | None = None
+    created_at: datetime = Field(default_factory=now)
+
+
+class WebChatMessage(SQLModel, table=True):
+    """One website-chat message, inbound (visitor) or outbound (agent/human).
+
+    The web chat channel: a visitor talks to an agent through the embeddable
+    widget (or the site chatbot). Threads key on the visitor's session id the
+    same way SMS threads key on the phone number, so the Desk inbox folds them
+    in as a projection like every other channel. agent_id records which Expert
+    answered; empty means a human replied from the Desk."""
+
+    id: str = Field(primary_key=True)  # wm_...
+    session_id: str = Field(default="", index=True)  # visitor session (thread key), wc_...
+    direction: str = "inbound"  # inbound (visitor) | outbound (agent or human)
+    body: str = ""
+    agent_id: str = ""  # Expert id for agent replies, "" for visitor/human messages
+    visitor_label: str = ""  # optional display name the widget was embedded with
     created_at: datetime = Field(default_factory=now)
 
 
@@ -380,9 +399,23 @@ class EvalRun(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now)
 
 
-engine = create_engine(
-    f"sqlite:///{settings.sqlite_path}", connect_args={"check_same_thread": False}
-)
+# DATABASE_URL switches the whole server onto managed Postgres (e.g. Supabase:
+# Project Settings → Database → Connection string; use the session-pooler URI).
+# Unset, everything keeps working on the local SQLite file exactly as before.
+_db_url = os.getenv("DATABASE_URL", "").strip()
+if _db_url:
+    # Supabase hands out "postgres://"; SQLAlchemy needs the explicit driver.
+    if _db_url.startswith("postgres://"):
+        _db_url = _db_url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif _db_url.startswith("postgresql://"):
+        _db_url = _db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    engine = create_engine(_db_url, pool_pre_ping=True, pool_recycle=300)
+else:
+    engine = create_engine(
+        f"sqlite:///{settings.sqlite_path}", connect_args={"check_same_thread": False}
+    )
+
+IS_SQLITE = engine.url.get_backend_name() == "sqlite"
 
 
 def _migrate() -> None:
@@ -739,10 +772,52 @@ def seed_demo_email() -> None:
 
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)  # creates the new Folder table
-    _migrate()  # backfills new Document columns on pre-existing databases
-    seed_desk()  # sample CRM data on first run so Veyra Desk looks alive
-    seed_demo_conversations()  # sample inbox threads (calls + texts)
-    seed_demo_email()  # sample email threads + a fax (omnichannel inbox demo)
+    if IS_SQLITE:
+        _migrate()  # PRAGMA-based backfill; Postgres schemas are born current via create_all()
+    # SEED_DEMO=0 gives a clean deployment (developer/API-only tenants who never
+    # open the CRM shouldn't be carrying fake contacts). Default stays on: the
+    # demo experience — Desk looking alive on first boot — is a product feature.
+    if os.getenv("SEED_DEMO", "1").strip().lower() not in ("0", "false", "no"):
+        seed_desk()  # sample CRM data on first run so Veyra Desk looks alive
+        seed_demo_conversations()  # sample inbox threads (calls + texts)
+        seed_demo_email()  # sample email threads + a fax (omnichannel inbox demo)
+        seed_chat_agent()  # the site chatbot has an agent to answer as
+
+
+def seed_chat_agent() -> None:
+    """Give the web chat channel a default agent on first boot, so the site
+    chatbot and the embeddable widget work out of the box. Skipped once any
+    chat-enabled Expert exists — a real workspace owns its own agents."""
+    from .experts.models import Expert
+
+    with Session(engine) as session:
+        from sqlmodel import or_
+
+        existing = session.exec(
+            select(Expert).where(or_(Expert.kind == "chat", Expert.triggers_json.contains("chat")))  # type: ignore[attr-defined]
+        ).first()
+        if existing:
+            return
+        session.add(Expert(
+            id=new_id("exp"),
+            name="Veyra Guide",
+            description="Answers website visitors' questions about Veyra.",
+            kind="chat",
+            system_prompt=(
+                "You are Veyra's website guide. Veyra builds AI voice and chat agents that answer "
+                "calls, work every channel from one inbox, follow up with leads, and hand off to "
+                "humans with context. Answer visitor questions plainly and briefly. Search the "
+                "knowledge base before answering factual questions about the product. If someone "
+                "wants a demo or pricing, point them to /start and /pricing. Never invent numbers "
+                "or customers."
+            ),
+            goal="",
+            triggers_json='["chat"]',
+            allowed_tools_json='[{"kind": "kb", "ref": "knowledge_base", "label": "Knowledge Base"}]',
+            reasoning="fast",
+            status="active",
+        ))
+        session.commit()
 
 
 def get_session():

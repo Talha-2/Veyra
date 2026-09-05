@@ -35,7 +35,11 @@ const jetbrainsMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Veyra — AI agents that answer, call, and close",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://veyra.vercel.app"),
+  title: {
+    default: "Veyra — AI agents that answer, call, and close",
+    template: "%s",
+  },
   description:
     "Veyra builds AI voice and chat agents that talk to your customers, run real workflows, and connect to your CRM. Sub-second, grounded, and built for the calls that break everything else.",
 };

@@ -1,10 +1,18 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Veyra Integrations — 1000+ Tools via Composio",
+  description:
+    "One connection and the agent can act: CRM, calendars, support, payments, messaging, docs. Managed OAuth, your own MCP servers welcome.",
+};
+
 /* Integrations — the catalog as console cards with mono tool tags; MCP and
    custom HTTP as first-class rows. */
 
-const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/contact";
+const CALENDAR_URL = process.env.NEXT_PUBLIC_CALENDAR_URL || "/start";
 const bookProps = CALENDAR_URL.startsWith("http")
   ? { target: "_blank", rel: "noopener noreferrer" as const }
   : {};

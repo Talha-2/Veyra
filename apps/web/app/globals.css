@@ -3007,6 +3007,31 @@ input[type="range"].slider::-moz-range-thumb {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 24%, transparent);
 }
 .trg-blurb { margin-top: 3px; font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+
+/* product-event rows in the trigger picker: quiet checklist, accent when armed */
+.evt-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 120ms var(--ease-out), background 120ms var(--ease-out);
+}
+.evt-row:hover { border-color: var(--border-strong); }
+.evt-row[data-on] {
+  border-color: var(--border-accent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+.evt-row input[type="checkbox"] {
+  margin-top: 3px;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
 .trg-body {
   margin-top: 14px; padding-top: 14px;
   border-top: 1px solid color-mix(in srgb, var(--tc) 16%, var(--border));
@@ -4233,6 +4258,128 @@ input[type="range"].slider::-moz-range-thumb {
   color: var(--text-secondary);
 }
 .msg-card__body { padding: 0 14px 12px; }
+/* ── chat widget (the iframe page + site launcher) ──────────────────────────
+   The widget always renders the dark console — it is a product surface
+   embedded on arbitrary pages, so it carries its own ground and never
+   inherits the host page's theme. */
+.vw-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.vw-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.vw-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+.vw-title { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+.vw-live { margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); }
+.vw-scroll { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.vw-empty { margin: auto; max-width: 30ch; text-align: center; font-size: 13px; line-height: 1.6; color: var(--text-tertiary); }
+.vw-msg {
+  max-width: 82%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.vw-msg--you {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-bottom-right-radius: 4px;
+}
+.vw-msg--agent {
+  align-self: flex-start;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.vw-input {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.vw-input input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-primary);
+  font-size: 13.5px;
+}
+.vw-input input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.vw-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #0e0e13;
+  border: none;
+  cursor: pointer;
+}
+.vw-send:disabled { opacity: 0.45; cursor: default; }
+.vw-send:not(:disabled):hover { background: var(--accent-hover); }
+
+/* the floating launcher on the marketing site */
+.vw-launcher {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent, #e96b34);
+  color: #0e0e13;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out, ease-out);
+}
+.vw-launcher:hover { transform: translateY(-1px); }
+.vw-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 76px;
+  z-index: 60;
+  width: min(380px, calc(100vw - 32px));
+  height: min(560px, calc(100vh - 110px));
+  border: 1px solid var(--border, #27272a);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0e0e13;
+}
+.vw-panel iframe { width: 100%; height: 100%; border: 0; display: block; }
+
 /* ── call-recording player ──────────────────────────────────────────────── */
 .rplay {
   display: flex;
@@ -6161,8 +6308,36 @@ a.row:hover .row__tag { color: var(--accent); }
   transition: border-color 150ms var(--ease-out);
 }
 .field::placeholder { color: var(--text-tertiary); }
-.field:focus { outline: none; border-color: var(--accent); }
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
 textarea.field { height: auto; min-height: 120px; padding: 12px 14px; line-height: 1.6; resize: vertical; }
+select.field { appearance: none; cursor: pointer; }
+.field-wrap { position: relative; }
+.field-wrap .chev {
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-tertiary);
+}
+/* designed failure: danger-tinted console row with recovery copy, never an alert */
+.form-error {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid color-mix(in srgb, var(--danger) 36%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-radius: var(--radius-md);
+  padding: 11px 13px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+.form-error svg { flex-shrink: 0; margin-top: 2px; color: var(--danger); }
 .field-label {
   display: block;
   margin-bottom: 8px;

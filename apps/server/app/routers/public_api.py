@@ -35,7 +35,7 @@ from ..config import settings
 from ..db import CallTranscript, get_session, new_id, now
 from ..experts.models import Expert, ExpertRun
 from ..experts.runtime import create_run, execute_run
-from ..publicapi import webhooks
+from .. import events
 from ..publicapi.keys import ApiKey, require_api_key
 
 router = APIRouter(prefix="/v1", tags=["public-api"])
@@ -194,7 +194,7 @@ async def create_run_api(
         raise HTTPException(404, "agent not found")
     input_text = body.input if isinstance(body.input, str) else json.dumps(body.input)
     run = create_run(session, e, "external", input_text)
-    webhooks.emit("run.started", {"object": "run", "id": run.id, "agent_id": e.id})
+    events.publish("run.started", {"object": "run", "id": run.id, "agent_id": e.id})
     if wait:
         await execute_run(run.id)
         session.refresh(run)
@@ -281,7 +281,7 @@ def create_call(body: CallCreate, key: ApiKey = Depends(require_api_key)):
         .with_grants(lk.VideoGrants(room_join=True, room=room, can_publish=True, can_subscribe=True))
         .to_jwt()
     )
-    webhooks.emit("call.started", {"object": "call", "room": room, "identity": identity})
+    events.publish("call.started", {"object": "call", "room": room, "identity": identity})
     return {"object": "call", "room": room, "identity": identity,
             "token": token, "url": settings.livekit_url, "expires_in": 1800}
 

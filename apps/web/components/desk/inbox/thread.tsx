@@ -13,7 +13,7 @@ import Link from "next/link";
 import {
   ArrowLeft, ArrowDown, Archive, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, Copy,
   ExternalLink, FileText, Mail, MessageSquare, MoreHorizontal, Paperclip, Phone, PhoneCall,
-  Moon, PhoneIncoming, PhoneMissed, PhoneOutgoing, Printer, Send, Star, StickyNote,
+  MessageCircle, Moon, PhoneIncoming, PhoneMissed, PhoneOutgoing, Printer, Send, Star, StickyNote,
   Ticket as TicketIcon, Users,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -103,8 +103,8 @@ function ThreadHeader({
           <span className="mono truncate">{isEmailPeer(peer) ? peer : prettyPhone(peer)}</span>
           {channels.map((c) => (
             <span key={c} className="ibx-cht" title={`This thread includes ${c}`}>
-              {c === "email" ? <Mail /> : c === "fax" ? <Printer /> : c === "sms" ? <MessageSquare /> : <Phone />}
-              {c === "sms" ? "SMS" : c}
+              {c === "email" ? <Mail /> : c === "fax" ? <Printer /> : c === "sms" ? <MessageSquare /> : c === "webchat" ? <MessageCircle /> : <Phone />}
+              {c === "sms" ? "SMS" : c === "webchat" ? "chat" : c}
             </span>
           ))}
         </div>
@@ -309,7 +309,7 @@ function ThreadBody({
               {d.entries.map((e) =>
                 e.type === "ticket" ? (
                   <TicketCard key={e.key} ticket={e.ticket} team={team} refresh={refresh} />
-                ) : e.item.kind === "sms" ? (
+                ) : e.item.kind === "sms" || e.item.kind === "webchat" ? (
                   <SmsBubble key={e.key} item={e.item} />
                 ) : e.item.kind === "call" ? (
                   <CallCard key={e.key} item={e.item} />
@@ -572,10 +572,11 @@ function TicketCard({ ticket, team, refresh }: { ticket: Ticket; team: Member[];
 }
 
 // ── composer ─────────────────────────────────────────────────────────────────
-type Mode = "sms" | "email" | "note" | "ticket" | "reminder";
+type Mode = "sms" | "email" | "chat" | "note" | "ticket" | "reminder";
 const MODES: { key: Mode; label: string; short: string; icon: any; hint: string }[] = [
   { key: "sms", label: "Reply by SMS", short: "SMS", icon: MessageSquare, hint: "Goes to the contact's phone." },
   { key: "email", label: "Reply by email", short: "Email", icon: Mail, hint: "Sends from your connected mailbox." },
+  { key: "chat", label: "Reply in chat", short: "Chat", icon: MessageCircle, hint: "Appears in the visitor's chat window." },
   { key: "note", label: "Internal note", short: "Note", icon: StickyNote, hint: "Only your team sees this." },
   { key: "ticket", label: "File a ticket", short: "Ticket", icon: TicketIcon, hint: "Opens a tracked ticket on the contact." },
   { key: "reminder", label: "Set a reminder", short: "Reminder", icon: Bell, hint: "Nudges the team later." },
@@ -593,13 +594,14 @@ function Composer({
   forceMode: { mode: string; n: number } | null;
 }) {
   const emailPeer = isEmailPeer(peer);
-  const [mode, setMode] = useState<Mode>(emailPeer ? "email" : "sms");
+  const chatPeer = peer.startsWith("wc_");
+  const [mode, setMode] = useState<Mode>(chatPeer ? "chat" : emailPeer ? "email" : "sms");
   const [text, setText] = useState("");
   const [subject, setSubject] = useState("");
   const [busy, setBusy] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { setMode(emailPeer ? "email" : "sms"); setText(""); setSubject(""); }, [peer, emailPeer]);
+  useEffect(() => { setMode(chatPeer ? "chat" : emailPeer ? "email" : "sms"); setText(""); setSubject(""); }, [peer, emailPeer, chatPeer]);
   useEffect(() => {
     if (!forceMode) return;
     setMode(forceMode.mode as Mode);
@@ -625,6 +627,8 @@ function Composer({
   const current = MODES.find((m) => m.key === mode)!;
 
   const blocked =
+    mode === "chat" && !chatPeer ? "Only web-chat threads can be answered in chat." :
+    mode === "sms" && chatPeer ? "This visitor is on web chat — reply in Chat mode." :
     mode === "sms" && !contactPhone ? "This thread has no phone number to text." :
     mode === "email" && !contactEmail ? "This thread has no email address." :
     mode === "email" && !activeMailbox ? "Connect Gmail or Outlook in Integrations to send email." :
@@ -632,6 +636,7 @@ function Composer({
       ? "Save this peer as a contact first — use the Details panel." : "";
 
   const placeholder =
+    mode === "chat" ? "Reply to the visitor — they see it in their chat window…" :
     mode === "sms" ? `Text ${thread?.contact?.name || prettyPhone(peer)}…` :
     mode === "email" ? "Write your reply…" :
     mode === "note" ? "Add a note only your team can see…" :
@@ -643,7 +648,9 @@ function Composer({
     if (!body || busy || blocked) return;
     setBusy(true);
     try {
-      if (mode === "sms") {
+      if (mode === "chat") {
+        await api.post(`/api/desk/webchat/${peer}/send`, { body });
+      } else if (mode === "sms") {
         await api.post("/api/telephony/messages", { to: contactPhone, body });
       } else if (mode === "email") {
         await api.post("/api/desk/email/send", {
@@ -679,16 +686,16 @@ function Composer({
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); return; }
-    if (e.key === "Enter" && !e.shiftKey && mode === "sms") { e.preventDefault(); send(); }
+    if (e.key === "Enter" && !e.shiftKey && (mode === "sms" || mode === "chat")) { e.preventDefault(); send(); }
   };
 
   const segments = Math.max(1, Math.ceil(text.length / SMS_SEGMENT));
-  const sendLabel = mode === "sms" || mode === "email" ? "Send" : mode === "ticket" ? "File" : "Save";
+  const sendLabel = mode === "sms" || mode === "email" || mode === "chat" ? "Send" : mode === "ticket" ? "File" : "Save";
 
   return (
     <div className={`ibx-composer mode-${mode}`}>
       <div className="ibx-composer__modes" role="tablist" aria-label="Composer mode">
-        {MODES.map((m) => (
+        {MODES.filter((m) => (chatPeer ? m.key !== "sms" && m.key !== "email" : m.key !== "chat")).map((m) => (
           <button
             key={m.key}
             role="tab"

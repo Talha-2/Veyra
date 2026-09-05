@@ -12,11 +12,11 @@
    never offer a kind that would return nothing. */
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { Check, Filter as FilterIcon, Mail, MessageSquare, Phone, Printer, Ticket as TicketIcon } from "lucide-react";
+import { Check, Filter as FilterIcon, Mail, MessageCircle, MessageSquare, Phone, Printer, Ticket as TicketIcon } from "lucide-react";
 import { Popover, useAnchor } from "@/components/desk/popover";
 import type { Thread, TimelineItem, Ticket } from "./types";
 
-export type MessageKind = "sms" | "call" | "email" | "fax" | "ticket";
+export type MessageKind = "sms" | "call" | "email" | "fax" | "webchat" | "ticket";
 export type Sender = "customer" | "team";
 
 export type StreamEntry =
@@ -24,10 +24,10 @@ export type StreamEntry =
   | { at: string; key: string; type: "ticket"; ticket: Ticket };
 
 const KIND_LABEL: Record<MessageKind, string> = {
-  sms: "Texts", call: "Calls", email: "Emails", fax: "Faxes", ticket: "Tickets",
+  sms: "Texts", call: "Calls", email: "Emails", fax: "Faxes", webchat: "Chats", ticket: "Tickets",
 };
 const KIND_ICON: Record<MessageKind, any> = {
-  sms: MessageSquare, call: Phone, email: Mail, fax: Printer, ticket: TicketIcon,
+  sms: MessageSquare, call: Phone, email: Mail, fax: Printer, webchat: MessageCircle, ticket: TicketIcon,
 };
 
 export const kindOf = (e: StreamEntry): MessageKind => (e.type === "ticket" ? "ticket" : e.item.kind);
@@ -85,7 +85,7 @@ export function MessageFilterProvider({
       senders.add(senderOf(e));
     }
     return {
-      kinds: (["sms", "call", "email", "fax", "ticket"] as MessageKind[]).filter((k) => kinds.has(k)),
+      kinds: (["sms", "call", "email", "fax", "webchat", "ticket"] as MessageKind[]).filter((k) => kinds.has(k)),
       senders: (["customer", "team"] as Sender[]).filter((s) => senders.has(s)),
     };
   }, [entries]);

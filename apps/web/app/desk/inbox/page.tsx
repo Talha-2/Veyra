@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle, Archive, Filter as FilterIcon, Inbox as InboxIcon, Mail, MailOpen,
+  AlertTriangle, Archive, Filter as FilterIcon, Inbox as InboxIcon, Mail, MailOpen, MessageCircle,
   MessageSquare, Moon, PanelLeft, Phone, Plus, Printer, RefreshCw, Search, Send,
   Star, UserRound, X,
 } from "lucide-react";
@@ -70,6 +70,7 @@ function buildNav(mineId: string): { title: string; items: NavItem[] }[] {
       items: [
         { key: "email", label: "Emails", icon: Mail, filters: f({ channels: ["email"] }) },
         { key: "phone", label: "Phone & SMS", icon: Phone, filters: f({ channels: ["call", "sms"] }) },
+        { key: "webchat", label: "Web chat", icon: MessageCircle, filters: f({ channels: ["webchat"] }) },
         { key: "fax", label: "Fax", icon: Printer, filters: f({ channels: ["fax"] }) },
       ],
     },
@@ -656,6 +657,7 @@ const CHANNEL_ICONS: Record<string, React.ElementType> = {
   sms: MessageSquare,
   call: Phone,
   fax: Printer,
+  webchat: MessageCircle,
 };
 
 function LastKindIcon({ kind }: { kind?: string }) {
