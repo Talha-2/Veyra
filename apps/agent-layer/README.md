@@ -1,0 +1,153 @@
+# Veyra agent layer
+
+The Python half of the product: everything that runs a model, and nothing that
+owns customer data. It reaches the app layer through one typed client and the
+contract in [docs/agent-contract.md](../../docs/agent-contract.md).
+
+```
+apps/agent-layer/
+├── packages/common/
+│   ├── app_sdk/          AppSdk — the only way to reach the app layer
+│   └── veyra_harness/    the worker's brain: model seam, tools, executor, worker loop, prompts
+├── gateway/veyra_gateway/   FastAPI — the app layer's front door; Ask threads, automations, skill tests
+└── agents/voice/veyra_voice/  LiveKit worker: talker (FrontAgent) + the harness Worker, per call
+```
+
+## What runs where
+
+**One worker loop, three hosts.** `veyra_harness.Worker` is a plain tool loop
+over a `ChatModel` — not a LiveKit Agent — so the same code runs a live call's
+delegations, an Ask thread and an automation. What differs is what is absent:
+a text run has no delegation rows (there is no call) and no talker.
+
+| Host | Entry | What it does |
+|---|---|---|
+| Voice worker | `python -m veyra_voice dev` | Answers a LiveKit room: `inbound_call` (one round trip), builds the pipeline from the call's language, runs the talker with the worker behind it, pushes the transcript, runs the silent post-call pass, reports the call ended. |
+| Gateway | `python -m veyra_gateway`, or the `agent` service in `apps/app-layer/docker-compose.yml` | Serves `/v1/health`, `/v1/runs`, `/v1/threads/stream` (Ask, token by token), `/v1/skills/test`, `/v1/calls/outbound` (501, honestly) on `:8100`, and a claim loop that pulls queued automation runs across tenants every `GATEWAY_CLAIM_INTERVAL` seconds. |
+
+## Reliability, in code
+
+The rules in ARCHITECTURE.md §5.4 are enforced, not hoped for:
+
+- `executor.py` records every tool call **before** dispatch. A non-idempotent
+  action carries an idempotency key; a retry gets the earlier record back and
+  reconciles from its status instead of running again. A timed-out write is
+  closed as `timeout` and is never `confirmed_complete`.
+- `worker.py` opens a delegation row per transcript delta and closes it with
+  the reply. The app answers `completed_durable_write` from the audit trail,
+  and `front_desk.guard_reply` appends an explicit "nothing durable was
+  confirmed" line when the worker's prose claims a write the app did not see.
+- `hangup_call` refuses only while a durable write is in flight (by Studio's
+  flag, not a name heuristic). A read left running costs nothing.
+- `delegate()` advances its transcript cursor when the delegation *begins*, so
+  a retry cannot send the same segment twice; the app 409s if one does.
+- A voicemail or a dead worker becomes the talker's fallback line, which
+  claims nothing.
+
+## Run the tests
+
+```powershell
+# from apps/agent-layer, with the repo .venv (httpx, pydantic, openai, fastapi, pytest, livekit-agents)
+..\..\.venv\Scripts\python.exe -m pytest -q
+```
+
+69 tests: the SDK against a fake app with the PHP contract's payloads; the
+executor's idempotency and timeout promises; the worker loop driven by a
+scripted model (parallel reads, serialized writes, the synchronous claim,
+progress digests, stall detection, finalization classified from records);
+prompt assembly; pipeline selection per language; the gateway end to end with
+its claim loop. Nothing in the suite touches the network.
+
+## Running it with the app (docker compose)
+
+The gateway is a service in the app layer's compose stack, built from this
+directory's `Dockerfile` (gateway dependencies only; the LiveKit voice worker
+is a separate, heavier image):
+
+```bash
+cd apps/app-layer
+docker compose up -d agent        # builds veyra-agent-gateway:dev the first time
+```
+
+It reads provider keys from the repo-root `.env`, takes `AGENT_SHARED_SECRET`
+from `apps/app-layer/.env`, reaches the app as `http://app:8000`, and is
+reached as `http://agent:8100` (`AGENT_GATEWAY_URL` in the app's `.env`).
+`packages/common` and `gateway` are bind-mounted, so a Python edit needs
+`docker compose restart agent`, not a rebuild. Its port is also published on
+`:8100` for curl.
+
+## Ask streaming
+
+`POST /v1/threads/stream` runs one Ask turn and streams it as server-sent
+events: `status`, then `tool` (running → done, with a human label such as
+"Searching knowledge" and a one-line result) and `delta` tokens in the order
+they happen, then `done` or `error`. The worker's `emit` callback produces
+them; `OpenAIChatModel.complete_stream` assembles streamed tool-call
+fragments. Laravel relays the stream (it must read it with Guzzle's
+`StreamHandler` over HTTP/1.0: the default curl handler buffers the whole
+body, and PHP's dechunk filter holds 8 KB) and saves the finished turn.
+
+## Proven live (2026-09-27)
+
+With the gateway on the host (`AGENT_GATEWAY_URL=http://host.docker.internal:8100`
+on the app), OpenAI `gpt-4o-mini`, and the seeded tenant:
+
+- **Ask**: a Studio message → app push → gateway → the worker searched the
+  knowledge base twice in one batch → the model answered from the seeded
+  documents → the reply landed on the thread through the contract. 13 s.
+- **Automation**: "Run now" on the digest → queued → the claim loop took it
+  (the push then got a clean 404: no double run) → `recent_calls`, two
+  contact lookups → a real overnight summary on the run's row. 22 s, 3,111
+  tokens, steps recorded.
+- The first live automation run found a product gap — no tool listed recent
+  calls — and a provider difference (`gpt-4o-mini` rejects `reasoning_effort`).
+  Both fixed: `GET /calls` + the `recent_calls` built-in, and a model client
+  that drops the parameter a provider names in a 400.
+
+Not yet run live: a LiveKit call. The voice worker imports and its pure parts
+are tested; a real room needs the LiveKit and Deepgram/ElevenLabs credentials
+from the root `.env` and a SIP trunk pointed at a seeded line.
+
+## Environment
+
+| Variable | Meaning |
+|---|---|
+| `APP_LAYER_URL` | The Laravel app, e.g. `http://app:8080`. |
+| `AGENT_SHARED_SECRET` | Same value as on the app layer. |
+| `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | Any OpenAI-compatible endpoint; else `XAI_API_KEY` and Grok. Per-expert `model` in Studio overrides the worker's. |
+| `TALKER_MODEL`, `WORKER_MODEL` | Defaults `grok-3-mini` / `grok-4`. |
+| `GATEWAY_CLAIM_INTERVAL` | Seconds between automation claims; `0` disables the loop. |
+| `LIVEKIT_*`, `DEEPGRAM_API_KEY`, `ELEVEN_API_KEY`, `AZURE_SPEECH_KEY/REGION` | Voice only. Azure is used for Urdu, where ElevenLabs Flash has no voice. |
+
+The repo `.env`'s `LLM_MODEL=llama-3.3-70b-versatile` no longer exists at
+Groq (404 `model_not_found` on the first live run). Point `LLM_*` somewhere
+current.
+
+## Models, providers, tracing
+
+`veyra_harness.models` is the one place a ``provider:model`` reference
+(``openai:gpt-4.1-mini``, ``groq:openai/gpt-oss-120b``) becomes a base URL
+and a key. Studio stores references on the agent config (`talker_model`,
+`worker_model`; an expert's own `model` beats the worker one); the gateway's
+`GET /v1/capabilities` reports which providers have keys **and whether the
+key works** (a live `/models` call, cached ten minutes), so a dead key shows
+as "rejected" in Studio instead of as a call that cannot start. Defaults are
+OpenAI `gpt-4o-mini` (talker) and `gpt-4.1-mini` (worker).
+
+Composio actions execute here: the app mirrors a toolkit's tools as actions
+carrying `tool_slug` and the `connected_account_id`, and
+`veyra_harness.actions.composio_handler` posts to Composio's v3 execute
+endpoint with `COMPOSIO_API_KEY` from this layer's env.
+
+Langfuse: set `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` (and `LANGFUSE_HOST`)
+and every delegation and tool call becomes a span, with LiveKit's own spans
+joining the same trace on a call.
+
+## Known gaps
+
+- MCP actions answer honestly that they are not connected; the executor is
+  the next slice.
+- One worker expert per call. Peer routing between several workers is wired
+  in the prompt (`peers`) but not in the loop.
+- Outbound calling is a 501.
+- No Langfuse tracing yet; logs only.

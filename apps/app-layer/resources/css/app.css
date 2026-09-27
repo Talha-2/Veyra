@@ -1,0 +1,477 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../js/**/*.{ts,tsx}';
+
+/* ===================================================================
+   VEYRA APP — Desk and Studio
+   ===================================================================
+
+   The product app's own system (DESIGN.md › "The app: Desk and Studio").
+   It shares the Veyra name, the Ember accent and nothing else with the
+   marketing site, which stays on its console system in apps/web.
+
+   Character: calm, exact, quietly expensive — a native Mac app more than a
+   web dashboard. Poppins throughout; neutral greys doing the structure; one
+   accent (Ember) spent on focus, selection and live state; primary actions
+   are ink pills. Depth is real but soft: hairline + a low, wide shadow in
+   light, hairlines alone in dark.
+
+   Every existing token name is kept so pages keep compiling; only values
+   changed. New names are additions.
+   =================================================================== */
+
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/poppins/poppins-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/poppins/poppins-latin-ext-400-normal.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/poppins/poppins-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/poppins/poppins-latin-ext-500-normal.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/poppins/poppins-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/poppins/poppins-latin-ext-600-normal.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+:root {
+    color-scheme: light;
+
+    /* canvas and surfaces */
+    --bg: #f7f7f8;
+    --bg-subtle: #f1f1f3;
+    --sidebar: #f0f0f2;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-overlay: rgba(255, 255, 255, 0.88);
+    --surface-sunken: #f2f2f4;
+    --surface-hover: rgba(0, 0, 0, 0.04);
+    --surface-active: rgba(0, 0, 0, 0.065);
+
+    /* the voice stage stays dark in both themes */
+    --stage: #0e0e13;
+    --stage-raised: #18181b;
+    --stage-border: #27272a;
+    --stage-text: #f5f5f7;
+    --stage-text-muted: #8e8e93;
+
+    /* hairlines */
+    --border: rgba(0, 0, 0, 0.075);
+    --border-strong: rgba(0, 0, 0, 0.13);
+    --border-accent: rgba(233, 107, 52, 0.55);
+    --separator: rgba(0, 0, 0, 0.06);
+
+    /* text */
+    --text-primary: #1d1d1f;
+    --text-secondary: #636366;
+    --text-tertiary: #8e8e93;
+    --text-disabled: #c2c2c7;
+    --text-inverse: #ffffff;
+    --text-on-accent: #ffffff;
+
+    /* primary action: an ink pill */
+    --primary: #1d1d1f;
+    --primary-hover: #3a3a3c;
+    --primary-text: #ffffff;
+
+    /* accent: Ember, spent sparingly */
+    --accent: #e96b34;
+    --accent-hover: #d55f2c;
+    --accent-active: #c25526;
+    --accent-subtle: rgba(233, 107, 52, 0.1);
+    --accent-subtle-hover: rgba(233, 107, 52, 0.16);
+    --accent-text: #c2541c;
+    --accent-2: #34c759;
+
+    --success: #248a3d; --success-fill: #34c759; --success-subtle: rgba(52, 199, 89, 0.12); --success-border: rgba(36, 138, 61, 0.28);
+    --warning: #b25f00; --warning-fill: #ff9f0a; --warning-subtle: rgba(255, 159, 10, 0.13); --warning-border: rgba(178, 95, 0, 0.28);
+    --danger: #d70015;  --danger-fill: #ff3b30;  --danger-subtle: rgba(255, 59, 48, 0.1);   --danger-border: rgba(215, 0, 21, 0.26);
+    --info: #0066cc;    --info-fill: #0a84ff;    --info-subtle: rgba(10, 132, 255, 0.1);    --info-border: rgba(0, 102, 204, 0.26);
+
+    --voice-agent: #0a84ff;
+    --voice-caller: #7c5cff;
+
+    --chart-1: #0a84ff; --chart-2: #34c759; --chart-3: #af52de; --chart-4: #ff9f0a; --chart-5: #5e5ce6;
+
+    /* depth: a hairline plus a low, wide shadow */
+    --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.04);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 10px rgba(0, 0, 0, 0.025);
+    --shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.05), 0 10px 28px rgba(0, 0, 0, 0.07);
+    --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 18px 48px rgba(0, 0, 0, 0.16), 0 3px 10px rgba(0, 0, 0, 0.06);
+    --ring: 0 0 0 3px rgba(233, 107, 52, 0.28);
+
+    --radius-xs: 6px;
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+    --radius-pill: 9999px;
+
+    --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out-quint: settles without overshoot */
+}
+
+[data-theme='dark'] {
+    color-scheme: dark;
+
+    --bg: #111113;
+    --bg-subtle: #0c0c0e;
+    --sidebar: #17171a;
+    --surface: #1b1b1e;
+    --surface-raised: #232327;
+    --surface-overlay: rgba(36, 36, 40, 0.9);
+    --surface-sunken: #0d0d0f;
+    --surface-hover: rgba(255, 255, 255, 0.05);
+    --surface-active: rgba(255, 255, 255, 0.085);
+
+    --stage: #09090b;
+    --stage-raised: #18181b;
+    --stage-border: #27272a;
+    --stage-text: #f5f5f7;
+    --stage-text-muted: #8e8e93;
+
+    --border: rgba(255, 255, 255, 0.075);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --border-accent: rgba(255, 138, 87, 0.55);
+    --separator: rgba(255, 255, 255, 0.06);
+
+    --text-primary: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --text-tertiary: #6e6e73;
+    --text-disabled: #48484a;
+    --text-inverse: #111113;
+    --text-on-accent: #ffffff;
+
+    --primary: #f5f5f7;
+    --primary-hover: #ffffff;
+    --primary-text: #111113;
+
+    --accent: #f07a45;
+    --accent-hover: #ff8a57;
+    --accent-active: #e96b34;
+    --accent-subtle: rgba(240, 122, 69, 0.14);
+    --accent-subtle-hover: rgba(240, 122, 69, 0.22);
+    --accent-text: #ff9b6e;
+    --accent-2: #30d158;
+
+    --success: #30d158; --success-fill: #30d158; --success-subtle: rgba(48, 209, 88, 0.14); --success-border: rgba(48, 209, 88, 0.3);
+    --warning: #ffb340; --warning-fill: #ff9f0a; --warning-subtle: rgba(255, 159, 10, 0.15); --warning-border: rgba(255, 179, 64, 0.3);
+    --danger: #ff6961;  --danger-fill: #ff453a;  --danger-subtle: rgba(255, 69, 58, 0.14);  --danger-border: rgba(255, 105, 97, 0.32);
+    --info: #64b5ff;    --info-fill: #0a84ff;    --info-subtle: rgba(10, 132, 255, 0.16);  --info-border: rgba(100, 181, 255, 0.3);
+
+    --voice-agent: #64b5ff;
+    --voice-caller: #a18bff;
+
+    --chart-1: #0a84ff; --chart-2: #30d158; --chart-3: #bf5af2; --chart-4: #ff9f0a; --chart-5: #5e5ce6;
+
+    --shadow-xs: none;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-raised: 0 8px 28px rgba(0, 0, 0, 0.45);
+    --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.6);
+    --ring: 0 0 0 3px rgba(240, 122, 69, 0.35);
+}
+
+/* Tokens exposed to Tailwind: bg-surface, text-secondary, text-title, … */
+@theme inline {
+    /* 'Noto Nastaliq Urdu' after Poppins on purpose: fallback is per
+       character, so Latin resolves to Poppins and Arabic script to Nastaliq
+       with nothing tagging the language. See docs/urdu-support.md. */
+    --font-sans: 'Poppins', 'Noto Nastaliq Urdu', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+    /* the type ramp — named, so pages never carry a pixel value */
+    --text-2xs: 11px;  --text-2xs--line-height: 1.45;
+    --text-xs: 12px;   --text-xs--line-height: 1.5;
+    --text-sm: 13px;   --text-sm--line-height: 1.55;
+    --text-base: 14px; --text-base--line-height: 1.6;
+    --text-md: 15px;   --text-md--line-height: 1.55;
+    --text-lg: 17px;   --text-lg--line-height: 1.45;
+    --text-xl: 20px;   --text-xl--line-height: 1.35;
+    --text-2xl: 24px;  --text-2xl--line-height: 1.25;
+    --text-3xl: 28px;  --text-3xl--line-height: 1.2;
+    --text-4xl: 34px;  --text-4xl--line-height: 1.15;
+
+    --color-bg: var(--bg);
+    --color-bg-subtle: var(--bg-subtle);
+    --color-sidebar: var(--sidebar);
+    --color-surface: var(--surface);
+    --color-surface-raised: var(--surface-raised);
+    --color-surface-sunken: var(--surface-sunken);
+    --color-surface-hover: var(--surface-hover);
+    --color-surface-active: var(--surface-active);
+
+    /* the ink fill of primary controls, and the text that sits on it */
+    --color-ink: var(--primary);
+    --color-ink-text: var(--primary-text);
+
+    --color-border: var(--border);
+    --color-border-strong: var(--border-strong);
+    --color-separator: var(--separator);
+
+    --color-primary: var(--text-primary);
+    --color-secondary: var(--text-secondary);
+    --color-tertiary: var(--text-tertiary);
+    --color-disabled: var(--text-disabled);
+
+    --color-accent: var(--accent);
+    --color-accent-hover: var(--accent-hover);
+    --color-accent-subtle: var(--accent-subtle);
+    --color-accent-text: var(--accent-text);
+    --color-accent-2: var(--accent-2);
+
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-danger: var(--danger);
+    --color-info: var(--info);
+    --color-success-subtle: var(--success-subtle);
+    --color-warning-subtle: var(--warning-subtle);
+    --color-danger-subtle: var(--danger-subtle);
+    --color-info-subtle: var(--info-subtle);
+
+    --radius-xs: var(--radius-xs);
+    --radius-sm: var(--radius-sm);
+    --radius-md: var(--radius-md);
+    --radius-lg: var(--radius-lg);
+    --radius-xl: var(--radius-xl);
+
+    --shadow-card: var(--shadow-card);
+    --shadow-raised: var(--shadow-raised);
+    --shadow-overlay: var(--shadow-overlay);
+
+    --animate-fade-in: fade-in 180ms var(--ease-out) both;
+    --animate-rise: rise 320ms var(--ease-entrance) both;
+    --animate-pop: pop 220ms var(--ease-spring) both;
+    --animate-shimmer: shimmer 1.6s linear infinite;
+}
+
+/* ── base ─────────────────────────────────────────────────────────── */
+
+/* Tailwind v4 draws an uncoloured border in currentColor, which turned every
+   bare `border-t` / `divide-y` into a hard black rule. Default to the hairline;
+   a colour utility or inline style still wins. */
+@layer base {
+    *, ::after, ::before, ::backdrop, ::file-selector-button { border-color: var(--border); }
+}
+
+html { overflow-x: clip; }
+
+body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.55;
+    letter-spacing: -0.003em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'ss01', 'cv11';
+}
+
+/* Nastaliq cascades diagonally and clips at Latin leading. `lang="ur"` is set
+   by UserText when it detects Arabic script. */
+:lang(ur) { line-height: 2.1; }
+
+::selection { background: var(--accent-subtle-hover); color: var(--text-primary); }
+
+*:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+    border-radius: var(--radius-sm);
+}
+
+/* A bare field inside a container that shows focus itself (the Ask composer,
+   a search pill): the container carries the ring, not the field. */
+.v-bare:focus-visible { box-shadow: none; }
+
+/* Scrollbars appear on hover, as on a Mac. */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 9999px; border: 3px solid transparent; background-clip: padding-box; }
+*:hover::-webkit-scrollbar-thumb { background-color: var(--border-strong); }
+
+input[type='checkbox'], input[type='radio'] { accent-color: var(--accent); width: 15px; height: 15px; }
+
+code:not(pre code) {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+}
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.96) translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes pulse-dot { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(2.4); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ── shared primitives ────────────────────────────────────────────── */
+/* In @layer components so utilities, which sort after, still override. */
+
+@layer components {
+    /* Meta text: counts, durations, identifiers, timestamps. Never uppercase. */
+    .v-mono {
+        font-family: var(--font-sans);
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-tertiary);
+    }
+
+    /* Section and group labels. */
+    .v-eyebrow {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-tertiary);
+    }
+
+    .v-code { font-family: var(--font-mono); font-size: 12px; }
+
+    /* Containers: a white card with a hairline and a soft shadow. */
+    .v-panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+    }
+
+    .v-card-hover { transition: box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out), border-color 200ms var(--ease-out); }
+    .v-card-hover:hover { box-shadow: var(--shadow-raised); border-color: var(--border-strong); }
+
+    /* Actions are pills. Primary is ink; the accent is not a button colour. */
+    .v-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 34px;
+        padding: 0 16px;
+        border-radius: var(--radius-pill);
+        border: 1px solid transparent;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: -0.005em;
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), transform 120ms var(--ease-out);
+    }
+    .v-btn:active:not(:disabled) { transform: scale(0.97); }
+    .v-btn:disabled { opacity: 0.42; cursor: not-allowed; }
+    .v-btn svg { flex-shrink: 0; }
+
+    .v-btn--ember, .v-btn--primary { background: var(--primary); color: var(--primary-text); box-shadow: var(--shadow-xs); }
+    .v-btn--ember:hover:not(:disabled), .v-btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+    .v-btn--accent, .v-btn--mint { background: var(--accent); color: var(--text-on-accent); }
+    .v-btn--accent:hover:not(:disabled), .v-btn--mint:hover:not(:disabled) { background: var(--accent-hover); }
+
+    .v-btn--quiet, .v-btn--secondary {
+        background: var(--surface);
+        color: var(--text-primary);
+        border-color: var(--border-strong);
+        box-shadow: var(--shadow-xs);
+    }
+    .v-btn--quiet:hover:not(:disabled), .v-btn--secondary:hover:not(:disabled) { background: var(--surface-sunken); }
+
+    .v-btn--ghost { background: transparent; color: var(--text-secondary); }
+    .v-btn--ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-primary); }
+
+    .v-btn--danger { background: var(--danger-subtle); color: var(--danger); }
+    .v-btn--danger:hover:not(:disabled) { background: var(--danger-fill); color: #fff; }
+
+    .v-btn--sm { height: 28px; padding: 0 12px; font-size: 12px; }
+    .v-btn--icon { width: 32px; height: 32px; padding: 0; border-radius: var(--radius-sm); }
+
+    /* Fields: calm white wells that light up in the accent on focus. */
+    .v-field {
+        width: 100%;
+        height: 36px;
+        padding: 0 12px;
+        background: var(--surface);
+        color: var(--text-primary);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-md);
+        font-family: var(--font-sans);
+        font-size: 13.5px;
+        line-height: 1.5;
+        transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), background-color 160ms var(--ease-out);
+    }
+    .v-field::placeholder { color: var(--text-tertiary); }
+    .v-field:hover:not(:disabled):not(:focus) { border-color: color-mix(in srgb, var(--text-primary) 22%, transparent); }
+    .v-field:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); border-radius: var(--radius-md); }
+    .v-field:disabled { background: var(--surface-sunken); color: var(--text-tertiary); cursor: not-allowed; }
+    textarea.v-field { padding-top: 9px; padding-bottom: 9px; resize: vertical; }
+    select.v-field {
+        appearance: none;
+        padding-right: 32px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2.5 3.75 5 6.25l2.5-2.5' fill='none' stroke='%238e8e93' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 11px center;
+        cursor: pointer;
+    }
+    input[type='color'].v-field { padding: 3px; cursor: pointer; }
+
+    .v-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    /* Text that is loading: a soft sweep, used for "Thinking" and live steps. */
+    .v-shimmer {
+        background: linear-gradient(90deg, var(--text-tertiary) 0%, var(--text-tertiary) 40%, var(--text-primary) 50%, var(--text-tertiary) 60%, var(--text-tertiary) 100%);
+        background-size: 200% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: var(--animate-shimmer);
+    }
+
+    .v-skeleton {
+        background: linear-gradient(90deg, var(--surface-sunken) 0%, var(--surface-hover) 50%, var(--surface-sunken) 100%);
+        background-size: 200% 100%;
+        animation: var(--animate-shimmer);
+        border-radius: var(--radius-sm);
+    }
+
+    .v-glass {
+        background: var(--surface-overlay);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        backdrop-filter: saturate(180%) blur(20px);
+    }
+
+    /* Markdown in chat and documents. */
+    .v-prose { font-size: 14.5px; line-height: 1.7; color: var(--text-primary); overflow-wrap: anywhere; }
+    .v-prose > * + * { margin-top: 0.8em; }
+    .v-prose h1, .v-prose h2, .v-prose h3 { font-weight: 600; letter-spacing: -0.01em; margin-top: 1.3em; line-height: 1.35; }
+    .v-prose h1 { font-size: 20px; } .v-prose h2 { font-size: 17px; } .v-prose h3 { font-size: 15px; }
+    .v-prose ul, .v-prose ol { padding-left: 1.35em; }
+    .v-prose ul { list-style: disc; } .v-prose ol { list-style: decimal; }
+    .v-prose li + li { margin-top: 0.3em; }
+    .v-prose li::marker { color: var(--text-tertiary); }
+    .v-prose a { color: var(--accent-text); text-decoration: underline; text-decoration-color: var(--accent-subtle-hover); text-underline-offset: 3px; }
+    .v-prose strong { font-weight: 600; }
+    .v-prose blockquote { border-left: 3px solid var(--border-strong); padding-left: 14px; color: var(--text-secondary); }
+    .v-prose hr { border: none; border-top: 1px solid var(--separator); margin: 1.4em 0; }
+    .v-prose pre { background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
+    .v-prose pre code { font-family: var(--font-mono); background: none; border: none; padding: 0; }
+    .v-prose table { width: 100%; border-collapse: collapse; font-size: 13px; display: block; overflow-x: auto; }
+    .v-prose th, .v-prose td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+    .v-prose th { background: var(--surface-sunken); font-weight: 600; }
+}

@@ -1,0 +1,91 @@
+# Local development stack for the Veyra app layer.
+#
+# PHP and Postgres run in containers; **Vite runs on the host** (`npm run dev`).
+# That split is deliberate: Node is already installed here, and a Vite watcher
+# inside a Windows bind mount has to poll for changes, which is both slow and
+# unreliable. Nothing else needs Node.
+#
+# Ports are chosen around this machine: 5433 rather than 5432 so it cannot
+# collide with the Z360 stack's Postgres, and nothing in the Windows reserved
+# TCP ranges (netsh interface ipv4 show excludedportrange protocol=tcp).
+
+services:
+    app:
+        build:
+            context: .
+            dockerfile: docker/Dockerfile
+        image: veyra-app-layer:dev
+        ports:
+            - '${APP_PORT:-8080}:8000'
+        volumes:
+            - '.:/app'
+        environment:
+            # 0 = serve PHP from opcache without re-stat-ing files (fast; PHP
+            # edits need `docker compose restart app`). 1 = pick up edits
+            # live, at 2–6 s per request on this bind mount. See docker/php.ini.
+            OPCACHE_VALIDATE_TIMESTAMPS: '${OPCACHE_VALIDATE_TIMESTAMPS:-0}'
+        # Deliberately NO DB_* here — they live in .env only.
+        #
+        # A variable set on the container lands in $_SERVER, and Laravel's Env
+        # repository reads $_SERVER before $_ENV. PHPUnit's <env> only writes
+        # $_ENV and putenv(), so container-set DB_* silently beat phpunit.xml
+        # even with force="true": the suite ran against this Postgres and
+        # RefreshDatabase truncated the development data on every run.
+        depends_on:
+            pgsql:
+                condition: service_healthy
+        networks:
+            - veyra
+
+    # The agent layer's gateway: Ask streaming, skill tests, automation runs.
+    # It reaches the app over this network as http://app:8000 and the app
+    # reaches it as http://agent:8100 (AGENT_GATEWAY_URL in .env).
+    #
+    # Provider keys come from the repo-root .env, the one place they live.
+    # The shared secret is interpolated from this directory's .env so both
+    # sides always hold the same value. The source is bind-mounted, so a
+    # Python edit needs only `docker compose restart agent`, not a rebuild.
+    agent:
+        build:
+            context: ../agent-layer
+        image: veyra-agent-gateway:dev
+        env_file:
+            - path: ../../.env
+              required: false
+        environment:
+            APP_LAYER_URL: 'http://app:8000'
+            AGENT_SHARED_SECRET: '${AGENT_SHARED_SECRET:?set AGENT_SHARED_SECRET in apps/app-layer/.env}'
+            GATEWAY_CLAIM_INTERVAL: '${GATEWAY_CLAIM_INTERVAL:-15}'
+        ports:
+            - '${AGENT_PORT:-8100}:8100'
+        volumes:
+            - '../agent-layer/packages/common:/srv/packages/common'
+            - '../agent-layer/gateway:/srv/gateway'
+        networks:
+            - veyra
+
+    pgsql:
+        image: 'postgres:17'
+        ports:
+            - '${FORWARD_DB_PORT:-5433}:5432'
+        environment:
+            POSTGRES_USER: '${DB_USERNAME:-veyra}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD:-veyra}'
+            POSTGRES_DB: '${DB_DATABASE:-veyra}'
+        volumes:
+            - 'veyra-pgsql:/var/lib/postgresql/data'
+        networks:
+            - veyra
+        healthcheck:
+            test: ['CMD', 'pg_isready', '-q', '-d', '${DB_DATABASE:-veyra}', '-U', '${DB_USERNAME:-veyra}']
+            retries: 5
+            timeout: 5s
+            interval: 5s
+
+volumes:
+    veyra-pgsql:
+        driver: local
+
+networks:
+    veyra:
+        driver: bridge

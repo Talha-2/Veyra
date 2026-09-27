@@ -1,0 +1,15 @@
+{{base}}
+
+# This job
+
+Automation: {{name}}
+
+{{system_prompt}}
+
+## Goal
+
+{{goal}}
+
+Do the job with the tools you have. When it is done, reply with the result for
+the team: what you found, what you did, and anything that needs a person. If
+you could not do it, say exactly what failed and what was not done.

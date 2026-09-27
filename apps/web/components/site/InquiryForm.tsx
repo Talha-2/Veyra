@@ -162,7 +162,7 @@ export function InquiryForm({
           <AlertTriangle size={15} />
           <span>
             We couldn&rsquo;t send that. Nothing was lost — your message is still here. Try again,
-            or email <a href="mailto:dev@z360.biz" style={{ color: "var(--accent-text)" }}>dev@z360.biz</a> directly.
+            or email <a href="mailto:trazzaq744@gmail.com" style={{ color: "var(--accent-text)" }}>trazzaq744@gmail.com</a> directly.
           </span>
         </div>
       )}

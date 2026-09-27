@@ -1,44 +1,22 @@
-import localFont from "next/font/local";
-import SiteNav from "@/components/SiteNav";
-import SiteFooter from "@/components/site/SiteFooter";
-import { ChatLauncher } from "@/components/site/ChatLauncher";
+import type { Metadata } from "next";
 
-/* Marketing-site chrome. The site subtree reads in Inter (the seasonSans
-   stand-in) and Geist Mono; both are registered here so app surfaces keep
-   their own faces and pay nothing for these. */
-const inter = localFont({
-  src: "../fonts/inter.woff2",
-  weight: "100 900",
-  variable: "--font-inter",
-  display: "swap",
-});
+import { SiteFooter, SiteNav } from "@/components/mk/chrome";
 
-const geistMono = localFont({
-  src: "../fonts/geist-mono.woff2",
-  weight: "100 900",
-  variable: "--font-gm",
-  display: "swap",
-});
+import "./site.css";
 
-/* Direction contract — audited at finish; must survive the production build. */
-const CONTRACT = `<!--
-THESIS: A voice-AI platform rendered as the console it is — midnight canvas, hairline structure,
-whispered weight-300 headlines — refusing the aurora/glass/gradient SaaS hero.
-OWN-WORLD: Void #0e0e13 / Carbon #09090b surfaces, Iron #27272a hairlines, Cream #fffaea ink,
-Ember #e96b34 + Mint #62f6b5 pill pair, six-color spectrogram quarantined to the hero waveform,
-5.6px containers, wide-tracked Geist Mono labels, Inter at 300-650. Flat, shadowless.
-STORY: A business owner sees their calls answered by serious infrastructure they can run without
-engineers — and either requests a demo (Ember) or starts free (Mint).
-FIRST VIEWPORT: Centered two-line light headline, one-sentence sub, the binary pill pair, the
-inverted cream TALK TO VEYRA console, and the full-bleed spectrogram closing the fold.
-FORM: brief-pinned (user-supplied Vapi reference beats the roll); seed: vapi-console/pinned.
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the
-verdict, and DESIGN.md
--->`;
+/* The company site. Its own palette, type and motion live in site.css under
+   .mk, so the pages here share nothing visual with the old app surfaces that
+   still sit in globals.css. The design rules are in DESIGN.md under
+   "The company site". */
 
-/* Site-wide structured data: who Veyra is and what the site is. Per-page
-   JSON-LD (pricing offer, contact page) belongs to those pages. */
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://veyra.vercel.app";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  title: { default: "Veyra: AI agents that answer, call and follow through", template: "%s · Veyra" },
+  description: "Veyra answers your calls, texts and email with an AI agent that books, looks things up and hands off to your team when it matters.",
+};
+
 const ORG_LD = {
   "@context": "https://schema.org",
   "@graph": [
@@ -46,29 +24,19 @@ const ORG_LD = {
       "@type": "Organization",
       name: "Veyra",
       url: SITE_URL,
-      description:
-        "AI voice and chat agents that answer, call, and close — one grounded brain across voice, chat, phone, and SMS.",
+      description: "AI voice and chat agents that answer, call, and close — one grounded brain across voice, chat, phone, and SMS.",
     },
-    {
-      "@type": "WebSite",
-      name: "Veyra",
-      url: SITE_URL,
-    },
+    { "@type": "WebSite", name: "Veyra", url: SITE_URL },
   ],
 };
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`site-shell ${inter.variable} ${geistMono.variable}`}>
-      <div hidden aria-hidden dangerouslySetInnerHTML={{ __html: CONTRACT }} />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_LD) }}
-      />
+    <div className="mk">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_LD) }} />
       <SiteNav />
       <main>{children}</main>
       <SiteFooter />
-      <ChatLauncher />
     </div>
   );
 }

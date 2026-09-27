@@ -1,7 +1,27 @@
 ---
 name: Veyra
-description: The voice-AI console — neon spectrogram across midnight concrete, rendered flat and shadowless.
+description: Apple-grade calm in Poppins. Ink pill actions, one Ember accent, hairline surfaces; the company site adds black cinema bands and scroll-driven motion. (The console direction below this header is historical.)
 colors:
+  # current system (app + company site)
+  ink: "#1d1d1f"
+  ink-secondary: "#636366"
+  ink-tertiary: "#8e8e93"
+  ink-disabled: "#c2c2c7"
+  app-bg: "#f7f7f8"
+  app-sidebar: "#f0f0f2"
+  app-sunken: "#f2f2f4"
+  site-bg: "#fbfbfd"
+  site-alt: "#f5f5f7"
+  site-ink-2: "#6e6e73"
+  site-ink-3: "#86868b"
+  night: "#000000"
+  night-card: "#161618"
+  ember-deep: "#c2541c"
+  success: "#248a3d"
+  warning: "#b25f00"
+  danger: "#d70015"
+  info: "#0066cc"
+  # historical console palette
   ember: "#e96b34"
   ember-hover-dark: "#f07d4a"
   ember-hover-light: "#d55f2c"
@@ -18,7 +38,7 @@ colors:
   paper: "#faf8f2"
   paper-subtle: "#f4f1e8"
   parchment: "#fffdf6"
-  ink: "#131316"
+  console-ink: "#131316"
   ink-muted: "#52525b"
   ink-faint: "#8b8b94"
   hairline-warm: "#e5e2d8"
@@ -31,30 +51,30 @@ colors:
   spectro-ember: "#e96b34"
 typography:
   display:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
     fontSize: "clamp(2.55rem, 5.9vw, 4.25rem)"
     fontWeight: 300
     lineHeight: 1.06
     letterSpacing: "-0.025em"
   headline:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
     fontSize: "clamp(1.85rem, 3.7vw, 2.8rem)"
     fontWeight: 300
     lineHeight: 1.12
     letterSpacing: "-0.02em"
   title:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
     fontSize: "17px"
     fontWeight: 510
     letterSpacing: "-0.01em"
   body:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
     fontSize: "16px"
     fontWeight: 400
     lineHeight: 1.65
     letterSpacing: "-0.006em"
   label:
-    fontFamily: "Geist Mono, ui-monospace, monospace"
+    fontFamily: "ui-monospace, SF Mono, Cascadia Code, monospace"
     fontSize: "12px"
     fontWeight: 500
     letterSpacing: "0.08em"
@@ -115,6 +135,16 @@ components:
 ---
 
 # Design System: Veyra
+
+<!-- The product app (Veyra Desk and Veyra Studio, apps/app-layer) has its own
+     system, documented in the last section, "The app: Desk and Studio". It
+     replaced the console system for the app on 2026-09-27 at the owner's
+     request (Poppins, Apple-grade polish, Z360 structure). -->
+
+<!-- SUPERSEDED FOR THE SITE on 2026-09-27: the owner asked for an Apple-grade,
+     scroll-animated company site in Poppins. The console system below is kept
+     for history only; the site is now built to the last section of this file,
+     "The company site". -->
 
 <!-- Scope note: this document records the MARKETING SITE's built system — the
      `.site-shell` subtree under apps/web/app/(site)/, styled by the
@@ -292,3 +322,186 @@ The site's imagery is the product drawn in its own grammar: `ConsoleMock` (deep-
 - **Don't** add entrance animations beyond the hero's `.rise` stagger; sections below the fold arrive static.
 - **Don't** reach into the DESK INBOX or Studio class layers from site pages, or use `.site-*`/marketing classes inside the apps — the systems share tokens, not components.
 - **Don't** invent customer logos, testimonials, or new metrics; the proof strip is the real infrastructure stack and the published numbers (PRODUCT.md).
+
+---
+
+# The app: Desk and Studio
+
+> Scope: `apps/app-layer` (Laravel + Inertia + React). Adopted 2026-09-27 at the
+> owner's request: "Poppins, the level of polish Apple would ship, Z360's
+> structure." It deliberately departs from the console system above, which
+> stays the marketing site's. The two share the Veyra name and the Ember
+> accent, nothing else. Tokens live in `apps/app-layer/resources/css/app.css`.
+
+**North star: a native Mac app, not a web dashboard.** Calm, exact, quietly
+expensive. Neutral greys do the structure; one accent is spent on focus,
+selection and live state; every screen answers one question and the answer
+is the largest thing on it.
+
+## Foundations
+
+- **Type:** Poppins 400/500/600, self-hosted (`public/fonts/poppins`). Headings
+  are **600 with tight tracking**, never 300. Urdu falls through to Noto
+  Nastaliq per character. Mono (`font-mono`) only for code and keys.
+- **Scale — named, never pixels in a page:** `text-2xs` 11 · `text-xs` 12 ·
+  `text-sm` 13 · `text-base` 14 · `text-md` 15 · `text-lg` 17 · `text-xl` 20 ·
+  `text-2xl` 24 · `text-3xl` 28 · `text-4xl` 34. Page title `text-3xl
+  font-semibold tracking-tight`; card title `text-md font-semibold`; body
+  `text-base`; secondary copy `text-sm text-secondary`; meta `text-xs
+  text-tertiary`.
+- **Colour:** text `text-primary` / `text-secondary` / `text-tertiary`;
+  surfaces `bg-surface` (cards) on `bg-bg` (canvas), `bg-surface-sunken`
+  (wells, tracks), `bg-surface-hover`; hairlines `var(--border)`, row
+  separators `var(--separator)`. Status: `text-success|warning|danger|info`
+  with `--*-subtle` tints and `--*-fill` for dots. **Ember (`--accent`) is not
+  a button colour**: it marks the active nav icon, focus rings, selection,
+  links (`text-accent-text`) and live state.
+- **Primary action is an ink pill** (`v-btn v-btn--primary`): one per view.
+  Secondary `v-btn--quiet`, tertiary `v-btn--ghost`, destructive
+  `v-btn--danger`, compact `v-btn--sm`, icon `v-btn--icon`.
+- **Shape:** cards `rounded-lg` (14px), dialogs and composer `rounded-xl`
+  (20px), fields `rounded-md` (10px), buttons and search pills full.
+- **Depth:** light theme = hairline + low wide shadow (`--shadow-card`,
+  `--shadow-raised` on hover, `--shadow-overlay` for menus, dialogs, toasts);
+  dark theme = hairlines. Glass (`v-glass`) only on floating things: menus,
+  palette, toasts, the save bar.
+- **Motion:** `animate-rise` on page headers, `animate-pop` on overlays,
+  springy switches; everything off under reduced motion. Loading text uses
+  `v-shimmer`; loading blocks use `Skeleton`.
+
+## Building blocks (`resources/js/components`)
+
+| Need | Use |
+|---|---|
+| Page title, description, back link, actions, meta badges | `ui/page` `PageHeader` |
+| URL-driven filter | `ui/page` `Segmented` (Apple segmented control) |
+| Local tab / view switch | `ui/kit` `SegmentedControl`, `Tabs` |
+| A group of content | `ui/kit` `Card` + `CardHeader` / `CardBody` / `CardFooter` |
+| A settings group | `studio/form` `Section` + `Field` (`inline` = System Settings row) + `Toggle` |
+| Rows | `ui/kit` `List` + `ListRow` (leading `IconTile`/`Avatar`, title, subtitle, trailing) |
+| Tabular data | `ui/page` `Table` / `Th` / `Td` / `Row` |
+| Numbers at a glance | `ui/kit` `StatTile`, `Meter` |
+| Detail sidebar facts | `ui/kit` `KeyValues` |
+| Filters + search above a list | `ui/kit` `Toolbar` + `SearchField` |
+| Something to know before acting | `ui/kit` `Callout` |
+| Status | `ui/primitives` `Badge` (with `dot`), `StatusDot` (`live` pulses) |
+| Nothing here yet | `ui/primitives` `EmptyState` with an `action` |
+| Unsaved form | `studio/form` `SaveBar` (floats in when dirty; pass `onDiscard`) |
+| Modal | `ui/dialog` |
+| Popover menu | `shell/menu` `Menu` / `MenuItem` |
+| Copy a value | `ui/kit` `CopyButton` |
+| Feedback after a request | automatic: every `->with('success'|'warning'|'error')` becomes a toast; client-side `toast()` from `ui/toaster` |
+
+## Page recipes
+
+1. **Index page** — `PageHeader` (title, one-line description, one primary
+   action) → optional `StatTile` strip when the numbers change what you do →
+   `Toolbar` (Segmented + SearchField) → one `Card` holding a `List` of
+   `ListRow`s or a `Table` → `EmptyState` with the primary action when empty.
+2. **Detail / editor** — `PageHeader` with `back`, status badges in `meta`,
+   secondary actions; then `grid lg:grid-cols-[minmax(0,1fr)_300px] gap-6`:
+   the main column is `Section`s in the order a person fills them in, the
+   right column is a sticky inspector (`Card` + `KeyValues`, related items,
+   danger zone last). `SaveBar` at the end of the form.
+3. **Settings** — `Section`s of `inline` `Field` rows and `Toggle`s: label
+   and consequence left, control right.
+4. **Dialog** — title, one-sentence description, stacked fields, footer
+   right-aligned: `v-btn--ghost` Cancel, `v-btn--primary` action.
+
+## Rules
+
+- One primary button per view. Everything else is quiet or ghost.
+- Every setting carries its consequence in a hint.
+- Group labels are `Eyebrow` (the only uppercase); meta is `Mono` (never
+  uppercase, tabular).
+- Lists are hairline-separated rows inside one card, not a stack of cards.
+- A number's unit and context sit next to it (`StatTile` hint), never in a tooltip.
+- Empty states teach: what goes here, and the one thing to do.
+- Never a literal font-size, hex colour or shadow in a page.
+
+
+# The company site
+
+Replaced the console direction on 2026-09-27 at the owner's request: "like
+Apple made it", Poppins, immersive scroll animation, large logos, the company
+name huge behind the footer. Code: `apps/web/app/(site)/` (pages),
+`apps/web/app/(site)/site.css` (the whole visual system, scoped under `.mk`),
+`apps/web/components/mk/` (everything reusable). Nothing on the site may use
+the old `.site-shell` classes, `globals.css` marketing section, shadcn `ui/`
+components, or the `rv-theme` light/dark toggle.
+
+## Foundations
+
+- **Type:** Poppins 400/500/600, self-hosted. Headlines 600 with tight
+  tracking. Classes: `mk-mega` (up to 168px), `mk-display` (104), `mk-h1` (80),
+  `mk-h2` (56), `mk-h3` (32), `mk-h4` (21), `mk-lead` (19–24), `mk-body` (17),
+  `mk-small` (14), `mk-eyebrow` (17, Ember), `mk-kicker`. No other font sizes
+  for text; numbers in art may use arbitrary clamp() sizes.
+- **Palette:** off-white canvas `--mk-bg`, `mk-alt` grey bands, and black
+  `mk-night` cinema bands. Inside `.mk-night` every token flips, so the same
+  components work on black. Alternate light / alt / night down a page the way
+  a product page does; never two night bands in a row.
+- **Accent:** Ember is the only brand colour, used for the eyebrow, links
+  (`mk-link`), one emphasised word (`mk-accent`) and graphics. No gradient
+  text anywhere.
+- **Actions:** `mk-btn mk-btn--primary` (ink pill) is the main action,
+  `mk-btn--ghost` the second. One primary per view. Inline "Learn more" is
+  `mk-link` with a ChevronRight.
+- **Surfaces:** `mk-card` (28px radius, soft shadow), `mk-card--alt`,
+  `mk-card--night`, `mk-card-lift` for hover. `mk-pill` for small labels.
+- **Layout:** `mk-wrap` (1180 content), `mk-wrap--wide` (1440), `mk-wrap--text`
+  (760). Sections are `mk-section` (88–168px block padding) or
+  `mk-section--tight`.
+
+## Motion (components/mk/motion.tsx)
+
+| Primitive | Use it for |
+|---|---|
+| `Reveal variant="rise|pop|zoom|left|right|blur|fade" delay` | any single element entering |
+| `Stagger step` | grids and lists whose items pop in one by one |
+| `HorizontalScroll header` | a row of cards that travels sideways while the page scrolls down (pinned) |
+| `StickyStory beats height` | a pinned stage whose content changes per beat (render prop; needs a client component) |
+| `ZoomOnScroll from` | a device or hero image that grows into place |
+| `Parallax speed` | background art drifting at a different speed |
+| `TextReveal text` | one big statement whose words light up while scrolling |
+| `CountUp to decimals prefix suffix` | figures |
+| `Marquee duration reverse gap` | endless logo rails |
+
+Every primitive already handles `prefers-reduced-motion`. Use at most one
+pinned scene (`HorizontalScroll` or `StickyStory`) per two screens of page.
+Render-prop primitives cannot be used from a server page; put them in a
+client component.
+
+## Imagery (components/mk/scenes.tsx, components/mk/brand.tsx)
+
+All art is vector or CSS, sharp on 4K. `VoiceOrb` (hero object), `Waveform`,
+`PhoneFrame` + `CallScreen` (a live call playing), `LaptopFrame` + `DeskScreen`
+/ `StudioScreen` / `AskScreen` (faithful miniatures of the real app),
+`LogoOrbit`, `Globe`, `LanguageCloud`. The orb is illustration, not UI, and has
+its own fixed palette: #ff9a62, #e96b34, #b33b1c, #5a1a0c for the body, rose
+#ff5f7e and violet #8b6cff for the light falling on it, #ffb08a for its rings.
+The app's sign-in panel reuses the same orb. Partner logos are the vendors' real
+full-colour SVGs in `public/logos/color/` via `LogoTile` (white app-icon
+tile) or `LogoMark` (bare); the registries are `PARTNERS` (infrastructure)
+and `APPS` (integrations). Never draw a look-alike of a real brand's logo.
+
+## Honesty rules
+
+- No invented customers, testimonials, customer logos, headcounts, funding,
+  office addresses, or team members.
+- Figures only from what is true of the product: `<1.2s` voice-to-voice is a
+  **target**, ~100ms barge-in stop, 1,500+ apps (Composio catalog), 100+
+  countries, 8 languages in Studio (English, Spanish, French, German,
+  Portuguese, Hindi, Arabic, Urdu). Urdu voice runs on Azure, not Cartesia.
+- Sign in / sign up go to the Laravel app: `APP_URL` from
+  `components/mk/links.ts` (`/login`, `/register`). Demo requests use
+  `DEMO_URL` + `demoLinkProps`.
+
+## Page recipe
+
+Hero (eyebrow, `mk-display` or `mk-h1`, `mk-lead`, one primary + one ghost
+button, then a big piece of art) → a proof band → one pinned scene →
+alternating feature sections with art → a `Stagger` grid → a closing CTA
+band. The footer (giant "Veyra" behind the links) and the nav come from the
+layout; pages never render their own.
+

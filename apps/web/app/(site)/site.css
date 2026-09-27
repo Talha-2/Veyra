@@ -1,0 +1,285 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   THE COMPANY SITE — Apple-grade product storytelling.
+
+   Scoped under .mk so nothing here reaches the old app surfaces that still
+   share globals.css. One designed palette, no theme toggle: the page itself
+   alternates light canvases with black "cinema" bands, the way a product
+   page does, so the rhythm is part of the design rather than a preference.
+
+   Rules (see DESIGN.md → "The company site"):
+   • Poppins 400/500/600 only. Headlines 600, tight tracking.
+   • Ink pill = primary action. Ember = the brand's single accent.
+   • Every graphic is vector or CSS, so it is sharp on a 4K panel.
+   • Motion is scroll-driven and always has a reduced-motion fallback.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@font-face { font-family: 'Poppins'; font-style: normal; font-display: swap; font-weight: 400; src: url('../fonts/poppins-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-display: swap; font-weight: 500; src: url('../fonts/poppins-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-display: swap; font-weight: 600; src: url('../fonts/poppins-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-display: swap; font-weight: 400; src: url('../fonts/poppins-latin-ext-400-normal.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-display: swap; font-weight: 500; src: url('../fonts/poppins-latin-ext-500-normal.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Poppins'; font-style: normal; font-display: swap; font-weight: 600; src: url('../fonts/poppins-latin-ext-600-normal.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+.mk {
+    /* light canvas */
+    --mk-bg: #fbfbfd;
+    --mk-bg-alt: #f5f5f7;
+    --mk-card: #ffffff;
+    --mk-ink: #1d1d1f;
+    --mk-ink-2: #6e6e73;
+    --mk-ink-3: #86868b;
+    --mk-line: rgba(0, 0, 0, 0.08);
+    --mk-line-strong: rgba(0, 0, 0, 0.14);
+
+    /* the cinema band */
+    --mk-night: #000000;
+    --mk-night-2: #0b0b0d;
+    --mk-night-card: #161618;
+    --mk-night-card-2: #1d1d20;
+    --mk-night-ink: #f5f5f7;
+    --mk-night-ink-2: #a1a1a6;
+    --mk-night-ink-3: #6e6e73;
+    --mk-night-line: rgba(255, 255, 255, 0.1);
+
+    /* brand */
+    --mk-ember: #e96b34;
+    --mk-ember-deep: #c2541c;
+    --mk-ember-soft: #ffb08a;
+    --mk-rose: #ff5f7e;
+    --mk-violet: #8b6cff;
+    --mk-sky: #4db5ff;
+    --mk-mint: #3fd8a0;
+    --mk-glow: radial-gradient(60% 60% at 50% 45%, rgba(233, 107, 52, 0.55), rgba(255, 95, 126, 0.25) 45%, rgba(139, 108, 255, 0) 75%);
+
+    --mk-radius-card: 28px;
+    --mk-radius-tile: 22px;
+    --mk-radius-sm: 14px;
+
+    --mk-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.06);
+    --mk-shadow-float: 0 2px 6px rgba(0, 0, 0, 0.06), 0 30px 80px -20px rgba(0, 0, 0, 0.28);
+    --mk-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    /* ease-out-expo: a quick start that settles without overshoot */
+    --mk-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+
+    --mk-wrap: 1180px;
+    --mk-nav-h: 52px;
+    --mk-gutter: clamp(20px, 4vw, 44px);
+
+    background: var(--mk-bg);
+    color: var(--mk-ink);
+    font-family: 'Poppins', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-size: 17px;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: clip;
+}
+
+.mk ::selection { background: rgba(233, 107, 52, 0.22); }
+/* In the base layer (the same named layer Tailwind uses), so Tailwind colour
+   utilities and every link class below win over it. Unlayered, it beat them. */
+@layer base {
+    .mk :where(a) { color: inherit; text-decoration: none; }
+}
+.mk img, .mk svg { display: block; }
+/* box-shadow: none cancels the app-wide `*:focus-visible` ring in globals.css,
+   which would otherwise draw a second ring around every link and button here.
+   Form fields are exempt: the inquiry form draws their ring through that rule's
+   --ring variable (see components/mk/inquiry-form.tsx). */
+.mk :focus-visible:not(input, textarea, select) { outline: 2px solid var(--mk-ember); outline-offset: 3px; border-radius: 8px; box-shadow: none; }
+
+/* ── layout ─────────────────────────────────────────────────────────── */
+
+.mk-wrap { width: 100%; max-width: calc(var(--mk-wrap) + var(--mk-gutter) * 2); margin-inline: auto; padding-inline: var(--mk-gutter); }
+.mk-wrap--wide { max-width: calc(1440px + var(--mk-gutter) * 2); }
+.mk-wrap--text { max-width: calc(760px + var(--mk-gutter) * 2); }
+
+.mk-section { padding-block: clamp(88px, 12vw, 168px); position: relative; }
+.mk-section--tight { padding-block: clamp(56px, 7vw, 96px); }
+.mk-alt { background: var(--mk-bg-alt); }
+
+/* a black band: everything inside reads in the night palette */
+.mk-night {
+    background: var(--mk-night);
+    color: var(--mk-night-ink);
+    --mk-ink: var(--mk-night-ink);
+    --mk-ink-2: var(--mk-night-ink-2);
+    --mk-ink-3: var(--mk-night-ink-3);
+    --mk-line: var(--mk-night-line);
+    --mk-card: var(--mk-night-card);
+    --mk-bg-alt: var(--mk-night-2);
+    --mk-shadow-card: none;
+}
+
+/* ── type ───────────────────────────────────────────────────────────── */
+
+.mk-eyebrow { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--mk-ember); }
+.mk-night .mk-eyebrow { color: var(--mk-ember-soft); }
+.mk-kicker { font-size: 13px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mk-ink-3); }
+
+.mk-mega { font-size: clamp(56px, 11vw, 168px); font-weight: 600; line-height: 0.95; letter-spacing: -0.055em; }
+.mk-display { font-size: clamp(44px, 7.4vw, 104px); font-weight: 600; line-height: 1.02; letter-spacing: -0.045em; text-wrap: balance; }
+.mk-h1 { font-size: clamp(40px, 5.6vw, 80px); font-weight: 600; line-height: 1.04; letter-spacing: -0.04em; text-wrap: balance; }
+.mk-h2 { font-size: clamp(32px, 4.2vw, 56px); font-weight: 600; line-height: 1.08; letter-spacing: -0.035em; text-wrap: balance; }
+.mk-h3 { font-size: clamp(24px, 2.4vw, 32px); font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; }
+.mk-h4 { font-size: 21px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; }
+.mk-lead { font-size: clamp(19px, 1.7vw, 24px); line-height: 1.42; color: var(--mk-ink-2); font-weight: 400; letter-spacing: -0.015em; text-wrap: pretty; }
+.mk-body { font-size: 17px; line-height: 1.55; color: var(--mk-ink-2); text-wrap: pretty; }
+.mk-small { font-size: 14px; line-height: 1.5; color: var(--mk-ink-3); }
+.mk-strong { color: var(--mk-ink); font-weight: 600; }
+
+/* Apple's two-tone headline: the lead-in in ink, the rest dimmed. */
+.mk-dim { color: var(--mk-ink-3); }
+
+/* one word in the brand accent, never a paragraph */
+.mk-accent { color: var(--mk-ember); }
+.mk-night .mk-accent { color: var(--mk-ember-soft); }
+
+/* ── actions ────────────────────────────────────────────────────────── */
+
+.mk-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 48px; padding-inline: 24px; border-radius: 999px;
+    font-size: 17px; font-weight: 500; letter-spacing: -0.01em; white-space: nowrap;
+    transition: transform 200ms var(--mk-ease), background-color 200ms, box-shadow 200ms, color 200ms;
+}
+.mk-btn:active { transform: scale(0.97); }
+.mk-btn svg { width: 18px; height: 18px; }
+.mk-btn--primary { background: var(--mk-ink); color: var(--mk-bg); }
+.mk-btn--primary:hover { background: #3a3a3c; }
+.mk-night .mk-btn--primary { background: var(--mk-night-ink); color: #000; }
+.mk-night .mk-btn--primary:hover { background: #ffffff; }
+.mk-btn--ember { background: var(--mk-ember); color: #fff; }
+.mk-btn--ember:hover { background: var(--mk-ember-deep); }
+.mk-btn--ghost { background: transparent; color: var(--mk-ink); box-shadow: inset 0 0 0 1.5px var(--mk-line-strong); }
+.mk-night .mk-btn--ghost { box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.28); }
+.mk-btn--ghost:hover { background: rgba(127, 127, 127, 0.08); }
+.mk-btn--sm { height: 36px; padding-inline: 16px; font-size: 14px; }
+
+/* Apple's inline "Learn more >" link */
+.mk-link { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; color: var(--mk-ember-deep); }
+.mk-night .mk-link { color: var(--mk-ember-soft); }
+.mk-link svg { width: 16px; height: 16px; transition: transform 200ms var(--mk-ease); }
+.mk-link:hover svg { transform: translateX(3px); }
+.mk-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+/* ── surfaces ───────────────────────────────────────────────────────── */
+
+.mk-card {
+    background: var(--mk-card); border-radius: var(--mk-radius-card);
+    box-shadow: var(--mk-shadow-card); overflow: hidden; position: relative;
+}
+.mk-card--flat { box-shadow: none; }
+.mk-card--alt { background: var(--mk-bg-alt); box-shadow: none; }
+.mk-card--night { background: var(--mk-night-card); color: var(--mk-night-ink); --mk-ink: var(--mk-night-ink); --mk-ink-2: var(--mk-night-ink-2); --mk-ink-3: var(--mk-night-ink-3); --mk-line: var(--mk-night-line); box-shadow: none; }
+.mk-card-lift { transition: transform 450ms var(--mk-ease), box-shadow 450ms var(--mk-ease); }
+.mk-card-lift:hover { transform: translateY(-6px) scale(1.01); box-shadow: var(--mk-shadow-float); }
+
+.mk-pill { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding-inline: 12px; border-radius: 999px; font-size: 13px; font-weight: 500; background: rgba(127, 127, 127, 0.1); color: var(--mk-ink-2); }
+.mk-pill--ember { background: rgba(233, 107, 52, 0.12); color: var(--mk-ember-deep); }
+.mk-night .mk-pill--ember { color: var(--mk-ember-soft); background: rgba(233, 107, 52, 0.18); }
+
+.mk-hairline { height: 1px; background: var(--mk-line); border: 0; }
+
+/* a logo sits on a white app-icon tile at any size */
+.mk-logo-tile {
+    display: grid; place-items: center; background: #fff; border-radius: 24%;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 10px 30px -12px rgba(0, 0, 0, 0.25);
+    aspect-ratio: 1;
+}
+.mk-logo-tile img { width: 58%; height: 58%; object-fit: contain; }
+.mk-logo-tile span { font-weight: 600; letter-spacing: -0.03em; color: #1d1d1f; }
+
+/* ── navigation ─────────────────────────────────────────────────────── */
+
+.mk-nav {
+    position: sticky; top: 0; z-index: 50; height: 52px;
+    background: rgba(251, 251, 253, 0.72);
+    backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid transparent;
+    transition: border-color 300ms, background-color 300ms;
+}
+.mk-nav[data-scrolled='true'] { border-bottom-color: var(--mk-line); }
+/* over a black band the bar turns graphite, like Apple's product pages */
+.mk-nav[data-dark='true'] { background: rgba(22, 22, 23, 0.78); border-bottom-color: rgba(255, 255, 255, 0.08); color: #f5f5f7; --mk-ink: #f5f5f7; --mk-ink-2: #c7c7cc; --mk-bg: #000; }
+.mk-nav[data-dark='true'] .mk-btn--primary { background: #f5f5f7; color: #000; }
+.mk-nav__row { height: 52px; display: flex; align-items: center; gap: 24px; }
+.mk-nav__links { display: none; align-items: center; gap: 30px; margin-inline: auto; }
+@media (min-width: 900px) { .mk-nav__links { display: flex; } }
+.mk-nav__link { font-size: 14px; color: var(--mk-ink-2); transition: color 200ms; }
+.mk-nav__link:hover, .mk-nav__link[aria-current='page'] { color: var(--mk-ink); }
+.mk-nav__sheet { position: fixed; inset: 52px 0 0; background: rgba(251, 251, 253, 0.97); backdrop-filter: blur(20px); padding: 24px var(--mk-gutter); z-index: 49; }
+.mk-nav__sheet a { display: block; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; padding-block: 10px; }
+
+/* ── footer: the name, larger than life, behind everything ─────────── */
+
+.mk-footer { position: relative; background: var(--mk-bg-alt); overflow: hidden; padding-top: 72px; }
+.mk-footer__cols { position: relative; z-index: 1; display: grid; gap: 36px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 900px) { .mk-footer__cols { grid-template-columns: 1.6fr repeat(4, minmax(0, 1fr)); } }
+.mk-footer h4 { font-size: 13px; font-weight: 600; color: var(--mk-ink); margin-bottom: 14px; }
+.mk-footer li { font-size: 13px; color: var(--mk-ink-2); padding-block: 5px; }
+.mk-footer li a:hover { color: var(--mk-ink); text-decoration: underline; text-underline-offset: 3px; }
+.mk-footer__legal { position: relative; z-index: 1; border-top: 1px solid var(--mk-line); margin-top: 48px; padding-block: 18px; font-size: 12px; color: var(--mk-ink-3); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+.mk-footer__giant {
+    position: relative; z-index: 0; pointer-events: none; user-select: none;
+    font-weight: 600; letter-spacing: -0.07em; line-height: 0.78;
+    font-size: clamp(120px, 29vw, 460px);
+    text-align: center; white-space: nowrap;
+    color: #1d1d1f; opacity: 0.075;
+    margin-top: -0.05em; margin-bottom: -0.12em;
+    /* fades out downward so the word sinks into the page edge */
+    -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 96%);
+    mask-image: linear-gradient(to bottom, #000 30%, transparent 96%);
+}
+
+/* ── motion: scroll-revealed ────────────────────────────────────────── */
+
+.mk-reveal { opacity: 0; transition: opacity 900ms var(--mk-ease), transform 1000ms var(--mk-ease), filter 900ms var(--mk-ease); transition-delay: var(--mk-delay, 0ms); will-change: transform, opacity; }
+.mk-reveal[data-variant='rise'] { transform: translate3d(0, 48px, 0); }
+.mk-reveal[data-variant='pop'] { transform: translate3d(0, 36px, 0) scale(0.9); transition-timing-function: var(--mk-ease), var(--mk-ease-spring), var(--mk-ease); }
+.mk-reveal[data-variant='zoom'] { transform: scale(0.86); filter: blur(10px); }
+.mk-reveal[data-variant='left'] { transform: translate3d(-64px, 0, 0); }
+.mk-reveal[data-variant='right'] { transform: translate3d(64px, 0, 0); }
+.mk-reveal[data-variant='blur'] { filter: blur(14px); transform: translate3d(0, 16px, 0); }
+.mk-reveal[data-variant='fade'] { transform: none; }
+.mk-reveal[data-in='true'] { opacity: 1; transform: none; filter: none; }
+
+/* a group reveals its children one by one: children carry --i */
+.mk-stagger > * { opacity: 0; transform: translate3d(0, 44px, 0) scale(0.94); transition: opacity 800ms var(--mk-ease), transform 950ms var(--mk-ease-spring); transition-delay: calc(var(--i, 0) * var(--mk-step, 90ms)); }
+.mk-stagger[data-in='true'] > * { opacity: 1; transform: none; }
+
+/* pinned scenes: JS writes --p (0..1) on the scene root */
+.mk-scene { position: relative; }
+.mk-scene__sticky { position: sticky; top: var(--mk-nav-h); height: calc(100vh - var(--mk-nav-h)); height: calc(100svh - var(--mk-nav-h)); overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+.mk-htrack { display: flex; gap: 24px; will-change: transform; padding-inline: var(--mk-gutter); width: max-content; }
+
+/* words that light up as the reader scrolls past */
+.mk-textreveal span { color: var(--mk-ink); opacity: 0.16; transition: opacity 200ms linear; }
+.mk-textreveal span[data-on='true'] { opacity: 1; }
+
+/* infinite logo rail */
+.mk-marquee { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+.mk-marquee__track { display: flex; gap: var(--mk-marquee-gap, 28px); width: max-content; animation: mk-marquee var(--mk-marquee-dur, 50s) linear infinite; }
+.mk-marquee[data-reverse='true'] .mk-marquee__track { animation-direction: reverse; }
+.mk-marquee:hover .mk-marquee__track { animation-play-state: paused; }
+@keyframes mk-marquee { to { transform: translate3d(-50%, 0, 0); } }
+
+/* ambient loops for the graphics */
+@keyframes mk-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+@keyframes mk-spin { to { transform: rotate(360deg); } }
+@keyframes mk-spin-rev { to { transform: rotate(-360deg); } }
+@keyframes mk-breathe { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.06); opacity: 1; } }
+@keyframes mk-bar { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+@keyframes mk-ping { 0% { transform: scale(0.8); opacity: 0.7; } 100% { transform: scale(2.4); opacity: 0; } }
+@keyframes mk-caret { 50% { opacity: 0; } }
+@keyframes mk-typing { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+.mk-float { animation: mk-float 7s ease-in-out infinite; }
+.mk-breathe { animation: mk-breathe 5.5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+    .mk-reveal, .mk-stagger > * { opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; }
+    .mk-marquee__track, .mk-float, .mk-breathe, .mk *[style*='animation'] { animation: none !important; }
+    .mk-textreveal span { opacity: 1; }
+    .mk-card-lift:hover { transform: none; }
+}

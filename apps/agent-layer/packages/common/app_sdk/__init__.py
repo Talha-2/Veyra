@@ -1,0 +1,62 @@
+"""AppSdk — the only way the agent layer reaches the app layer.
+
+One typed client over the contract in ``docs/agent-contract.md``. Nothing in
+the agent layer imports httpx to talk to the app; it imports this. That rule is
+what keeps the contract greppable from either side.
+"""
+
+from .client import AppSdk
+from .errors import AppSdkError, Conflict, NotFound, Unauthenticated, Unavailable
+from .models import (
+    AgentSettings,
+    AutomationJob,
+    CallContext,
+    CallerInfo,
+    CallInfo,
+    ContactLookup,
+    ContactRecord,
+    DelegationOutcome,
+    DelegationRecord,
+    ExpertRecord,
+    KnowledgeHit,
+    KnowledgeResult,
+    LanguageCapability,
+    MessageRecord,
+    SkillDocument,
+    SkillStub,
+    TenantContext,
+    TicketRecord,
+    ToolCallRecord,
+    ToolCallStart,
+    ToolSpec,
+)
+
+__all__ = [
+    "AppSdk",
+    "AppSdkError",
+    "Conflict",
+    "NotFound",
+    "Unauthenticated",
+    "Unavailable",
+    "AgentSettings",
+    "AutomationJob",
+    "CallContext",
+    "CallerInfo",
+    "CallInfo",
+    "ContactLookup",
+    "ContactRecord",
+    "DelegationOutcome",
+    "DelegationRecord",
+    "ExpertRecord",
+    "KnowledgeHit",
+    "KnowledgeResult",
+    "LanguageCapability",
+    "MessageRecord",
+    "SkillDocument",
+    "SkillStub",
+    "TenantContext",
+    "TicketRecord",
+    "ToolCallRecord",
+    "ToolCallStart",
+    "ToolSpec",
+]
