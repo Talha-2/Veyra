@@ -1,0 +1,108 @@
+# Render blueprint: the Laravel app layer and the Python agent gateway.
+# Postgres lives on Neon (paste its connection string into DB_URL).
+# The company website stays on Vercel; point its NEXT_PUBLIC_APP_URL at
+# veyra-app's URL.
+#
+# Values marked `sync: false` are secrets or addresses you enter in the
+# Render dashboard when you create the blueprint; nothing secret lives here.
+# Deploy steps: apps/app-layer/README.md, "Deploying (Render + Neon)".
+
+services:
+  # ── Veyra Desk, Studio, sign-in, and the site's inquiry endpoint ──────────
+  - type: web
+    name: veyra-app
+    runtime: docker
+    plan: free
+    region: ohio
+    dockerfilePath: ./apps/app-layer/docker/Dockerfile.prod
+    dockerContext: ./apps/app-layer
+    buildFilter:
+      paths:
+        - apps/app-layer/**
+    healthCheckPath: /up
+    autoDeploy: true
+    envVars:
+      # A base64 256-bit value; the start script adds Laravel's "base64:" prefix.
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_NAME
+        value: Veyra
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      # Neon's DIRECT connection string (pooling off), e.g.
+      # postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+      - key: DB_URL
+        sync: false
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: sync
+      # Shared with the gateway below; generated once, never typed.
+      - key: AGENT_SHARED_SECRET
+        generateValue: true
+      # veyra-agent's URL, e.g. https://veyra-agent.onrender.com (after its first deploy).
+      - key: AGENT_GATEWAY_URL
+        sync: false
+      # Longer than the local default: a free service asleep takes ~30-60 s to wake.
+      - key: AGENT_GATEWAY_TIMEOUT
+        value: "60"
+      - key: COMPOSIO_API_KEY
+        sync: false
+      - key: CARTESIA_API_KEY
+        sync: false
+      # Opt-in demo workspace (Northwind). Needs DEMO_PASSWORD, 12+ characters.
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: DEMO_PASSWORD
+        sync: false
+
+  # ── the agent gateway: Ask, automations, skill tests ─────────────────────
+  - type: web
+    name: veyra-agent
+    runtime: docker
+    plan: free
+    region: ohio
+    dockerfilePath: ./apps/agent-layer/Dockerfile
+    dockerContext: ./apps/agent-layer
+    buildFilter:
+      paths:
+        - apps/agent-layer/**
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: GATEWAY_PORT
+        value: "10000"
+      - key: AGENT_SHARED_SECRET
+        fromService:
+          type: web
+          name: veyra-app
+          envVarKey: AGENT_SHARED_SECRET
+      # veyra-app's URL, e.g. https://veyra-app.onrender.com
+      - key: APP_LAYER_URL
+        sync: false
+      - key: GATEWAY_CLAIM_INTERVAL
+        value: "30"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: COMPOSIO_API_KEY
+        sync: false
+      - key: CARTESIA_API_KEY
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: LANGFUSE_HOST
+        value: https://cloud.langfuse.com

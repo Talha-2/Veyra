@@ -39,6 +39,12 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Behind a hosting proxy (Render, a load balancer) the request reaches
+        // PHP as plain http. Trusting the proxy's X-Forwarded-* headers is what
+        // makes url() and the Vite asset tags come out as https; without it the
+        // browser blocks every script and stylesheet as mixed content.
+        $middleware->trustProxies(at: '*');
+
         $middleware->web(append: [
             AddLinkHeadersForPreloadedAssets::class,
             HandleInertiaRequests::class,

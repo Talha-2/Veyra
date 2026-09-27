@@ -101,6 +101,12 @@ def create_app(*, sdk: AppSdk | None = None, runner: TextRunner | None = None, c
         app_.state.tasks.add(task)
         task.add_done_callback(app_.state.tasks.discard)
 
+    @app.get("/healthz")
+    async def liveness() -> dict[str, bool]:
+        """Unauthenticated liveness for a host's health check. Says nothing
+        but "the process is up"; /v1/health is the authenticated detail."""
+        return {"ok": True}
+
     @app.get("/v1/health")
     async def health(_: None = Depends(authenticated)) -> dict[str, Any]:
         app_ok: bool | None = None
@@ -194,4 +200,4 @@ def main() -> None:
     import uvicorn
 
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
-    uvicorn.run(create_app(), host=os.getenv("GATEWAY_HOST", "0.0.0.0"), port=int(os.getenv("GATEWAY_PORT", "8100")))
+    uvicorn.run(create_app(), host=os.getenv("GATEWAY_HOST", "0.0.0.0"), port=int(os.getenv("GATEWAY_PORT") or os.getenv("PORT") or "8100"))

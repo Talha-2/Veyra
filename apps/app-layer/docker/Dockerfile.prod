@@ -1,0 +1,63 @@
+# syntax=docker/dockerfile:1.7
+#
+# Production image for the Veyra app layer (Render, or any Docker host).
+#
+# Three stages: Node builds the frontend, Composer installs PHP dependencies
+# without dev packages, and the final image carries only PHP, the code, the
+# vendor tree and the built assets. The dev image (docker/Dockerfile) stays
+# as it is for docker compose on a laptop.
+#
+# It still serves with `php artisan serve` and forked workers rather than
+# php-fpm + nginx: one process, one port, fine for a small deployment, and it
+# streams Ask replies without a proxy buffering them. Move to FrankenPHP or
+# fpm + nginx when traffic needs it.
+
+# ── 1. frontend ─────────────────────────────────────────────────────────
+FROM node:22-bookworm-slim AS assets
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
+COPY vite.config.js tsconfig.json ./
+COPY resources ./resources
+COPY public ./public
+RUN npm run build
+
+# ── 2. PHP dependencies ─────────────────────────────────────────────────
+FROM composer:2 AS vendor
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN --mount=type=cache,target=/tmp/cache \
+    composer install --no-dev --no-scripts --no-interaction --prefer-dist --no-progress \
+      --optimize-autoloader --ignore-platform-reqs
+
+# ── 3. runtime ──────────────────────────────────────────────────────────
+FROM php:8.4-cli
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq-dev \
+    && docker-php-ext-install pdo_pgsql opcache \
+    && apt-get purge -y --auto-remove \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY docker/php.ini /usr/local/etc/php/conf.d/99-app.ini
+
+WORKDIR /app
+COPY . .
+COPY --from=vendor /app/vendor ./vendor
+COPY --from=assets /app/public/build ./public/build
+
+# The autoloader was dumped in the vendor stage without the app's classes'
+# package discovery; finish it here, where artisan exists.
+RUN php artisan package:discover --ansi \
+    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+
+ENV APP_ENV=production \
+    APP_DEBUG=false \
+    LOG_CHANNEL=stderr \
+    PHP_CLI_SERVER_WORKERS=4 \
+    PORT=10000
+
+EXPOSE 10000
+# Through sh, so neither the file's mode bit nor a checkout's line endings
+# can stop the container from starting.
+CMD ["sh", "docker/start-prod.sh"]
