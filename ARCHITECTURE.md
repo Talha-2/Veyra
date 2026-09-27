@@ -128,9 +128,10 @@ veyra/
 2026-09-27 the owner replaced the August "neon spectrogram" direction with an
 Apple-grade, scroll-animated site in Poppins (DESIGN.md, "The company site";
 code in `app/(site)/` and `components/mk/`). Its sign-in and sign-up buttons go
-to the Laravel app (`NEXT_PUBLIC_APP_URL`), and its contact and demo forms post
-to the app layer's public `POST /api/site/inquiries`. The site no longer calls
-`apps/server` at all. `apps/web/app/desk/**` and `apps/web/app/studio/**` are
+to the Laravel app and its forms post to the app layer's public
+`POST /api/site/inquiries` once `NEXT_PUBLIC_APP_URL` is set; until then they
+use the Next.js `/login`, `/signup` and the old intake endpoint, which is the
+site's last dependency on `apps/server`. `apps/web/app/desk/**` and `apps/web/app/studio/**` are
 deleted once their Laravel replacements ship — not before.
 
 **`apps/server` is retired.** Its 19 routers migrate into the app layer as

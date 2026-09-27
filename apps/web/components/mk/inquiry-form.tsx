@@ -12,7 +12,7 @@
 import { useId, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, ArrowRight, Loader2, Mail } from "lucide-react";
 
-import { APP_URL } from "./links";
+import { INQUIRY_ENDPOINT } from "./links";
 
 export type Topic = "demo" | "sales" | "support" | "other";
 type Field = "name" | "email" | "company" | "phone" | "topic" | "message";
@@ -125,18 +125,20 @@ export function InquiryForm({
     setStatus("sending");
     const trim = (s: string) => s.trim() || undefined;
     try {
-      const res = await fetch(`${APP_URL}/api/site/inquiries`, {
+      const fields = {
+        name: values.name.trim(),
+        email: values.email.trim(),
+        company: trim(values.company),
+        phone: trim(values.phone),
+        topic,
+        message: trim(values.message),
+      };
+      // The Laravel app when it is configured; otherwise the old intake
+      // endpoint, which takes the same fields plus a `source`.
+      const res = await fetch(INQUIRY_ENDPOINT.url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          name: values.name.trim(),
-          email: values.email.trim(),
-          company: trim(values.company),
-          phone: trim(values.phone),
-          topic,
-          message: trim(values.message),
-          page,
-        }),
+        body: JSON.stringify(INQUIRY_ENDPOINT.legacy ? { ...fields, source: "form", website: "" } : { ...fields, page }),
       });
 
       if (res.ok) {

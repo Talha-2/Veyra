@@ -8,7 +8,7 @@ import {
 import type { Metadata } from "next";
 
 import { APPS, LogoTile, PARTNERS, type Partner } from "@/components/mk/brand";
-import { APP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
+import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
 import { CountUp, HorizontalScroll, Marquee, Parallax, Reveal, Stagger, TextReveal } from "@/components/mk/motion";
 import { PhoneFrame, VoiceOrb } from "@/components/mk/scenes";
 import { IndustryCall, type IndustryId } from "@/components/mk/solutions-parts";
@@ -282,7 +282,7 @@ export default function SolutionsPage() {
             <p className="mk-lead mx-auto mt-6 max-w-[44ch]">A burst pipe at midnight. A patient moving a cleaning. A buyer asking about a listing. One agent learns your business and handles each the way you would.</p>
           </Reveal>
           <Reveal variant="rise" delay={280} className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Request a demo</a>
           </Reveal>
         </div>
@@ -436,7 +436,7 @@ export default function SolutionsPage() {
           <Reveal><h2 className="mk-display mx-auto max-w-[14ch]">Tell it your business.</h2></Reveal>
           <Reveal delay={100}><p className="mk-lead mx-auto mt-6 max-w-[40ch]">Describe what you do in plain English. Veyra drafts the first skills from it. You review them, turn them on, and it picks up.</p></Reveal>
           <Reveal delay={200} className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Talk to our team</a>
           </Reveal>
         </div>

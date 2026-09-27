@@ -493,8 +493,10 @@ and `APPS` (integrations). Never draw a look-alike of a real brand's logo.
   **target**, ~100ms barge-in stop, 1,500+ apps (Composio catalog), 100+
   countries, 8 languages in Studio (English, Spanish, French, German,
   Portuguese, Hindi, Arabic, Urdu). Urdu voice runs on Azure, not Cartesia.
-- Sign in / sign up go to the Laravel app: `APP_URL` from
-  `components/mk/links.ts` (`/login`, `/register`). Demo requests use
+- Sign in / sign up use `SIGN_IN_URL` / `SIGN_UP_URL` and the forms use
+  `INQUIRY_ENDPOINT`, all from `components/mk/links.ts`: the Laravel app when
+  `NEXT_PUBLIC_APP_URL` is set, otherwise this app's own `/login`, `/signup`
+  and the old intake endpoint. Never hard-code localhost. Demo requests use
   `DEMO_URL` + `demoLinkProps`.
 
 ## Page recipe

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, AudioLines, BookOpen, ChevronRight, Globe2, Languages, PhoneForwarded, ShieldCheck, Sparkles, Workflow, Zap } from "lucide-react";
 
 import { APPS, LogoTile, PARTNERS, VeyraMark } from "@/components/mk/brand";
-import { APP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
+import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
 import { CountUp, HorizontalScroll, Marquee, Parallax, Reveal, Stagger, TextReveal, ZoomOnScroll } from "@/components/mk/motion";
 import { AskScreen, DeskScreen, Globe, LanguageCloud, LaptopFrame, LogoOrbit, StudioScreen, VoiceOrb, Waveform } from "@/components/mk/scenes";
 import { CallStory } from "@/components/mk/sections";
@@ -75,7 +75,7 @@ export default function Home() {
             <p className="mk-lead mx-auto mt-6 max-w-[40ch]">An AI agent that picks up your phone, texts and email, does the work in your tools, and brings your team in when it matters.</p>
           </Reveal>
           <Reveal variant="rise" delay={280} className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Request a demo</a>
           </Reveal>
         </div>
@@ -232,7 +232,7 @@ export default function Home() {
           <Reveal><h2 className="mk-display mx-auto max-w-[13ch]">Put Veyra on the phone.</h2></Reveal>
           <Reveal delay={100}><p className="mk-lead mx-auto mt-6 max-w-[38ch]">Set it up in an afternoon. Start with one line and the questions you hear every day.</p></Reveal>
           <Reveal delay={200} className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Talk to our team</a>
           </Reveal>
         </div>

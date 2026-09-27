@@ -4,7 +4,7 @@ import { ArrowRight, ChevronRight, Lock, Mail, MessageSquare, MessagesSquare, Ph
 
 import { LogoTile, PARTNERS, VeyraLogo, VeyraMark } from "@/components/mk/brand";
 import { LayerDiagram, RingingMark, WhyStory } from "@/components/mk/company-parts";
-import { APP_URL } from "@/components/mk/links";
+import { SIGN_UP_URL } from "@/components/mk/links";
 import { Marquee, Reveal, Stagger, TextReveal } from "@/components/mk/motion";
 
 export const metadata: Metadata = {
@@ -119,7 +119,7 @@ export default function CompanyPage() {
             <p className="mk-lead mx-auto mt-6 max-w-[44ch]">Small businesses lose customers to calls nobody answers. Veyra answers every one, then does the work: books the visit, logs the call, and brings your team in when it matters.</p>
           </Reveal>
           <Reveal variant="rise" delay={280} className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
             <Link href="/contact" className="mk-btn mk-btn--ghost">Talk to us</Link>
           </Reveal>
         </div>
@@ -298,7 +298,7 @@ export default function CompanyPage() {
           <Reveal><h2 className="mk-display mx-auto max-w-[14ch]">Let’s get Veyra answering your calls.</h2></Reveal>
           <Reveal delay={100}><p className="mk-lead mx-auto mt-6 max-w-[40ch]">Start with one line and the questions you hear every day, or tell us about the calls that keep going wrong.</p></Reveal>
           <Reveal delay={200} className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
             <Link href="/contact" className="mk-btn mk-btn--ghost">Talk to us</Link>
           </Reveal>
         </div>

@@ -4,7 +4,7 @@ import { ArrowRight, Check, ChevronRight } from "lucide-react";
 
 import { VeyraMark } from "@/components/mk/brand";
 import { InquiryForm } from "@/components/mk/inquiry-form";
-import { APP_URL } from "@/components/mk/links";
+import { SIGN_UP_URL } from "@/components/mk/links";
 import { Reveal, Stagger } from "@/components/mk/motion";
 
 export const metadata: Metadata = {
@@ -79,7 +79,7 @@ export default function StartPage() {
                     </li>
                   ))}
                 </ul>
-                <a href={`${APP_URL}/register`} className="mk-btn mk-btn--ember mt-10 w-full">Create your account <ArrowRight /></a>
+                <a href={SIGN_UP_URL} className="mk-btn mk-btn--ember mt-10 w-full">Create your account <ArrowRight /></a>
                 <p className="mk-small mt-4 text-center">No sales call required.</p>
               </div>
             </div>

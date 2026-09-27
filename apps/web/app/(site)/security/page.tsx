@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 import { LogoTile, PARTNERS } from "@/components/mk/brand";
-import { APP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
+import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
 import { CountUp, HorizontalScroll, Parallax, Reveal, Stagger, TextReveal } from "@/components/mk/motion";
 import { DataFlow, PrincipleArt, ShieldArt } from "@/components/mk/security-parts";
 
@@ -76,7 +76,7 @@ export default function SecurityPage() {
             <p className="mk-lead mx-auto mt-6 max-w-[44ch]">Veyra is built to sit in front of your customers. Your data lives in one place, your secrets never leave the server, and the agent asks before it does anything risky.</p>
           </Reveal>
           <Reveal variant="rise" delay={280} className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Talk to our team</a>
           </Reveal>
         </div>
@@ -221,7 +221,7 @@ export default function SecurityPage() {
           <Reveal delay={100}><p className="mk-lead mx-auto mt-6 max-w-[40ch]">Have a security review team? We will walk them through how Veyra is built, layer by layer.</p></Reveal>
           <Reveal delay={200} className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--primary">Talk to our team <ArrowRight /></a>
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--ghost">Get started</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--ghost">Get started</a>
           </Reveal>
           <Reveal delay={260} className="mt-8"><Link href="/pricing" className="mk-link">See pricing <ChevronRight /></Link></Reveal>
         </div>

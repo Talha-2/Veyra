@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 import { APPS, LogoTile, PARTNERS, type Partner } from "@/components/mk/brand";
 import { IntegrationExplorer } from "@/components/mk/integrations-parts";
-import { APP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
+import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
 import { CountUp, HorizontalScroll, Marquee, Parallax, Reveal, Stagger } from "@/components/mk/motion";
 import { LogoOrbit } from "@/components/mk/scenes";
 
@@ -124,7 +124,7 @@ export default function IntegrationsPage() {
             <p className="mk-lead mx-auto mt-6 max-w-[44ch]">Sign in to an app once and the agent can act in it on a call: book the visit, log the call, send the link. You choose exactly what it may do.</p>
           </Reveal>
           <Reveal variant="rise" delay={280} className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Request a demo</a>
           </Reveal>
         </div>
@@ -332,7 +332,7 @@ export default function IntegrationsPage() {
           <Reveal><h2 className="mk-display mx-auto max-w-[13ch]">Your tools, one sign-in away.</h2></Reveal>
           <Reveal delay={100}><p className="mk-lead mx-auto mt-6 max-w-[40ch]">Connect the apps you run today. The agent books, logs, sends and follows up in them, on every call.</p></Reveal>
           <Reveal delay={200} className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Talk to our team</a>
           </Reveal>
         </div>

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 
 import { VeyraLogo } from "./brand";
-import { APP_URL } from "./links";
+import { SIGN_UP_URL, SIGN_IN_URL } from "./links";
 
 
 const LINKS: [string, string][] = [
@@ -53,8 +53,8 @@ export function SiteNav() {
             ))}
           </div>
           <div className="ml-auto hidden items-center gap-5 md:flex" style={{ marginLeft: "auto" }}>
-            <a href={`${APP_URL}/login`} className="mk-nav__link">Sign in</a>
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary mk-btn--sm">Get started</a>
+            <a href={SIGN_IN_URL} className="mk-nav__link">Sign in</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary mk-btn--sm">Get started</a>
           </div>
           <button type="button" className="ml-auto flex size-10 items-center justify-center md:hidden" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
             {open ? <X size={22} /> : <Menu size={22} />}
@@ -65,8 +65,8 @@ export function SiteNav() {
         <div className="mk-nav__sheet md:hidden">
           {LINKS.map(([label, href]) => <Link key={href} href={href}>{label}</Link>)}
           <div className="mt-8 flex flex-col gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started</a>
-            <a href={`${APP_URL}/login`} className="mk-btn mk-btn--ghost">Sign in</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
+            <a href={SIGN_IN_URL} className="mk-btn mk-btn--ghost">Sign in</a>
           </div>
         </div>
       )}
@@ -93,7 +93,7 @@ export function SiteFooter() {
           <div>
             <VeyraLogo size={28} />
             <p className="mk-small mt-4 max-w-[30ch]">AI agents that answer, call and follow through, on every channel your customers use.</p>
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary mk-btn--sm mt-6">Get started</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary mk-btn--sm mt-6">Get started</a>
           </div>
           {COLUMNS.map((col) => (
             <div key={col.title}>

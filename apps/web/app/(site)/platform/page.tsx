@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 
 import { APPS, LogoTile, PARTNERS, VeyraMark, type Partner } from "@/components/mk/brand";
-import { APP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
+import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
 import { CountUp, HorizontalScroll, Marquee, Parallax, Reveal, Stagger, TextReveal, ZoomOnScroll } from "@/components/mk/motion";
 import { AgentDiagram, AskStream, ReplyLanes, WebhookCode } from "@/components/mk/platform-parts";
 import { CallScreen, DeskScreen, Globe, LanguageCloud, LaptopFrame, LogoOrbit, PhoneFrame, VoiceOrb, Waveform } from "@/components/mk/scenes";
@@ -287,7 +287,7 @@ export default function PlatformPage() {
             <p className="mk-lead mx-auto mt-6 max-w-[44ch]">It answers your calls, texts, email and chat, does the work in your tools, and leaves your team a clean record. Here is everything underneath.</p>
           </Reveal>
           <Reveal delay={280} className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started</a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Request a demo</a>
           </Reveal>
         </div>
@@ -612,7 +612,7 @@ export default function PlatformPage() {
           <Reveal><h2 className="mk-display mx-auto max-w-[12ch]">Start with one number.</h2></Reveal>
           <Reveal delay={100}><p className="mk-lead mx-auto mt-6 max-w-[40ch]">Connect a line, add what you know, and let it take the next call. Shape the rest as you go.</p></Reveal>
           <Reveal delay={200} className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started <ArrowRight /></a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Talk to our team</a>
           </Reveal>
         </div>

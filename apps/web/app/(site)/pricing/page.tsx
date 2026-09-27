@@ -15,7 +15,7 @@ import {
   Workflow,
 } from "lucide-react";
 
-import { APP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
+import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
 import { CountUp, Reveal, Stagger } from "@/components/mk/motion";
 import { FaqAccordion, PassThroughArt } from "@/components/mk/pricing-parts";
 import { VoiceOrb } from "@/components/mk/scenes";
@@ -69,7 +69,7 @@ const PLANS: Plan[] = [
     unit: "forever",
     blurb: "Everything you need to try Veyra end to end.",
     features: ["Build voice and chat agents", "The visual workflow builder", "A knowledge base for grounded answers", "The live demo playground", "Community support"],
-    cta: { label: "Start free", href: `${APP_URL}/register` },
+    cta: { label: "Start free", href: SIGN_UP_URL },
   },
   {
     name: "Growth",
@@ -79,7 +79,7 @@ const PLANS: Plan[] = [
     recommended: true,
     lead: "Everything in Starter, plus",
     features: ["The deep agent builder", "Telephony: real numbers, calls and SMS", "Integrations with managed sign-in", "Evals and simulated callers", "Email support"],
-    cta: { label: "Start building", href: `${APP_URL}/register` },
+    cta: { label: "Start building", href: SIGN_UP_URL },
   },
   {
     name: "Scale",
@@ -403,7 +403,7 @@ export default function PricingPage() {
           <Reveal><h2 className="mk-display mx-auto max-w-[13ch]">Build it free. Go live for $99.</h2></Reveal>
           <Reveal delay={100}><p className="mk-lead mx-auto mt-6 max-w-[40ch]">Build your agent, get a real number and connect your tools. Upgrade the moment Veyra is live and earning its keep.</p></Reveal>
           <Reveal delay={200} className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Start free <ArrowRight /></a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Start free <ArrowRight /></a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Contact sales</a>
           </Reveal>
         </div>

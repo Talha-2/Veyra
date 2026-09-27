@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarCheck, ChevronRight, Clock, LogIn, Mail, UserRound } from "lucide-react";
 
 import { InquiryForm } from "@/components/mk/inquiry-form";
-import { APP_URL } from "@/components/mk/links";
+import { SIGN_UP_URL, SIGN_IN_URL } from "@/components/mk/links";
 import { Reveal, Stagger } from "@/components/mk/motion";
 
 export const metadata: Metadata = {
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 const WAYS = [
   { icon: Mail, title: "Email us", body: "Straight to the team building Veyra.", link: { label: "trazzaq744@gmail.com", href: "mailto:trazzaq744@gmail.com" } },
   { icon: CalendarCheck, title: "Book a live demo", body: "Veyra on your real use case, the same day where we can.", link: { label: "Request a demo", href: "/start" } },
-  { icon: LogIn, title: "Already a customer?", body: "Sign in to Veyra Desk and Studio.", link: { label: "Sign in", href: `${APP_URL}/login` } },
+  { icon: LogIn, title: "Already a customer?", body: "Sign in to Veyra Desk and Studio.", link: { label: "Sign in", href: SIGN_IN_URL } },
 ];
 
 export default function ContactPage() {
@@ -87,7 +87,7 @@ export default function ContactPage() {
           <Reveal><h2 className="mk-h1 mx-auto max-w-[16ch]">Prefer to just start?</h2></Reveal>
           <Reveal delay={100}><p className="mk-lead mx-auto mt-5 max-w-[40ch]">Set up your first agent free and book time with us once you have something to show.</p></Reveal>
           <Reveal delay={200} className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
-            <a href={`${APP_URL}/register`} className="mk-btn mk-btn--primary">Get started free <ArrowRight /></a>
+            <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started free <ArrowRight /></a>
             <Link href="/pricing" className="mk-link">See pricing <ChevronRight /></Link>
           </Reveal>
         </div>
