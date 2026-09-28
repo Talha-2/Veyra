@@ -33,7 +33,10 @@ from livekit.plugins import silero
 # start, not lazily inside the job.
 from livekit.plugins import cartesia, deepgram, openai  # noqa: F401,E402
 
-for _optional in ("livekit.plugins.elevenlabs", "livekit.plugins.azure", "livekit.plugins.turn_detector.multilingual", "livekit.plugins.noise_cancellation"):
+# The turn detector registers an inference process that holds its model in
+# memory (hundreds of MB), so a low-memory host never imports it.
+_LOW_MEMORY = os.getenv("VOICE_LOW_MEMORY", "").strip().lower() in {"1", "true", "yes"}
+for _optional in ("livekit.plugins.elevenlabs", "livekit.plugins.azure", "livekit.plugins.noise_cancellation", *(() if _LOW_MEMORY else ("livekit.plugins.turn_detector.multilingual",))):
     try:
         __import__(_optional)
     except Exception:  # noqa: BLE001 — optional: the pipeline falls back when one is missing
@@ -280,7 +283,10 @@ def main() -> None:
     # event loop with the worker's housekeeping or another call, or a blocked
     # loop turns into gaps in the agent's voice. (The Windows dev default ran
     # jobs as threads in one process.)
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm, job_executor_type=JobExecutorType.PROCESS, num_idle_processes=int(os.getenv("VOICE_IDLE_PROCESSES", "1")),
+    # A low-memory host cannot afford a process per call (each loads the VAD
+    # and every plugin again), so there calls share the worker's process.
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm, job_executor_type=JobExecutorType.THREAD if _LOW_MEMORY else JobExecutorType.PROCESS,
+                              num_idle_processes=int(os.getenv("VOICE_IDLE_PROCESSES", "1")),
                               # Loading the VAD and plugins in a fresh process took longer than
                               # LiveKit's 10 s default on a busy machine, and the process was killed.
                               initialize_process_timeout=float(os.getenv("VOICE_PROCESS_INIT_TIMEOUT", "90"))))

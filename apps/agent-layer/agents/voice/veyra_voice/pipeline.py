@@ -63,6 +63,13 @@ class PipelineSpec:
     notes: list[str] = field(default_factory=list)
 
 
+def low_memory() -> bool:
+    """VOICE_LOW_MEMORY=1: a ~1 GB host (Oracle's free Micro VM). Calls run as
+    threads in one process and the turn-detector model is never loaded, so
+    turns end on VAD silence alone. One call at a time is the realistic load."""
+    return os.getenv("VOICE_LOW_MEMORY", "").strip().lower() in {"1", "true", "yes"}
+
+
 def _has(provider: str) -> bool:
     return bool({"cartesia": os.getenv("CARTESIA_API_KEY"), "elevenlabs": os.getenv("ELEVEN_API_KEY") or os.getenv("ELEVENLABS_API_KEY"), "azure": os.getenv("AZURE_SPEECH_KEY")}.get(provider))
 
@@ -100,7 +107,7 @@ def select_pipeline(ctx: CallContext) -> PipelineSpec:
         spec.notes.append("No TTS provider key found; the session will fail to build.")
 
     # Turn taking
-    spec.semantic_turns = bool(caps.semantic_turns and agent.turn.semantic_turn_detection)
+    spec.semantic_turns = bool(caps.semantic_turns and agent.turn.semantic_turn_detection) and not low_memory()
     spec.min_endpointing_s = agent.turn.min_endpointing_ms / 1000
     spec.min_interruption_s = agent.turn.min_interruption_ms / 1000
     spec.allow_interruptions = agent.turn.allow_interruptions
