@@ -179,3 +179,32 @@ async def test_when_the_audit_row_cannot_be_written_a_write_does_not_run_but_a_r
     assert not write.ok and "not run" in write.output and ran == []
     read = await executor.execute(tool("find_contact", handler, is_durable_write=False, is_idempotent=True), {}, state=None)
     assert read.ok and ran == ["ran"]
+
+
+async def test_a_close_that_hits_a_restarting_app_is_retried_in_the_background(monkeypatch):
+    """A record left open reads as "timed out mid-write"; a brief outage must not strand it."""
+    import asyncio as _asyncio
+
+    from app_sdk.errors import Unavailable
+    from veyra_harness import executor as ex
+
+    class FlakySdk:
+        def __init__(self):
+            self.calls = 0
+
+        async def finish_tool_call(self, tool_call_id, **fields):
+            self.calls += 1
+            if self.calls == 1:
+                raise Unavailable("app layer unreachable: restarting")
+
+    sleeps: list[float] = []
+
+    async def fast_sleep(d):
+        sleeps.append(d)
+
+    sdk = FlakySdk()
+    monkeypatch.setattr(ex.asyncio, "sleep", fast_sleep)
+    executor = ex.ActionExecutor(sdk, scope=ex.ExecutionScope())
+    await executor._finish(7, status="succeeded")
+    await _asyncio.gather(*list(ex._PENDING_CLOSES))
+    assert sdk.calls == 2 and sleeps == [1.0]

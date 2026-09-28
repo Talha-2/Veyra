@@ -98,7 +98,7 @@ class DemoDataSeeder extends Seeder
         $talker = Expert::create([
             'slug' => 'front-desk', 'name' => 'Front desk',
             'description' => 'Holds the conversation and answers what it can.',
-            'system_prompt' => "You own every word the caller hears.\n\nAnswer business questions yourself. Delegate only when something must be done — booked, written, changed, submitted. Never promise a ticket, booking or callback that a completed action has not confirmed.",
+            'system_prompt' => "You own every word the caller hears.\n\nAnswer business questions from the business information and the knowledge base (search it for anything specific). Delegate only when something must be done — booked, written, changed, submitted. Never promise a ticket, booking or callback that a completed action has not confirmed.",
             'runtime' => AgentRuntime::Talker, 'is_builtin' => true, 'position' => 0,
         ]);
 

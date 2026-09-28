@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Middleware\AuthenticateAgent;
+use App\Http\Middleware\AuthenticateApiKey;
 use App\Http\Middleware\EnsureSurfaceAccess;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetCurrentOrganization;
+use App\Support\PublicApi\ApiError;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -54,6 +56,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => SetCurrentOrganization::class,
             'surface' => EnsureSurfaceAccess::class,
             'agent.auth' => AuthenticateAgent::class,
+            'api.key' => AuthenticateApiKey::class,
         ]);
 
         // Implicit route-model binding runs in SubstituteBindings, which sits
@@ -72,9 +75,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // Same rule for the machine credential: the agent names the tenant in
         // the path, and `{call}` must resolve inside that tenant.
         $middleware->prependToPriorityList(SubstituteBindings::class, AuthenticateAgent::class);
+        // And for the public API: the key names the tenant, and `{ticket}`
+        // must resolve inside it.
+        $middleware->prependToPriorityList(SubstituteBindings::class, AuthenticateApiKey::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+        // The public API has one error shape: {"error": {type, message, fields?}}.
+        $exceptions->render(function (Throwable $e, Request $request) {
+            if ($request->is('api/v1', 'api/v1/*')) {
+                return ApiError::fromException($e);
+            }
+        });
     })->create();

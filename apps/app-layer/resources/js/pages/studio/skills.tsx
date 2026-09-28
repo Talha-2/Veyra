@@ -4,7 +4,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 
 import { ChoiceCard } from '../../components/studio-capability/choice-card';
 import { useCreateParam } from '../../components/studio-capability/use-create-param';
-import { Field } from '../../components/studio/form';
+import { Stacked } from '../../components/studio/space';
 import Dialog from '../../components/ui/dialog';
 import { Callout, Card, IconTile, List, ListRow, SearchField, SegmentedControl, Toolbar } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
@@ -75,10 +75,12 @@ export default function Skills({ skills, modes }: { skills: SkillRow[]; modes: M
                     </EmptyState>
                 </Card>
             ) : (
-                <>
-                    <Toolbar trailing={<SearchField value={query} onChange={setQuery} placeholder="Search skills and experts" className="w-full sm:w-70" />}>
-                        <SegmentedControl value={filter} onChange={setFilter} options={filterOptions} />
-                    </Toolbar>
+                <div className="pt-3">
+                    <div className="mb-2">
+                        <Toolbar trailing={<SearchField value={query} onChange={setQuery} placeholder="Search skills and experts" className="w-full sm:w-70" />}>
+                            <SegmentedControl value={filter} onChange={setFilter} options={filterOptions} />
+                        </Toolbar>
+                    </div>
 
                     <Card>
                         {visible.length === 0 ? (
@@ -96,14 +98,14 @@ export default function Skills({ skills, modes }: { skills: SkillRow[]; modes: M
                         )}
                     </Card>
 
-                    <p className="mt-3 px-1 text-xs text-tertiary">
+                    <p className="mt-4 px-1 text-sm text-tertiary">
                         {visible.length === skills.length ? `${skills.length} ${skills.length === 1 ? 'skill' : 'skills'}` : `Showing ${visible.length} of ${skills.length} skills`}
                         {' · '}A skill does nothing until it is granted to an expert.
                     </p>
-                </>
+                </div>
             )}
 
-            <Dialog open={creating} onClose={() => setCreating(false)} title="New skill" description="Name it and say when the agent should reach for it. You write the instructions on the next screen." width={580}>
+            <Dialog open={creating} onClose={() => setCreating(false)} title="New skill" description="Name it and say when the agent should reach for it. You write the instructions on the next screen." width={640}>
                 <CreateForm modes={modes} onDone={() => setCreating(false)} />
             </Dialog>
         </>
@@ -136,7 +138,7 @@ function SkillListRow({ skill: s }: { skill: SkillRow }) {
                     <Mono className="shrink-0">v{s.version}</Mono>
                 </span>
             }
-            subtitle={s.description}
+            subtitle={<>{gated && <span className="text-info">{s.mode_label} · </span>}{s.description}</>}
             trailing={
                 <>
                     <span className="hidden items-center gap-2 md:flex" title={experts.map((e) => e.name).join(', ') || undefined}>
@@ -158,10 +160,7 @@ function SkillListRow({ skill: s }: { skill: SkillRow }) {
                             </>
                         )}
                     </span>
-                    <span className="hidden w-23 justify-end lg:flex">
-                        <Badge tone={gated ? 'info' : 'muted'}>{s.mode_label}</Badge>
-                    </span>
-                    <span className="flex w-12 justify-end">
+                    <span className="flex w-14 justify-end">
                         <Badge tone={s.enabled ? 'success' : 'muted'} dot>{s.enabled ? 'On' : 'Off'}</Badge>
                     </span>
                     <span className="hidden w-16 justify-end sm:flex"><RelativeTime at={s.updated_at} /></span>
@@ -179,30 +178,29 @@ function CreateForm({ modes, onDone }: { modes: Mode[]; onDone: () => void }) {
     const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/skills', { onSuccess: onDone }); };
 
     return (
-        <form onSubmit={submit}>
-            <Field label="Name" error={errors.name}>
-                <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Reschedule a visit" maxLength={80} autoFocus />
-            </Field>
-            <Field label="When to use it" error={errors.description}
-                hint={`${data.description.length}/200. The agent reads only this line to decide whether to open the skill, so say when, not how.`}>
-                <input className="v-field" value={data.description} maxLength={200} onChange={(e) => setData('description', e.target.value)}
+        <form onSubmit={submit} className="flex flex-col gap-5 pt-1">
+            <Stacked label="Name" htmlFor="skill-name" error={errors.name}>
+                <input id="skill-name" className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Reschedule a visit" maxLength={80} autoFocus />
+            </Stacked>
+            <Stacked label="When to use it" htmlFor="skill-when" error={errors.description}
+                hint="The agent reads only this line to decide whether to open the skill, so say when, not how."
+                aside={<Mono>{data.description.length}/200</Mono>}>
+                <input id="skill-when" className="v-field" value={data.description} maxLength={200} onChange={(e) => setData('description', e.target.value)}
                     placeholder="When a caller wants to move or cancel a booked visit." />
-            </Field>
+            </Stacked>
 
-            <div className="mb-5">
-                <span className="v-label">How it runs</span>
-                <div role="radiogroup" aria-label="How it runs" className="grid gap-2 sm:grid-cols-2">
+            <Stacked label="How it runs" error={errors.execution_mode}>
+                <div role="radiogroup" aria-label="How it runs" className="grid gap-3 sm:grid-cols-2">
                     {modes.map((m) => (
                         <ChoiceCard key={m.value} selected={data.execution_mode === m.value} onSelect={() => setData('execution_mode', m.value)}
                             icon={modeIcon(m.value)} title={m.label} description={m.description} />
                     ))}
                 </div>
-                {errors.execution_mode && <p className="mt-1.5 text-sm text-danger">{errors.execution_mode}</p>}
-            </div>
+            </Stacked>
 
-            {mode?.caution && <div className="mb-5"><Callout tone="warning">{mode.caution}</Callout></div>}
+            {mode?.caution && <Callout tone="warning">{mode.caution}</Callout>}
 
-            <div className="flex justify-end gap-2">
+            <div className="mt-2 flex justify-end gap-2 border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
                 <button type="button" className="v-btn v-btn--ghost" onClick={onDone}>Cancel</button>
                 <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.name.trim() || !data.description.trim()}>
                     {processing ? 'Creating…' : 'Create skill'}

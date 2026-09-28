@@ -59,6 +59,8 @@ class Activity extends Model
         return match ($this->actor) {
             'agent' => 'Agent',
             'system' => 'System',
+            // Written through the public API (/api/v1) by an integration.
+            'api' => 'API',
             default => $this->user?->name ?? 'Someone',
         };
     }

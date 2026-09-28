@@ -2,9 +2,11 @@ import { Head, Link } from '@inertiajs/react';
 import { Headphones, Inbox, Phone, Ticket, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { Cell, DataTable, HeadCell, TableRow } from '../../components/desk-pages/collection';
 import { initialsOf } from '../../components/desk-pages/format';
-import { Callout, Card, Meter, SearchField, SegmentedControl, StatTile, Toolbar } from '../../components/ui/kit';
-import { PageHeader, Row, Table, Td, Th } from '../../components/ui/page';
+import { DeskPage, MetricTile, Panel } from '../../components/desk-pages/layout';
+import { Callout, Meter, SearchField, SegmentedControl } from '../../components/ui/kit';
+import { PageHeader } from '../../components/ui/page';
 import { Avatar, Badge, EmptyState, Mono, UserText, type Tone } from '../../components/ui/primitives';
 
 interface Member {
@@ -63,55 +65,67 @@ export default function Team({ members, can_manage }: { members: Member[]; can_m
         <>
             <Head title="Team" />
 
-            <div className="mx-auto max-w-[1320px] px-6 py-7 md:px-8">
+            <DeskPage width="wide" header={
                 <PageHeader
                     title="Team"
                     description="Who is on shift, what each person is carrying, and how to reach them."
                     actions={can_manage ? <Link href="/studio/settings/team" className="v-btn v-btn--quiet"><Users size={14} strokeWidth={1.8} />Manage in Studio</Link> : undefined}
                 />
-
-                <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatTile label="People" icon={<Users size={15} strokeWidth={1.8} />} value={members.length} hint={members.length === 1 ? 'Just you so far' : 'On this organization'} />
-                    <StatTile label="Active now" icon={<Headphones size={15} strokeWidth={1.8} />} value={presenceKnown ? activeNow : '—'} tone={activeNow > 0 ? 'success' : undefined}
+            }>
+                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                    <MetricTile label="People" icon={<Users size={15} strokeWidth={1.8} />} value={members.length} hint={members.length === 1 ? 'Just you so far' : 'On this organization'} />
+                    <MetricTile label="Active now" icon={<Headphones size={15} strokeWidth={1.8} />} value={presenceKnown ? activeNow : '—'} tone={activeNow > 0 ? 'var(--success)' : undefined}
                         hint={presenceKnown ? 'Used Veyra in the last five minutes' : 'Presence is not recorded on this server'} />
-                    <StatTile label="Open conversations" icon={<Inbox size={15} strokeWidth={1.8} />} value={totalConversations} hint="Assigned across the team" />
-                    <StatTile label="Open tickets" icon={<Ticket size={15} strokeWidth={1.8} />} value={totalTickets} hint="Assigned, not yet resolved" />
+                    <MetricTile label="Open conversations" icon={<Inbox size={15} strokeWidth={1.8} />} value={totalConversations} hint="Assigned across the team" />
+                    <MetricTile label="Open tickets" icon={<Ticket size={15} strokeWidth={1.8} />} value={totalTickets} hint="Assigned, not yet resolved" />
                 </div>
 
-                <Toolbar trailing={<SearchField value={term} onChange={setTerm} placeholder="Name, email or extension" className="w-full sm:w-[260px]" />}>
+                <section className="flex flex-col gap-6">
+                <div className="flex flex-wrap items-center gap-3">
                     <SegmentedControl value={sort} onChange={setSort} options={[
                         { value: 'load', label: 'Busiest first' },
                         { value: 'presence', label: 'Available first' },
                         { value: 'name', label: 'Name' },
                     ]} />
-                </Toolbar>
+                    <div className="flex-1" />
+                    <SearchField value={term} onChange={setTerm} placeholder="Name, email or extension" className="w-full sm:w-72 [&_input]:h-9" />
+                </div>
 
                 {rows.length === 0 ? (
-                    <Card><EmptyState icon={<Users size={20} strokeWidth={1.8} />} title={term ? 'No one matches' : 'No one on the team yet'}>{term ? 'Try a first name, or an extension number.' : 'An owner or admin invites people from Studio settings.'}</EmptyState></Card>
+                    <Panel><EmptyState icon={<Users size={22} strokeWidth={1.8} />} title={term ? 'No one matches' : 'No one on the team yet'}>{term ? 'Try a first name, or an extension number.' : 'An owner or admin invites people from Studio settings.'}</EmptyState></Panel>
                 ) : (
-                    <Table head={<><Th>Person</Th><Th>Status</Th><Th>Role</Th><Th>Workload</Th><Th>Extension</Th><Th>Can open</Th></>}>
+                    <DataTable minWidth={900} head={
+                        <>
+                            <HeadCell>Person</HeadCell>
+                            <HeadCell width={160}>Status</HeadCell>
+                            <HeadCell width={120}>Role</HeadCell>
+                            <HeadCell width={220}>Workload</HeadCell>
+                            <HeadCell width={120}>Extension</HeadCell>
+                            <HeadCell width={160}>Can open</HeadCell>
+                        </>
+                    }>
                         {rows.map((m) => {
                             const p = presenceOf(m.last_active_at);
                             const load = m.open_conversations + m.open_tickets;
                             return (
-                                <Row key={m.id}>
-                                    <Td>
-                                        <div className="flex items-center gap-3">
+                                <TableRow key={m.id}>
+                                    <Cell className="w-full max-w-0">
+                                        <div className="flex min-w-0 items-center gap-3 py-2.5">
                                             <span className="relative shrink-0">
                                                 <Avatar name={m.name} initials={initialsOf(m.name)} size={36} />
                                                 {m.last_active_at !== undefined && (
                                                     <span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full" style={{ background: p.live ? 'var(--success-fill)' : p.tone === 'warning' ? 'var(--warning-fill)' : 'var(--text-disabled)', boxShadow: '0 0 0 2px var(--surface)' }} aria-hidden="true" />
                                                 )}
                                             </span>
-                                            <div className="min-w-0">
+                                            <div className="min-w-0 leading-tight">
                                                 <div className="truncate text-base font-medium text-primary"><UserText>{m.name}</UserText></div>
                                                 <a href={`mailto:${m.email}`} className="block truncate text-xs text-tertiary hover:text-secondary">{m.email}</a>
                                             </div>
                                         </div>
-                                    </Td>
-                                    <Td>{m.last_active_at !== undefined ? <Badge tone={p.tone} dot>{p.label}</Badge> : <span className="text-sm text-tertiary">Unknown</span>}</Td>
-                                    <Td muted>{m.role}</Td>
-                                    <Td>
+                                    </Cell>
+                                    <Cell>{m.last_active_at !== undefined ? <Badge tone={p.tone} dot>{p.label}</Badge> : <span className="text-sm text-tertiary">Unknown</span>}</Cell>
+                                    <Cell className="text-secondary">{m.role}</Cell>
+                                    <Cell>
                                         <div className="w-[180px]">
                                             <div className="mb-1.5 flex items-center justify-between text-xs">
                                                 <span className="inline-flex items-center gap-2.5 text-secondary tabular-nums">
@@ -122,33 +136,34 @@ export default function Team({ members, can_manage }: { members: Member[]; can_m
                                             </div>
                                             <Meter value={(load / max) * 100} tone={load === max && load > 0 && members.length > 1 ? 'warning' : 'accent'} label={`${m.name}: ${load} open items`} />
                                         </div>
-                                    </Td>
-                                    <Td>
+                                    </Cell>
+                                    <Cell>
                                         {/* The extension is how the agent transfers a call to this person,
                                             so it is operationally useful here rather than decoration. */}
                                         {m.extension
                                             ? <span className="inline-flex items-center gap-1.5"><Phone size={12} strokeWidth={1.8} className="text-tertiary" /><Mono className="text-sm text-primary">{m.extension}</Mono></span>
                                             : <span className="text-sm text-tertiary">—</span>}
-                                    </Td>
-                                    <Td>
+                                    </Cell>
+                                    <Cell>
                                         <span className="flex gap-1">
                                             {(m.surfaces ?? []).length === 0 ? <span className="text-sm text-tertiary">—</span> : (m.surfaces ?? []).map((s) => <Badge key={s} tone="muted">{s.replace(/^Veyra\s+/, '')}</Badge>)}
                                         </span>
-                                    </Td>
-                                </Row>
+                                    </Cell>
+                                </TableRow>
                             );
                         })}
-                    </Table>
+                    </DataTable>
                 )}
 
-                <div className="mt-4">
+                <div>
                     <Callout tone="muted">
                         {can_manage
                             ? <>Invite people, change roles and set which of Desk and Studio each person can open in <Link href="/studio/settings/team" className="font-medium text-accent-text">Studio settings</Link>. The extension is what the agent dials to transfer a call.</>
                             : 'Only an owner or admin can change who is on the team. The extension is what the agent dials to transfer a call.'}
                     </Callout>
                 </div>
-            </div>
+                </section>
+            </DeskPage>
         </>
     );
 }

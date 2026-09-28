@@ -43,9 +43,29 @@ class SettingsController extends Controller
     {
         $this->authorize('administer-organization');
         $validated = $request->validate(['name' => ['required', 'string', 'max:120'], 'timezone' => ['required', 'timezone']]);
-        Organization::current()->update($validated);
+        $organization = Organization::current();
+        $oldName = $organization->name;
 
-        return back()->with('success', 'Organization updated.');
+        if ($validated['name'] !== $oldName) {
+            // The identifier follows the name. Nothing looks an organization
+            // up by it (the agent layer and the API use the numeric id), so
+            // a rename cannot orphan anything.
+            $validated['slug'] = Organization::uniqueSlug($validated['name'], $organization->id);
+
+            // Carry the new name to where the agent says it, but only where
+            // it still says the old one: never overwrite what someone wrote.
+            $profile = \App\Models\BusinessProfile::query()->first();
+            if ($profile && ($profile->name === null || $profile->name === $oldName)) {
+                $profile->update(['name' => $validated['name']]);
+            }
+            $config = \App\Models\AgentConfig::query()->first();
+            if ($config && filled($config->greeting) && str_contains($config->greeting, $oldName)) {
+                $config->update(['greeting' => str_replace($oldName, $validated['name'], $config->greeting)]);
+            }
+        }
+        $organization->update($validated);
+
+        return back()->with('success', isset($validated['slug']) ? "Organization renamed. Its identifier is now {$validated['slug']}." : 'Organization updated.');
     }
 
     public function team(): Response

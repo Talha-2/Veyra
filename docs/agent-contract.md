@@ -57,6 +57,7 @@ Base: `{APP_LAYER_URL}/api/agent/v1`. All bodies JSON. Validation failures are
 |---|---|
 | `GET /health` | `{ok, contract: "v1", app, time}`. A mismatched deploy is visible here. |
 | `POST /calls/inbound` | A call arrived. Resolves the tenant, opens the conversation, returns the **call context** (below). |
+| `POST /calls/web` | `{room}` — a browser voice session (Studio Talk) in a room named `web-…` that the app created. The room name resolves the tenant and the waiting call (created in the last 15 minutes); the first claim moves it to `in-progress` (201), a retry gets the same call (200). Returns the same call context, with `line.e164 = "web"` and a `web_session` caller. |
 | `POST /automations/claim` | The gateway's pull loop: claim due and queued automation runs across **every** tenant, exactly once. Each run carries `organization_id`. |
 
 `POST /calls/inbound` takes `{to, from, provider, provider_sid, room?}`.
@@ -199,6 +200,7 @@ turn.
 |---|---|
 | `GET /v1/health` | Reachability. Cached 30 s on the app side. |
 | `POST /v1/runs` | `{kind: thread, organization_id, thread_id, external_id?, message}` — start or continue an Ask run. `{kind: automation, organization_id, run_id, automation_id}` — start a queued run now. |
+| `POST /v1/chat/stream` | `{organization_id, conversation_id, message, history, context}` — one live-chat turn with the **customer-facing** agent (Studio Talk's chat; later the public chat API). `context` is the conversation bundle (tenant bundle + `caller`), sent by the app so no second fetch precedes the reply. Same event stream as Ask. The worker runs with the chat prompt (the front desk's voice and the worker's tools and rules in one text agent). |
 | `POST /v1/threads/stream` | `{organization_id, thread_id, message, history: [{role, content}]}` — one Ask turn as server-sent events, one JSON object per `data:` line: `status` `{text}`, `delta` `{text}`, `tool` `{id, name, status: running\|done\|error, label, detail, summary?, ms?}`, then `done` `{content, tokens, model}` or `error` `{message}`. `history` seeds a fresh worker, so a restarted gateway continues the thread. The app relays every event to the browser and saves the finished turn (text and tool steps in order) itself. |
 | `POST /v1/skills/test` | `{organization_id, skill, version, scenario}` — run a skill without a caller. |
 | `POST /v1/calls/outbound` | `{organization_id, to, from, goal, context}` — place a call. |

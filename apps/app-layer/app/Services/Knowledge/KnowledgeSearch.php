@@ -7,7 +7,9 @@ use App\Models\DocumentChunk;
 /**
  * What the agent would retrieve for a query.
  *
- * Keyword search over chunks, ranked by term hits. One implementation serves
+ * Keyword search over chunks: stems and everyday synonyms, matched in the
+ * text and the document title, ranked by how much of the question a chunk
+ * covers. One implementation serves
  * both the Studio "test retrieval" box and the agent's `knowledge/search`
  * route, so what an author sees on the page is exactly what the talker gets
  * on a call — the point of the test box is lost if they differ.
@@ -20,44 +22,128 @@ class KnowledgeSearch
     /**
      * @return array{query: string, results: list<array{document_id:int, document:?string, position:int, score:int, excerpt:string, content:string}>}
      */
-    public function search(string $query, int $limit = 8): array
+    /**
+     * Words that carry no meaning for retrieval. "How much is a visit" is
+     * about "visit" and a price, not about "how" or "much".
+     */
+    private const STOPWORDS = ['the', 'and', 'you', 'your', 'our', 'are', 'for', 'with', 'what', 'does', 'how', 'much', 'can', 'will', 'there', 'this', 'that', 'have', 'from', 'about', 'any', 'into', 'out', 'come', 'get', 'need', 'want', 'please', 'hi', 'hello', 'thanks', 'is', 'do', 'to', 'in', 'on', 'of', 'a', 'an', 'my', 'me', 'we', 'us', 'it', 'be'];
+
+    /**
+     * Everyday synonyms callers use for the same fact. A caller asks "what
+     * does a visit cost"; the document says "a diagnostic visit is $89".
+     * Stems, matched as substrings, so "pric" covers price and pricing.
+     */
+    private const CONCEPTS = [
+        ['pric', 'cost', 'fee', 'charg', 'rate', 'quot', '$'],
+        ['area', 'serv', 'cover', 'county', 'zone', 'location'],
+        ['book', 'schedul', 'appointment', 'slot', 'availab'],
+        ['hour', 'open', 'clos'],
+        ['cancel', 'refund', 'reschedul', 'resched'],
+        ['pay', 'card', 'cash', 'deposit', 'ach'],
+        ['warrant', 'guarant'],
+        ['emergenc', 'urgent', 'same-day', 'same day'],
+    ];
+
+    /**
+     * @return array{query: string, results: list<array{document_id:int, document:?string, position:int, score:int, excerpt:string, content:string}>}
+     */
+    public function search(string $query, int $limit = 8, bool $withMemory = true): array
     {
-        $terms = array_values(array_filter(preg_split('/\s+/', mb_strtolower(trim($query))) ?: [], fn ($t) => mb_strlen($t) > 2));
-        if (! $terms) {
+        $concepts = $this->concepts($query);
+        if (! $concepts) {
             return ['query' => $query, 'results' => []];
         }
+        $variants = array_values(array_unique(array_merge(...$concepts)));
 
         $results = DocumentChunk::query()
             ->with('document:id,name')
-            ->whereHas('document', fn ($q) => $q->where('status', 'ready'))
+            // `withMemory: false` is the public API's view: the knowledge
+            // base only, not what the agent has noted for itself.
+            ->whereHas('document', fn ($q) => $q->where('status', 'ready')->when(! $withMemory, fn ($d) => $d->where('source_type', '!=', 'agent')))
             // lower() + like rather than ilike: Postgres in dev, SQLite in
-            // tests, and this must mean the same thing on both.
-            ->where(function ($q) use ($terms) {
-                foreach ($terms as $t) {
-                    $q->orWhereRaw('lower(content) like ?', ['%'.str_replace(['%', '_'], ['\%', '\_'], $t).'%']);
+            // tests, and this must mean the same thing on both. A chunk
+            // qualifies on its text or on its document's title.
+            ->where(function ($q) use ($variants) {
+                foreach ($variants as $v) {
+                    $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $v).'%';
+                    $q->orWhereRaw('lower(content) like ?', [$like])
+                        ->orWhereHas('document', fn ($d) => $d->whereRaw('lower(name) like ?', [$like]));
                 }
             })
-            ->limit(60)
+            ->limit(80)
             ->get()
-            ->map(function (DocumentChunk $c) use ($terms) {
+            ->map(function (DocumentChunk $c) use ($concepts, $variants) {
                 $lower = mb_strtolower($c->content);
-                $score = collect($terms)->sum(fn ($t) => mb_substr_count($lower, $t));
+                $title = mb_strtolower((string) $c->document?->name);
+                $score = 0;
+                foreach ($concepts as $group) {
+                    $inText = collect($group)->sum(fn ($v) => mb_substr_count($lower, $v));
+                    $inTitle = collect($group)->contains(fn ($v) => str_contains($title, $v));
+                    // Covering more of the question beats repeating one word.
+                    if ($inText || $inTitle) {
+                        $score += 4 + min($inText, 3) + ($inTitle ? 3 : 0);
+                    }
+                }
 
                 return [
                     'document_id' => $c->document_id,
                     'document' => $c->document?->name,
                     'position' => $c->position,
                     'score' => $score,
-                    'excerpt' => $this->snippet($c->content, $lower, $terms),
+                    'excerpt' => $this->snippet($c->content, $lower, $variants),
                     'content' => $c->content,
                 ];
             })
+            ->filter(fn ($r) => $r['score'] > 0)
             ->sortByDesc('score')
             ->take($limit)
             ->values()
             ->all();
 
         return ['query' => $query, 'results' => $results];
+    }
+
+    /**
+     * The query as a list of concepts, each a list of substrings that count
+     * as a mention: the word's stem plus its everyday synonyms.
+     *
+     * @return list<list<string>>
+     */
+    private function concepts(string $query): array
+    {
+        $words = preg_split('/[^\p{L}\p{N}$-]+/u', mb_strtolower($query)) ?: [];
+        $out = [];
+        foreach ($words as $w) {
+            if ($w === '' || in_array($w, self::STOPWORDS, true) || (mb_strlen($w) < 3 && $w !== '$')) {
+                continue;
+            }
+            $stem = $this->stem($w);
+            $group = [$stem];
+            foreach (self::CONCEPTS as $concept) {
+                if (collect($concept)->contains(fn ($c) => str_starts_with($stem, $c) || str_starts_with($c, $stem))) {
+                    $group = array_merge($group, $concept);
+                }
+            }
+            $out[implode('|', $group)] = array_values(array_unique($group));
+        }
+
+        return array_values($out);
+    }
+
+    /** A light suffix stripper: pricing, priced, prices → pric. Good enough to match word forms. */
+    private function stem(string $word): string
+    {
+        if (mb_strlen($word) <= 4) {
+            return $word;
+        }
+        foreach (['ings', 'ing', 'ies', 'ied', 'es', 'ed', 's'] as $suffix) {
+            if (str_ends_with($word, $suffix) && mb_strlen($word) - mb_strlen($suffix) >= 3) {
+                $word = mb_substr($word, 0, -mb_strlen($suffix));
+                break;
+            }
+        }
+
+        return mb_strlen($word) > 4 ? rtrim($word, 'e') : $word;
     }
 
     /**

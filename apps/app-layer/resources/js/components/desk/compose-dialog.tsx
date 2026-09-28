@@ -41,9 +41,10 @@ function NoteDialog({ open, onClose, conversationId }: { open: boolean; onClose:
     const submit = (e: FormEvent) => { e.preventDefault(); post(`/desk/inbox/${conversationId}/notes`, { preserveScroll: true, onSuccess: () => { reset(); onClose(); } }); };
 
     return (
-        <Dialog open={open} onClose={onClose} title="Add a note" description="Visible to the team, never to the customer.">
+        <Dialog open={open} onClose={onClose} title="Add an internal note" description="Visible to the team, never to the customer. Ctrl or ⌘ + Enter saves." width={560}>
             <form onSubmit={submit}>
-                <textarea className="v-field h-auto py-2.5 text-base" rows={4} value={data.body} onChange={(e) => setData('body', e.target.value)} dir="auto" placeholder="What the next person should know" aria-label="Note" autoFocus />
+                <textarea className="v-field text-md" rows={5} value={data.body} onChange={(e) => setData('body', e.target.value)} dir="auto" placeholder="What the next person should know" aria-label="Note" autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} />
                 <FieldError>{errors.body}</FieldError>
                 <Footer onClose={onClose} processing={processing} label="Save note" disabled={!data.body.trim()} />
             </form>

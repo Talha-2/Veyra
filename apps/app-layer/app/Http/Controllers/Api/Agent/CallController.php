@@ -112,6 +112,43 @@ class CallController extends Controller
     }
 
     /**
+     * The voice worker joined a browser room (Studio Talk). The app created
+     * that room and its call row when the person pressed Start, so the room
+     * name is the whole lookup: it resolves the tenant (like the dialled
+     * number does for a phone call) and hands back the same bundle a phone
+     * call gets. Only a call that is still waiting to be answered and was
+     * created in the last 15 minutes can be claimed, and only once.
+     */
+    public function web(Request $request, CallContextBuilder $builder): JsonResponse
+    {
+        $validated = $request->validate(['room' => ['required', 'string', 'max:128', 'starts_with:web-']]);
+
+        $call = Call::withoutGlobalScopes()
+            ->where('provider', 'web')
+            ->where('room', $validated['room'])
+            ->where('created_at', '>=', now()->subMinutes(15))
+            ->first();
+        if (! $call) {
+            return response()->json(['error' => 'unknown_room', 'message' => 'No browser session is waiting in that room.'], 404);
+        }
+
+        Organization::setCurrent(Organization::find($call->organization_id));
+        try {
+            $claimed = $call->status === 'ringing';
+            if ($claimed) {
+                $call->forceFill(['status' => 'in-progress'])->save();
+                Activity::log($call->conversation, 'call_started', 'Browser voice session answered by the agent', actor: 'agent', meta: ['call_id' => $call->id]);
+            }
+
+            $identifier = $call->conversation->identifier;
+
+            return response()->json($builder->forCall($call, null, $identifier), $claimed ? 201 : 200);
+        } finally {
+            Organization::setCurrent(null);
+        }
+    }
+
+    /**
      * Recent calls, with their summaries: what a digest automation reads,
      * and what the worker reads to know a returning caller's history beyond
      * the three the bundle carries.

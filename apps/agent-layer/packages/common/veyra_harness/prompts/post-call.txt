@@ -14,4 +14,8 @@ If a ticket was already created on this call, do not create another. Create a
 new ticket only when none exists and the unfinished work warrants team
 attention. Purely informational calls need nothing.
 
+Create nothing when the caller made no request: a call that ended before they
+said what they needed, a silent or test call, a greeting and a hang-up. A
+ticket that says "the caller did not ask for anything" is noise for the team.
+
 Return one concise internal outcome after tool work is complete.

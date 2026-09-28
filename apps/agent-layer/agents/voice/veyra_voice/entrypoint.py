@@ -24,8 +24,20 @@ import os
 import time
 from typing import Any
 
-from livekit.agents import AgentSession, JobContext, JobProcess, MetricsCollectedEvent, RoomInputOptions, WorkerOptions, cli, metrics
+from livekit.agents import AgentSession, JobContext, JobExecutorType, JobProcess, MetricsCollectedEvent, RoomInputOptions, WorkerOptions, cli, metrics
 from livekit.plugins import silero
+
+# LiveKit plugins register themselves on import and refuse to do so off the
+# main thread ("Plugins must be registered on the main thread"). The pipeline
+# picks providers per call, so import every one it may use here, at worker
+# start, not lazily inside the job.
+from livekit.plugins import cartesia, deepgram, openai  # noqa: F401,E402
+
+for _optional in ("livekit.plugins.elevenlabs", "livekit.plugins.azure", "livekit.plugins.turn_detector.multilingual", "livekit.plugins.noise_cancellation"):
+    try:
+        __import__(_optional)
+    except Exception:  # noqa: BLE001 — optional: the pipeline falls back when one is missing
+        pass
 
 from app_sdk import AppSdk, AppSdkError, NotFound
 from veyra_harness.actions import tools_for_expert
@@ -88,13 +100,19 @@ async def _numbers_for(ctx: JobContext) -> tuple[str, str, str]:
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
     started = time.monotonic()
-    from_number, to_number, sid = await _numbers_for(ctx)
 
     sdk = AppSdk(timeout=8.0)
+    # A browser session (Studio Talk) runs in a room the app created and
+    # named "web-…"; everything after this lookup is identical to a call.
+    web_session = ctx.room.name.startswith("web-")
     try:
-        call_ctx = await sdk.inbound_call(to=to_number, from_=from_number, provider="livekit", provider_sid=sid, room=ctx.room.name)
+        if web_session:
+            call_ctx = await sdk.web_call(room=ctx.room.name)
+        else:
+            from_number, to_number, sid = await _numbers_for(ctx)
+            call_ctx = await sdk.inbound_call(to=to_number, from_=from_number, provider="livekit", provider_sid=sid, room=ctx.room.name)
     except NotFound:
-        logger.error("voice.unknown_line to=%s — no organization owns this number; hanging up", to_number)
+        logger.error("voice.unknown_%s room=%s — no organization owns this %s; hanging up", "room" if web_session else "line", ctx.room.name, "session" if web_session else "number")
         await sdk.aclose()
         return
     except AppSdkError as e:
@@ -117,12 +135,33 @@ async def entrypoint(ctx: JobContext) -> None:
         logger.warning("voice.no_worker_expert: delegation will fail honestly")
     tools = tools_for_expert(expert, call_ctx) if expert else []
     executor = ActionExecutor(app, scope=ExecutionScope(call_id=call_ctx.call.id, expert_slug=expert.slug if expert else None))
+    # Building the client loads the CA bundle synchronously (seconds on a busy
+    # host, measured 6.6 s), so it happens off the loop that carries audio.
+    worker_model = await asyncio.to_thread(
+        OpenAIChatModel.from_ref, spec.worker_model, default=DEFAULT_WORKER, temperature=0.2, max_tokens=2000, reasoning_effort=expert.reasoning_effort if expert else None,
+    )
     worker = Worker(
-        model=OpenAIChatModel.from_ref(spec.worker_model, default=DEFAULT_WORKER, temperature=0.2, max_tokens=2000, reasoning_effort=expert.reasoning_effort if expert else None),
+        model=worker_model,
         instructions=worker_instructions(call_ctx, expert, call_ctx) if expert else "There is no expert configured. Reply that the request cannot be handled.",
         tools=tools, executor=executor, state=state,
     )
     agent = FrontAgent(instructions=talker_instructions(call_ctx, call_ctx), worker=worker, state=state, finalization_instructions=post_call_instructions())
+
+    def publish(payload: dict[str, Any], topic: str = "agent_metrics") -> None:
+        async def send() -> None:
+            try:
+                await ctx.room.local_participant.publish_data(json.dumps(payload).encode(), reliable=True, topic=topic)
+            except Exception:  # noqa: BLE001 — a closed room must not kill the call
+                pass
+
+        asyncio.create_task(send())
+
+    # The worker's tool steps, live, for a browser that shows them (Studio
+    # Talk); a phone has nobody to show them to, and publishing is harmless.
+    async def on_tool(event: dict[str, Any]) -> None:
+        publish({k: event.get(k) for k in ("id", "name", "status", "label", "detail", "summary", "ms")}, topic="agent_activity")
+
+    worker.observer = on_tool
 
     session_kwargs = build_session_kwargs(spec, vad=ctx.proc.userdata["vad"])
     try:
@@ -135,16 +174,6 @@ async def entrypoint(ctx: JobContext) -> None:
     usage = metrics.UsageCollector()
     turn: dict[str, float] = {}
     latencies: list[float] = []
-
-    def publish(payload: dict[str, Any]) -> None:
-        async def send() -> None:
-            with_room = ctx.room.local_participant
-            try:
-                await with_room.publish_data(json.dumps(payload).encode(), reliable=True, topic="agent_metrics")
-            except Exception:  # noqa: BLE001
-                pass
-
-        asyncio.create_task(send())
 
     @session.on("metrics_collected")
     def on_metrics(ev: MetricsCollectedEvent) -> None:
@@ -201,12 +230,17 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.add_shutdown_callback(on_shutdown)
 
     room_input = RoomInputOptions()
-    try:
-        from livekit.plugins import noise_cancellation
+    # Noise cancellation earns its CPU on a phone line. A browser already runs
+    # echo cancellation and noise suppression on the microphone, and running
+    # BVC on top of it in-process blocked the event loop long enough to
+    # break the agent's audio into gaps.
+    if not web_session:
+        try:
+            from livekit.plugins import noise_cancellation
 
-        room_input = RoomInputOptions(noise_cancellation=noise_cancellation.BVC())
-    except Exception:  # noqa: BLE001
-        pass
+            room_input = RoomInputOptions(noise_cancellation=noise_cancellation.BVC())
+        except Exception:  # noqa: BLE001
+            pass
 
     await session.start(room=ctx.room, agent=agent, room_input_options=room_input)
     try:
@@ -217,7 +251,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
 REQUIRED = {
     "LIVEKIT_URL": "LiveKit", "LIVEKIT_API_KEY": "LiveKit", "LIVEKIT_API_SECRET": "LiveKit",
-    "DEEPGRAM_API_KEY": "Deepgram STT", "ELEVEN_API_KEY": "ElevenLabs TTS",
+    "DEEPGRAM_API_KEY": "Deepgram STT",
     "APP_LAYER_URL": "the Laravel app", "AGENT_SHARED_SECRET": "the contract secret",
 }
 
@@ -228,6 +262,9 @@ def preflight() -> None:
     if not ({"start", "dev", "connect"} & set(sys.argv[1:])):
         return
     missing = [k for k in REQUIRED if not os.getenv(k)]
+    # Any one working voice engine is enough; the pipeline picks per language.
+    if not (os.getenv("CARTESIA_API_KEY") or os.getenv("ELEVEN_API_KEY") or os.getenv("ELEVENLABS_API_KEY") or os.getenv("AZURE_SPEECH_KEY")):
+        missing.append("a TTS key (CARTESIA_API_KEY, ELEVEN_API_KEY or AZURE_SPEECH_KEY)")
     if not (os.getenv("LLM_API_KEY") or os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY")):
         missing.append("LLM_API_KEY (or XAI_API_KEY / OPENAI_API_KEY / GROQ_API_KEY)")
     if missing:
@@ -239,4 +276,11 @@ def preflight() -> None:
 def main() -> None:
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
     preflight()
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm))
+    # Each call in its own process, one kept warm: a call must never share an
+    # event loop with the worker's housekeeping or another call, or a blocked
+    # loop turns into gaps in the agent's voice. (The Windows dev default ran
+    # jobs as threads in one process.)
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm, job_executor_type=JobExecutorType.PROCESS, num_idle_processes=int(os.getenv("VOICE_IDLE_PROCESSES", "1")),
+                              # Loading the VAD and plugins in a fresh process took longer than
+                              # LiveKit's 10 s default on a busy machine, and the process was killed.
+                              initialize_process_timeout=float(os.getenv("VOICE_PROCESS_INIT_TIMEOUT", "90"))))

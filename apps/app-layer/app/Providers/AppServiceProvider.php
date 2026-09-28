@@ -2,9 +2,18 @@
 
 namespace App\Providers;
 
+use App\Models\AutomationRun;
+use App\Models\Call;
+use App\Models\Contact;
+use App\Models\Lead;
+use App\Models\Message;
+use App\Models\Ticket;
+use App\Observers\WebhookObserver;
 use App\Services\Agent\AgentGateway;
+use App\Services\Webhooks\WebhookDispatcher;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -13,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(AgentGateway::class);
+        $this->app->singleton(WebhookDispatcher::class);
     }
 
     public function boot(): void
@@ -24,5 +34,28 @@ class AppServiceProvider extends ServiceProvider
         // another's.
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(1200)
             ->by($request->route('organization') ?? $request->ip()));
+
+        // Public API (routes/api_v1.php): every route states the scope it
+        // needs — `null` for "any valid key" — and AuthenticateApiKey refuses
+        // a route that states none. `publishable()` opens a route to vy_pk_
+        // keys, which are otherwise refused everywhere.
+        Route::macro('apiScope', function (?string $scope) {
+            /** @var Route $this */
+            $this->action['api_scope'] = $scope;
+
+            return $this;
+        });
+        Route::macro('publishable', function () {
+            /** @var Route $this */
+            $this->action['api_publishable'] = true;
+
+            return $this;
+        });
+
+        // Outbound webhooks fire from the models, so every write path —
+        // Desk, Studio, the agent contract, the public API — emits them.
+        foreach ([Contact::class, Ticket::class, Lead::class, Call::class, Message::class, AutomationRun::class] as $model) {
+            $model::observe(WebhookObserver::class);
+        }
     }
 }

@@ -24,6 +24,8 @@ from __future__ import annotations
 import os
 from typing import Any, Literal
 
+import asyncio
+
 import httpx
 from pydantic import ValidationError
 
@@ -113,11 +115,39 @@ class AppSdk:
         same call back. The returned context names the tenant; bind with
         ``sdk.for_organization(ctx.organization.id)`` before anything else.
         """
-        body = await self._post("/calls/inbound", {"to": to, "from": from_, "provider": provider, "provider_sid": provider_sid, "room": room})
+        body = await self._answering_post("/calls/inbound", {"to": to, "from": from_, "provider": provider, "provider_sid": provider_sid, "room": room})
         try:
             return CallContext.model_validate(body)
         except ValidationError as e:
             raise AppSdkError(f"inbound call context is not a v1 CallContext: {e}", path="/calls/inbound") from e
+
+    async def web_call(self, *, room: str) -> CallContext:
+        """Claim a browser voice session (Studio Talk) by its room name.
+
+        The app created the room and a call row waiting in it, so the room
+        name names the tenant, the way the dialled number does for a phone
+        call. The returned context has a "Browser" line and a web-visitor
+        caller; everything else is the same bundle a phone call gets.
+        """
+        body = await self._answering_post("/calls/web", {"room": room})
+        try:
+            return CallContext.model_validate(body)
+        except ValidationError as e:
+            raise AppSdkError(f"web call context is not a v1 CallContext: {e}", path="/calls/web") from e
+
+    async def _answering_post(self, path: str, json: dict[str, Any]) -> dict[str, Any]:
+        """The one round trip a call cannot answer without: patient, and tried twice.
+
+        A busy app (a deploy restarting it, a cold free-tier instance) once
+        took longer than the SDK's default timeout, and the caller heard
+        nothing at all. Both routes are idempotent on their key, so a retry
+        gets the same call back.
+        """
+        try:
+            return await self._post(path, json, timeout=25.0)
+        except Unavailable:
+            await asyncio.sleep(1.0)
+            return await self._post(path, json, timeout=25.0)
 
     # ── tenant bundle & reads ───────────────────────────────────────────
 
@@ -283,8 +313,8 @@ class AppSdk:
                     raise
         raise AssertionError("unreachable")
 
-    async def _post(self, path: str, json: dict[str, Any]) -> dict[str, Any]:
-        return await self._send("POST", path, json=_compact(json))
+    async def _post(self, path: str, json: dict[str, Any], *, timeout: float | None = None) -> dict[str, Any]:
+        return await self._send("POST", path, json=_compact(json), timeout=timeout)
 
     async def _patch(self, path: str, json: dict[str, Any]) -> dict[str, Any]:
         return await self._send("PATCH", path, json=_compact(json))
@@ -292,9 +322,9 @@ class AppSdk:
     async def _put(self, path: str, json: dict[str, Any]) -> dict[str, Any]:
         return await self._send("PUT", path, json=_compact(json))
 
-    async def _send(self, method: str, path: str, *, params: dict[str, Any] | None = None, json: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def _send(self, method: str, path: str, *, params: dict[str, Any] | None = None, json: dict[str, Any] | None = None, timeout: float | None = None) -> dict[str, Any]:
         try:
-            response = await self._client.request(method, path, params=params, json=json)
+            response = await self._client.request(method, path, params=params, json=json, **({"timeout": timeout} if timeout else {}))
         except httpx.TransportError as e:
             raise Unavailable(f"app layer unreachable: {e}", path=path) from e
 

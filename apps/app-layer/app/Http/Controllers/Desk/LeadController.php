@@ -26,7 +26,8 @@ class LeadController extends Controller
     {
         $pipelines = Pipeline::query()->with('stages')->orderByDesc('is_default')->orderBy('name')->get();
         $pipeline = $pipelines->firstWhere('id', (int) $request->query('pipeline')) ?? $pipelines->first();
-        $view = in_array($request->query('view'), ['kanban', 'list'], true) ? $request->query('view') : 'kanban';
+        // Board, grouped list or table; `kanban` is the board's old name.
+        $view = match ($request->query('view')) { 'list' => 'list', 'table' => 'table', default => 'board' };
 
         $leads = Lead::query()
             ->when($pipeline, fn ($q) => $q->where('pipeline_id', $pipeline->id))
@@ -43,7 +44,7 @@ class LeadController extends Controller
                 'id' => $l->id,
                 'contact' => $l->contact ? [
                     'id' => $l->contact->id, 'name' => $l->contact->displayName(), 'initials' => $l->contact->initials(),
-                    'company' => $l->contact->company, 'phone' => $l->contact->phone,
+                    'company' => $l->contact->company, 'phone' => $l->contact->phone, 'email' => $l->contact->email,
                 ] : null,
                 'stage_id' => $l->pipeline_stage_id,
                 'source' => $l->source,
@@ -53,6 +54,7 @@ class LeadController extends Controller
                 'overdue' => $l->next_response_at?->isPast() ?? false,
                 'outreach_note' => $l->outreach_note,
                 'assignees' => $l->assignees->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->all(),
+                'created_at' => $l->created_at?->toIso8601String(),
                 'updated_at' => $l->updated_at?->toIso8601String(),
             ]);
 
@@ -157,6 +159,55 @@ class LeadController extends Controller
         }
 
         return back();
+    }
+
+    /**
+     * One change across the table's selection: move to a stage, reassign, or
+     * take out of the pipeline. Contacts are never deleted from here.
+     */
+    public function bulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer'],
+            'action' => ['required', Rule::in(['stage', 'assign', 'delete'])],
+            'pipeline_stage_id' => ['required_if:action,stage', 'nullable', 'integer', 'exists:pipeline_stages,id'],
+            'assignee_ids' => ['array'],
+            'assignee_ids.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        $leads = Lead::query()->with('stage:id,name')->whereIn('id', $validated['ids'])->get();
+        $n = $leads->count();
+
+        if ($validated['action'] === 'delete') {
+            $leads->each->delete();
+
+            return back()->with('success', ($n === 1 ? '1 lead' : "{$n} leads").' removed from the pipeline. The contacts are kept.');
+        }
+
+        if ($validated['action'] === 'assign') {
+            foreach ($leads as $lead) {
+                $lead->assignees()->sync($validated['assignee_ids'] ?? []);
+                Activity::log($lead, 'assigned', 'Assignment changed', $request->user());
+            }
+
+            return back()->with('success', $n === 1 ? '1 lead reassigned.' : "{$n} leads reassigned.");
+        }
+
+        $to = PipelineStage::findOrFail($validated['pipeline_stage_id']);
+        $position = (int) Lead::query()->where('pipeline_stage_id', $to->id)->max('position');
+
+        foreach ($leads as $lead) {
+            if ($lead->pipeline_stage_id === $to->id) {
+                continue;
+            }
+            $from = $lead->stage;
+            $lead->update(['pipeline_stage_id' => $to->id, 'position' => ++$position]);
+            Activity::log($lead, 'stage_changed', "Moved from {$from?->name} to {$to->name}", $request->user(),
+                ['from' => $from?->id, 'to' => $to->id]);
+        }
+
+        return back()->with('success', ($n === 1 ? '1 lead' : "{$n} leads")." moved to {$to->name}.");
     }
 
     public function destroy(Request $request, Lead $lead): RedirectResponse

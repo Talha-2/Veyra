@@ -1,15 +1,17 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Bot, ChevronRight, CircleDot, Flag, Layers, Mail, MessagesSquare, Phone, Plus, Users } from 'lucide-react';
+import { Bot, ChevronRight, CircleDot, Flag, Layers, Lock, Mail, MessagesSquare, Phone, Plus, StickyNote, Users } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
 import Popover from '../../components/ui/popover';
-import { Card, CardHeader, KeyValues, SegmentedControl } from '../../components/ui/kit';
+import { DeskPage, Panel, PanelHeader, WithSidePanel } from '../../components/desk-pages/layout';
+import { KeyValues, SegmentedControl } from '../../components/ui/kit';
 import { Avatar, Badge, Kbd, Mono, RelativeTime, UserText, toneColor, type Tone } from '../../components/ui/primitives';
 import { PageHeader } from '../../components/ui/page';
 import { AutoTextarea, AvatarStack, FieldError, PeoplePicker } from '../../components/desk-inbox/controls';
 import { channelIcon, dateTimeLabel, initialsOf } from '../../components/desk-inbox/helpers';
 import { PropertyRow, PropertySelect } from '../../components/desk-inbox/inspector';
 import TagEditor from '../../components/desk-inbox/tag-editor';
+import { NoteCard } from '../../components/desk-inbox/timeline-cards';
 
 interface Props {
     ticket: {
@@ -19,7 +21,7 @@ interface Props {
         contact: { id: number; name: string; initials: string; phone: string | null; email: string | null; company?: string | null } | null;
         conversation?: { id: number; title: string; channel: string; channel_label: string; status: string; last_message_at: string | null } | null;
         assignee_ids: number[]; tags: string[];
-        notes: { id: number; body: string; author: string; at: string }[];
+        notes: { id: number; body: string; author: string; at: string; by_agent?: boolean }[];
         activities: { id: number; actor: string; is_agent: boolean; description: string; at: string }[];
     };
     statuses: { value: string; label: string; tone?: Tone }[];
@@ -50,7 +52,7 @@ export default function TicketDetail({ ticket, statuses, priorities, types, team
     return (
         <>
             <Head title={`${ticket.reference} ${ticket.subject}`} />
-            <div className="mx-auto max-w-295 px-8 py-8">
+            <DeskPage header={
                 <PageHeader
                     back={{ href: '/desk/tickets', label: 'Tickets' }}
                     title={<UserText>{ticket.subject}</UserText>}
@@ -68,32 +70,32 @@ export default function TicketDetail({ ticket, statuses, priorities, types, team
                         </Link>
                     ) : undefined}
                 />
-
-                <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-                    <div className="flex min-w-0 flex-col gap-6">
-                        <Card>
-                            <div className="flex items-center gap-3 px-5 pt-4 pb-3.5" style={{ borderBottom: '1px solid var(--separator)' }}>
+            }>
+                <WithSidePanel main={
+                    <>
+                        <Panel>
+                            <div className="flex items-center gap-3.5 px-7 pt-6 pb-5" style={{ borderBottom: '1px solid var(--separator)' }}>
                                 {ticket.created_by_agent
-                                    ? <span className="flex size-8 items-center justify-center rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }}><Bot size={16} strokeWidth={2} /></span>
-                                    : <Avatar initials={initialsOf(ticket.created_by)} name={ticket.created_by} size={32} />}
+                                    ? <span className="flex size-9 items-center justify-center rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }}><Bot size={16} strokeWidth={2} /></span>
+                                    : <Avatar initials={initialsOf(ticket.created_by)} name={ticket.created_by} size={36} />}
                                 <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-semibold text-primary">{ticket.created_by}</div>
+                                    <div className="text-base font-semibold text-primary">{ticket.created_by}</div>
                                     <div className="text-xs text-tertiary">Opened <RelativeTime at={ticket.created_at} /> · {SOURCE[ticket.channel] ?? ticket.channel}</div>
                                 </div>
                             </div>
-                            <div className="px-5 py-4">
+                            <div className="px-7 py-6">
                                 {ticket.body
-                                    ? <p className="max-w-[72ch] text-base whitespace-pre-wrap text-primary"><UserText>{ticket.body}</UserText></p>
+                                    ? <p className="max-w-[72ch] text-md leading-relaxed whitespace-pre-wrap text-primary"><UserText>{ticket.body}</UserText></p>
                                     : <p className="text-sm text-tertiary">No details were given. Add what you know as a note below.</p>}
                             </div>
-                        </Card>
+                        </Panel>
 
                         <Discussion ticketId={ticket.id} notes={ticket.notes} activities={ticket.activities} />
-                    </div>
-
-                    <aside className="flex flex-col gap-4 lg:sticky lg:top-8">
-                        <Card>
-                            <div className="px-4 pt-2 pb-2">
+                    </>
+                } side={
+                    <>
+                        <Panel>
+                            <div className="px-7 pt-3 pb-3">
                                 <PropertySelect label="Status" icon={<CircleDot size={14} strokeWidth={1.9} />} value={ticket.status}
                                     options={statuses.map((s) => ({ value: s.value, label: s.label, color: toneColor(s.tone ?? 'muted') }))}
                                     onChange={(v) => patch({ status: v })} />
@@ -105,10 +107,10 @@ export default function TicketDetail({ ticket, statuses, priorities, types, team
                                     onChange={(v) => patch({ ticket_type_id: v ? Number(v) : null })} />
                                 <Assignees team={team} value={ticket.assignee_ids} onChange={(ids) => patch({ assignee_ids: ids })} />
                             </div>
-                            <div className="px-4 py-3.5" style={{ borderTop: '1px solid var(--separator)' }}>
+                            <div className="px-7 py-5" style={{ borderTop: '1px solid var(--separator)' }}>
                                 <Tags value={ticket.tags} onChange={(tags) => patch({ tags })} />
                             </div>
-                            <div className="px-4 py-3.5" style={{ borderTop: '1px solid var(--separator)' }}>
+                            <div className="px-7 py-5" style={{ borderTop: '1px solid var(--separator)' }}>
                                 <KeyValues items={[
                                     { label: 'Reference', value: <Mono>{ticket.reference}</Mono> },
                                     { label: 'Opened', value: dateTimeLabel(ticket.created_at) },
@@ -117,15 +119,15 @@ export default function TicketDetail({ ticket, statuses, priorities, types, team
                                     ...(type ? [{ label: 'Type', value: <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full" style={{ background: type.color }} />{type.name}</span> }] : []),
                                 ]} />
                             </div>
-                        </Card>
+                        </Panel>
 
                         {ticket.contact && <ContactCard contact={ticket.contact} />}
                         {ticket.conversation ? <ConversationCard conversation={ticket.conversation} /> : ticket.conversation_id ? (
                             <LinkCard href={`/desk/inbox/${ticket.conversation_id}`} icon={<MessagesSquare size={16} strokeWidth={1.9} />} title="Linked conversation" subtitle="Open the thread this came from" />
                         ) : null}
-                    </aside>
-                </div>
-            </div>
+                    </>
+                } />
+            </DeskPage>
         </>
     );
 }
@@ -181,7 +183,7 @@ function Tags({ value, onChange }: { value: string[]; onChange: (tags: string[])
 
 function LinkCard({ href, icon, title, subtitle, trailing }: { href: string; icon: ReactNode; title: ReactNode; subtitle?: ReactNode; trailing?: ReactNode }) {
     return (
-        <Link href={href} className="v-panel v-card-hover group flex items-center gap-3 px-4 py-3.5">
+        <Link href={href} className="v-panel v-card-hover group flex min-h-16 items-center gap-3.5 px-6 py-4">
             {icon}
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-primary">{title}</span>
@@ -195,9 +197,9 @@ function LinkCard({ href, icon, title, subtitle, trailing }: { href: string; ico
 
 function ContactCard({ contact }: { contact: NonNullable<Props['ticket']['contact']> }) {
     return (
-        <Card>
-            <CardHeader title="Contact" />
-            <Link href={`/desk/contacts/${contact.id}`} className="group flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-surface-hover">
+        <Panel className="overflow-hidden">
+            <PanelHeader title="Contact" />
+            <Link href={`/desk/contacts/${contact.id}`} className="group flex items-center gap-3.5 px-7 py-4 transition-colors hover:bg-surface-hover">
                 <Avatar initials={contact.initials} name={contact.name} size={40} />
                 <span className="min-w-0 flex-1">
                     <span className="block truncate text-base font-semibold text-primary"><UserText>{contact.name}</UserText></span>
@@ -206,12 +208,12 @@ function ContactCard({ contact }: { contact: NonNullable<Props['ticket']['contac
                 <ChevronRight size={15} strokeWidth={2} className="shrink-0 text-tertiary transition-transform group-hover:translate-x-0.5" />
             </Link>
             {(contact.phone || contact.email) && (
-                <div className="flex flex-col gap-1.5 px-5 pb-4">
+                <div className="flex flex-col gap-2.5 px-7 pb-6">
                     {contact.phone && <a href={`tel:${contact.phone}`} className="flex items-center gap-2 text-sm text-secondary tabular-nums hover:text-accent-text"><Phone size={14} strokeWidth={1.9} className="text-tertiary" />{contact.phone}</a>}
                     {contact.email && <a href={`mailto:${contact.email}`} className="flex items-center gap-2 truncate text-sm text-secondary hover:text-accent-text"><Mail size={14} strokeWidth={1.9} className="text-tertiary" /><span className="truncate">{contact.email}</span></a>}
                 </div>
             )}
-        </Card>
+        </Panel>
     );
 }
 
@@ -233,6 +235,13 @@ type Entry =
     | { kind: 'note'; at: string; note: Props['ticket']['notes'][number] }
     | { kind: 'activity'; at: string; activity: Props['ticket']['activities'][number] };
 
+const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl';
+
+/**
+ * The team's discussion of a ticket: notes (the same amber "Internal note"
+ * sheet the inbox thread uses) interleaved with what changed, on one rail,
+ * and a roomy editor underneath. Cmd/Ctrl+Enter saves.
+ */
 function Discussion({ ticketId, notes, activities }: { ticketId: number; notes: Props['ticket']['notes']; activities: Props['ticket']['activities'] }) {
     const [show, setShow] = useState<'all' | 'notes' | 'activity'>('all');
     const { data, setData, post, processing, errors, reset } = useForm({ body: '' });
@@ -249,43 +258,39 @@ function Discussion({ ticketId, notes, activities }: { ticketId: number; notes: 
     ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
     return (
-        <Card>
-            <CardHeader title="Discussion" description="Notes are for the team; the customer never sees them."
+        <Panel>
+            <PanelHeader title="Discussion" description="Notes are for the team; the customer never sees them."
                 actions={<SegmentedControl size="sm" value={show} onChange={setShow} options={[
                     { value: 'all', label: 'All' },
                     { value: 'notes', label: <>Notes{notes.length > 0 && <span className="text-tertiary tabular-nums">{notes.length}</span>}</> },
-                    { value: 'activity', label: 'Activity' },
+                    { value: 'activity', label: <>Activity{activities.length > 0 && <span className="text-tertiary tabular-nums">{activities.length}</span>}</> },
                 ]} />} />
 
-            <div className="px-5 py-4">
+            <div className="px-7 py-6">
                 {entries.length === 0 ? (
-                    <p className="py-4 text-center text-sm text-tertiary">{show === 'activity' ? 'Nothing has happened yet.' : 'No notes yet. Start the discussion below.'}</p>
+                    <div className="flex flex-col items-center py-6 text-center">
+                        <span className="mb-3 flex size-10 items-center justify-center rounded-md text-tertiary" style={{ background: 'var(--surface-sunken)', border: '1px solid var(--border)' }}>
+                            <StickyNote size={17} strokeWidth={1.8} />
+                        </span>
+                        <p className="text-sm font-medium text-primary">{show === 'activity' ? 'Nothing has happened yet' : 'No notes yet'}</p>
+                        <p className="mt-0.5 text-sm text-tertiary">{show === 'activity' ? 'Status, priority and owner changes land here.' : 'Write down what the next person should know.'}</p>
+                    </div>
                 ) : (
                     <ol className="relative flex flex-col gap-4">
-                        <span className="absolute top-3 bottom-3 left-3.25 w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />
+                        <span className="absolute top-3 bottom-3 left-3.5 w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />
                         {entries.map((e) => e.kind === 'note' ? (
-                            <li key={`n-${e.note.id}`} className="relative flex gap-3">
-                                <span className="relative rounded-full" style={{ boxShadow: '0 0 0 3px var(--surface)' }}>
-                                    <Avatar initials={initialsOf(e.note.author)} name={e.note.author} size={28} />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                    <div className="mb-1 flex items-baseline gap-2">
-                                        <span className="text-sm font-semibold text-primary">{e.note.author}</span>
-                                        <RelativeTime at={e.note.at} />
-                                    </div>
-                                    <div className="rounded-lg px-3.5 py-2.5 text-base whitespace-pre-wrap text-primary" style={{ background: 'var(--surface-sunken)' }}>
-                                        <UserText>{e.note.body}</UserText>
-                                    </div>
-                                </div>
+                            <li key={`n-${e.note.id}`} className="relative">
+                                <NoteCard note={e.note} size="lg" />
                             </li>
                         ) : (
-                            <li key={`a-${e.activity.id}`} className="relative flex items-center gap-3">
+                            <li key={`a-${e.activity.id}`} className="relative flex min-h-7 items-center gap-3">
                                 <span className="flex w-7 shrink-0 justify-center">
-                                    <span className="relative size-2 rounded-full" style={{ background: e.activity.is_agent ? 'var(--accent)' : 'var(--border-strong)', boxShadow: '0 0 0 3px var(--surface)' }} aria-hidden="true" />
+                                    {e.activity.is_agent
+                                        ? <span className="relative flex size-5 items-center justify-center rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)', boxShadow: '0 0 0 3px var(--surface)' }}><Bot size={11} strokeWidth={2.2} aria-hidden="true" /></span>
+                                        : <span className="relative size-2 rounded-full" style={{ background: 'var(--border-strong)', boxShadow: '0 0 0 3px var(--surface)' }} aria-hidden="true" />}
                                 </span>
                                 <p className="min-w-0 flex-1 text-sm text-secondary">
-                                    {e.activity.is_agent && <Bot size={14} strokeWidth={2} className="mr-1 inline text-accent" aria-hidden="true" />}
-                                    <span className="font-medium text-primary">{e.activity.actor}</span> · {e.activity.description}
+                                    <span className="font-medium text-primary">{e.activity.actor}</span> {lowerFirst(e.activity.description)}
                                 </p>
                                 <RelativeTime at={e.activity.at} />
                             </li>
@@ -294,18 +299,29 @@ function Discussion({ ticketId, notes, activities }: { ticketId: number; notes: 
                 )}
             </div>
 
-            <form onSubmit={submit} className="px-5 pt-1 pb-5">
-                <div className="rounded-xl transition-shadow focus-within:[box-shadow:var(--ring)]" style={{ background: 'var(--surface)', border: '1px solid var(--border-strong)' }}>
-                    <AutoTextarea value={data.body} onChange={(e) => setData('body', e.target.value)} dir="auto" maxHeight={240} aria-label="Add a note"
+            <form onSubmit={submit} className="px-7 pt-1 pb-7">
+                <div className="overflow-hidden rounded-lg transition-shadow focus-within:[box-shadow:var(--ring)]"
+                    style={{ background: 'var(--warning-subtle)', border: '1px solid var(--warning-border)' }}>
+                    <div className="flex items-center gap-1.5 px-4 pt-3 text-xs font-semibold" style={{ color: 'var(--warning)' }}>
+                        <Lock size={12} strokeWidth={2.4} aria-hidden="true" /> Internal note
+                        <span className="font-normal text-tertiary">· only your team sees this</span>
+                    </div>
+                    <AutoTextarea value={data.body} onChange={(e) => setData('body', e.target.value)} dir="auto" maxHeight={320} aria-label="Add a note"
                         onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(); } }}
-                        placeholder="Add a note for the team" className="px-4 pt-3 pb-2" style={{ minHeight: 64 }} />
-                    <div className="flex items-center justify-end gap-3 px-2.5 pb-2.5">
-                        <span className="hidden items-center gap-1 text-2xs text-tertiary sm:flex"><Kbd>Ctrl</Kbd><Kbd>↵</Kbd> to add</span>
-                        <button type="submit" className="v-btn v-btn--primary v-btn--sm" disabled={processing || !data.body.trim()}>{processing ? 'Adding…' : 'Add note'}</button>
+                        placeholder="What the next person should know: what you checked, what you promised, what is still open."
+                        className="v-bare px-4 pt-2 pb-2 text-md leading-relaxed" style={{ minHeight: 120 }} />
+                    <div className="flex items-center justify-end gap-3 px-3 pb-3">
+                        <span className="hidden items-center gap-1 text-2xs text-tertiary sm:flex"><Kbd>{MOD}</Kbd><Kbd>↵</Kbd> to save</span>
+                        <button type="submit" className="v-btn v-btn--primary v-btn--sm" disabled={processing || !data.body.trim()}>{processing ? 'Saving…' : 'Save note'}</button>
                     </div>
                 </div>
                 <FieldError>{errors.body}</FieldError>
             </form>
-        </Card>
+        </Panel>
     );
+}
+
+/** "Status set to Open" reads as a sentence after the actor's name. */
+function lowerFirst(text: string): string {
+    return text.length > 1 && text[1] !== text[1].toUpperCase() ? text.charAt(0).toLowerCase() + text.slice(1) : text;
 }

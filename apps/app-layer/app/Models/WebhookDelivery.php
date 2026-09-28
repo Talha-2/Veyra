@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['webhook_endpoint_id', 'event', 'payload', 'response_status', 'response_body', 'attempt', 'status'])]
+/** One attempt to deliver one event to one endpoint. A retry is a second row. */
+#[Fillable(['webhook_endpoint_id', 'event', 'payload', 'response_status', 'response_body', 'attempt', 'duration_ms', 'status'])]
 class WebhookDelivery extends Model
 {
     use BelongsToTenant;

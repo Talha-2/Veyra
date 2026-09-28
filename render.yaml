@@ -60,6 +60,10 @@ services:
         sync: false
       - key: CARTESIA_API_KEY
         sync: false
+      # Studio's voice catalog and previews. A free ElevenLabs plan can use only
+      # the default (premade) voices through the API, which is all the catalog lists.
+      - key: ELEVENLABS_API_KEY
+        sync: false
       # Opt-in demo workspace (Northwind). Needs DEMO_PASSWORD, 12+ characters.
       - key: SEED_DEMO_DATA
         value: "false"

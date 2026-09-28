@@ -1,4 +1,4 @@
-import { ArrowUp, Square } from 'lucide-react';
+import { ArrowUp, AudioLines, Square } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 /** "openai:gpt-4.1-mini" reads as "GPT-4.1 mini". */
@@ -23,7 +23,9 @@ const Composer = forwardRef<ComposerHandle, {
     model?: string | null;
     placeholder?: string;
     autoFocus?: boolean;
-}>(function Composer({ onSend, onStop, streaming, model, placeholder = 'Ask anything', autoFocus = false }, ref) {
+    /** When set, a voice button beside Send switches this conversation to voice mode, as in Claude. */
+    onVoice?: () => void;
+}>(function Composer({ onSend, onStop, streaming, model, placeholder = 'Ask anything', autoFocus = false, onVoice }, ref) {
     const [text, setText] = useState('');
     const area = useRef<HTMLTextAreaElement>(null);
 
@@ -65,6 +67,13 @@ const Composer = forwardRef<ComposerHandle, {
             />
             <div className="flex items-center justify-between gap-3 px-3 pt-1 pb-2.5">
                 <span className="truncate pl-1 text-2xs text-disabled">{model ? modelName(model) : 'Veyra agent'}</span>
+                <div className="flex shrink-0 items-center gap-2">
+                {onVoice && !streaming && (
+                    <button type="button" onClick={onVoice} aria-label="Talk with voice" title="Talk with voice"
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-primary transition-colors hover:bg-surface-active active:scale-95">
+                        <AudioLines size={16} />
+                    </button>
+                )}
                 {streaming ? (
                     <button type="button" onClick={onStop} aria-label="Stop"
                         className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-ink-text transition-transform active:scale-95">
@@ -76,6 +85,7 @@ const Composer = forwardRef<ComposerHandle, {
                         <ArrowUp size={16} strokeWidth={2.25} />
                     </button>
                 )}
+                </div>
             </div>
         </div>
     );

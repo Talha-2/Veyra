@@ -33,20 +33,20 @@ export function ChoiceCard({
             role={multiple ? 'checkbox' : 'radio'}
             aria-checked={selected}
             onClick={onSelect}
-            className="flex w-full items-start gap-3 rounded-md p-3.5 text-left transition-[background-color,border-color,box-shadow] duration-150"
+            className="flex h-full w-full items-start gap-3.5 rounded-md p-4.5 text-left transition-[background-color,border-color,box-shadow] duration-150"
             style={{
                 background: selected ? 'var(--accent-subtle)' : 'var(--surface)',
                 border: `1px solid ${selected ? 'var(--border-accent)' : 'var(--border-strong)'}`,
                 boxShadow: selected ? 'none' : 'var(--shadow-xs)',
             }}
         >
-            {icon && <IconTile tone={selected ? 'accent' : 'muted'} size={32}>{icon}</IconTile>}
+            {icon && <IconTile tone={selected ? 'accent' : 'muted'} size={34}>{icon}</IconTile>}
             <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2 text-base font-medium text-primary">
                     {title}
                     {meta}
                 </span>
-                {description && <span className="mt-0.5 block text-sm text-secondary">{description}</span>}
+                {description && <span className="mt-1 block text-sm text-secondary">{description}</span>}
             </span>
             <span
                 aria-hidden="true"

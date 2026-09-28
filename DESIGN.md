@@ -2,14 +2,25 @@
 name: Veyra
 description: Apple-grade calm in Poppins. Ink pill actions, one Ember accent, hairline surfaces; the company site adds black cinema bands and scroll-driven motion. (The console direction below this header is historical.)
 colors:
-  # current system (app + company site)
-  ink: "#1d1d1f"
-  ink-secondary: "#636366"
-  ink-tertiary: "#8e8e93"
-  ink-disabled: "#c2c2c7"
-  app-bg: "#f7f7f8"
-  app-sidebar: "#f0f0f2"
-  app-sunken: "#f2f2f4"
+  # current system (app, Vercel/Geist-style since 2026-09-28; company site shares ink and ember)
+  ink: "#171717"
+  ink-secondary: "#5f5f5f"
+  ink-tertiary: "#8f8f8f"
+  ink-disabled: "#c7c7c7"
+  app-bg: "#fafafa"
+  app-surface: "#ffffff"
+  app-sunken: "#f5f5f5"
+  app-border: "#ebebeb"
+  app-border-strong: "#d6d6d6"
+  app-separator: "#efefef"
+  dark-bg: "#000000"
+  dark-surface: "#0a0a0a"
+  dark-raised: "#111111"
+  dark-border: "#1f1f1f"
+  dark-border-strong: "#2e2e2e"
+  dark-ink: "#ededed"
+  dark-ink-secondary: "#a1a1a1"
+  dark-ink-tertiary: "#7a7a7a"
   site-bg: "#fbfbfd"
   site-alt: "#f5f5f7"
   site-ink-2: "#6e6e73"
@@ -17,10 +28,10 @@ colors:
   night: "#000000"
   night-card: "#161618"
   ember-deep: "#c2541c"
-  success: "#248a3d"
-  warning: "#b25f00"
-  danger: "#d70015"
-  info: "#0066cc"
+  success: "#107d32"
+  warning: "#a35200"
+  danger: "#cb2a2f"
+  info: "#0068d6"
   # historical console palette
   ember: "#e96b34"
   ember-hover-dark: "#f07d4a"
@@ -50,6 +61,37 @@ colors:
   spectro-mint: "#62f6b5"
   spectro-ember: "#e96b34"
 typography:
+  # current app type ramp (text-2xs … text-4xl in app.css)
+  app-2xs:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "11px"
+  app-xs:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "12px"
+  app-sm:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "13px"
+  app-base:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "14px"
+  app-md:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "15px"
+  app-lg:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "17px"
+  app-xl:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "20px"
+  app-2xl:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "24px"
+  app-3xl:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "28px"
+  app-4xl:
+    fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "34px"
   display:
     fontFamily: "Poppins, ui-sans-serif, system-ui, sans-serif"
     fontSize: "clamp(2.55rem, 5.9vw, 4.25rem)"
@@ -84,6 +126,14 @@ typography:
   # the clamp()-driven display/headline steps above.
   scale: [10px, 10.5px, 11px, 11.5px, 12px, 12.5px, 13px, 13.5px, 14px, 14.5px, 15px, 16px, 17px, 18px, 1.5rem, 22px, 24px, 26px, 2.2rem, 2.55rem, 2.8rem, 3.4rem, 4.25rem]
 rounded:
+  # current app system (resources/css/app.css)
+  app-xs: "4px"
+  app-sm: "6px"
+  app-control: "6px"
+  app-md: "8px"
+  app-lg: "12px"
+  app-xl: "16px"
+  # historical console scale
   xs: "4px"
   container: "5.6px"
   lg: "12px"
@@ -419,6 +469,47 @@ is the largest thing on it.
 - Empty states teach: what goes here, and the one thing to do.
 - Never a literal font-size, hex colour or shadow in a page.
 
+
+## Palette (2026-09-28): Vercel/Geist
+
+The owner asked for dark mode "like Vercel has" and a matching light mode.
+Tokens live in `resources/css/app.css`. Dark: true black canvas (#000),
+cards #0a0a0a, raised #111, hairlines #1f1f1f / #2e2e2e, ink #ededed with
+#a1a1a1 and #7a7a7a, white primary action. Light: #fafafa canvas, white cards,
+#ebebeb / #d6d6d6 hairlines, ink #171717 with #5f5f5f and #8f8f8f, black
+primary action. Structure comes from the hairline, not shadows (dark has
+none; light keeps a 1–2px lift). Buttons and inputs are softened rectangles
+(`--radius-control`, 6px), cards 12px. Ember stays the brand accent (focus
+ring, active nav icon, links); status colours follow Geist.
+
+## Space and scrolling (2026-09-28, binding)
+
+The owner found the app "congested, hard to read, edit or add content". These
+rules replace any tighter spacing written above.
+
+- **One scroll.** The document scrolls; the sidebar is sticky at full height
+  (layouts do this). No page adds its own full-height scrolling wrapper. Only
+  genuinely bounded regions scroll inside (a code block, a list inside a
+  popover, the inbox panes, a kanban column).
+- **Content column:** Studio 1200px (`width="wide"` 1440px for tables and
+  boards), padding 40–56px. Desk pages use the same padding.
+- **Rhythm:** 48px between page sections, 24px between cards in a section,
+  28px padding inside a card (24px minimum), 20px between fields in a form.
+  A page header sits 40px above the first section.
+- **Two columns only at ≥1280px.** Below that, side panels stack under the
+  main column. A side panel is 340–380px, never narrower.
+- **Reading and writing width:** long text (instructions, prompts, knowledge,
+  notes) is edited in a full-width editor of at least 640px with 15px text
+  at 1.6 line height, never in a narrow side column.
+- **Rows:** list and table rows are 52–60px tall with 16–20px horizontal
+  padding. Never more than two lines of text in a row; the rest goes to the
+  detail view.
+- **Density follows intent:** a page shows one job. Advanced settings sit
+  behind a disclosure ("Advanced") instead of on the first screen.
+- **Fields:** 40px inputs, 96px minimum textareas (app.css). Labels above
+  fields; a one-line hint under the label only when it prevents a mistake.
+- **Views on collections:** records that move through stages (tickets, leads)
+  offer Board, List and Table, remembered per page in the URL (`?view=`).
 
 # The company site
 

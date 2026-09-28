@@ -67,8 +67,8 @@ export function SectionNav({ items, heading = 'On this page' }: { items: Section
     };
 
     return (
-        <nav aria-label={heading} className="sticky top-8">
-            <Eyebrow className="mb-2 block px-3">{heading}</Eyebrow>
+        <nav aria-label={heading} className="sticky top-10">
+            <Eyebrow className="mb-3 block px-3">{heading}</Eyebrow>
             <ul className="flex flex-col gap-0.5">
                 {items.map((item) => {
                     const on = item.id === active;
@@ -78,12 +78,12 @@ export function SectionNav({ items, heading = 'On this page' }: { items: Section
                                 href={`#${item.id}`}
                                 onClick={go(item.id)}
                                 aria-current={on ? 'location' : undefined}
-                                className="relative flex h-8 items-center gap-2 rounded-md px-3 text-sm transition-colors hover:bg-surface-hover"
+                                className="relative flex h-9 items-center gap-2 rounded-md px-3 text-sm transition-colors hover:bg-surface-hover"
                                 style={{ color: on ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: on ? 600 : 400, background: on ? 'var(--surface-hover)' : undefined }}
                             >
                                 <span
                                     aria-hidden="true"
-                                    className="absolute top-1.5 bottom-1.5 left-0 w-[2px] rounded-full transition-opacity duration-200"
+                                    className="absolute top-2 bottom-2 left-0 w-[2px] rounded-full transition-opacity duration-200"
                                     style={{ background: 'var(--accent)', opacity: on ? 1 : 0 }}
                                 />
                                 <span className="min-w-0 flex-1 truncate">{item.label}</span>

@@ -1,50 +1,84 @@
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Ban, CheckCircle2, Copy, Key, Plus, Send, Trash2, Webhook } from 'lucide-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { CheckCircle2, Plus, Webhook } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 
-import { RowMenu } from '../../components/studio-ops/row-menu';
-import { Field, Toggle } from '../../components/studio/form';
-import { MenuItem, MenuSeparator } from '../../components/shell/menu';
-import Dialog from '../../components/ui/dialog';
-import { Callout, Card, CardBody, CardHeader, CopyButton, IconTile, KeyValues, List, ListRow, Switch } from '../../components/ui/kit';
+import ApiReference from '../../components/studio-developer/api-reference';
+import { KeyDialog, KeyList } from '../../components/studio-developer/api-keys';
+import GetStarted from '../../components/studio-developer/get-started';
+import type { ApiKeyRow, OpenApiDoc, WebhookRow } from '../../components/studio-developer/types';
+import { EventCatalog, HookDialog, SignatureHelp, WebhookList } from '../../components/studio-developer/webhooks';
+import { Callout, CopyButton, SegmentedControl, Skeleton } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
-import { Badge, EmptyState, Eyebrow, RelativeTime, type Tone } from '../../components/ui/primitives';
-import { toast } from '../../components/ui/toaster';
+import { Badge } from '../../components/ui/primitives';
 import type { SharedProps } from '../../types';
 
-interface ApiKeyRow { id: number; name: string; prefix: string; scopes: string[]; publishable: boolean; active: boolean; last_used_at: string | null; created_at: string; created_by: string | null }
-interface Delivery { id: number; event: string; status: string; response_status: number | null; attempt: number; at: string }
-interface WebhookRow { id: number; url: string; events: string[]; enabled: boolean; deliveries_count: number; consecutive_failures: number; last_delivered_at: string | null; recent: Delivery[] }
-interface Props { keys: ApiKeyRow[]; scopes: string[]; webhooks: WebhookRow[]; events: string[]; base_url: string }
-
-const STRIP = 20;
-const humanize = (s: string) => s.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
-
-/** `calls:read`, `call.ended` → grouped by the part before the separator. */
-function groupBy(items: string[], sep: string): [string, string[]][] {
-    const groups = new Map<string, string[]>();
-    for (const item of items) {
-        const head = item.split(sep)[0];
-        groups.set(head, [...(groups.get(head) ?? []), item]);
-    }
-    return [...groups.entries()];
+interface Props {
+    keys: ApiKeyRow[];
+    scopes: string[];
+    scope_descriptions: Record<string, string>;
+    publishable_scopes: string[];
+    webhooks: WebhookRow[];
+    events: string[];
+    event_descriptions: Record<string, string>;
+    disable_after: number;
+    base_url: string;
+    spec?: OpenApiDoc;
 }
 
-export default function Developer({ keys, scopes, webhooks, events, base_url }: Props) {
+type Tab = 'start' | 'keys' | 'webhooks' | 'reference';
+const TABS: Tab[] = ['start', 'keys', 'webhooks', 'reference'];
+
+function initialTab(): Tab {
+    const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
+    return t && TABS.includes(t) ? t : 'start';
+}
+
+export default function Developer(props: Props) {
+    const { keys, scopes, scope_descriptions, publishable_scopes, webhooks, events, event_descriptions, disable_after, base_url, spec } = props;
     const { flash } = usePage<SharedProps>().props;
+    const [tab, setTabState] = useState<Tab>(initialTab);
     const [creatingKey, setCreatingKey] = useState(false);
     const [creatingHook, setCreatingHook] = useState(false);
     const activeKeys = keys.filter((k) => k.active).length;
+    const docsUrl = `${window.location.origin}/docs/api`;
+
+    const setTab = (t: Tab) => {
+        setTabState(t);
+        const url = new URL(window.location.href);
+        if (t === 'start') url.searchParams.delete('tab'); else url.searchParams.set('tab', t);
+        if (t !== 'reference') url.hash = '';
+        history.replaceState(history.state, '', url);
+    };
+
+    // A secret was just minted: show it where it belongs.
+    useEffect(() => { if (flash.new_key) setTab('keys'); }, [flash.new_key]);
+    useEffect(() => { if (flash.new_webhook_secret) setTab('webhooks'); }, [flash.new_webhook_secret]);
+    // The spec is the page's largest prop, so it is only fetched for the reference.
+    useEffect(() => { if (tab === 'reference' && !spec) router.reload({ only: ['spec'] }); }, [tab, spec]);
+
+    const action = tab === 'webhooks'
+        ? <button type="button" className="v-btn v-btn--primary" onClick={() => setCreatingHook(true)}><Webhook size={15} strokeWidth={2} />Add endpoint</button>
+        : tab === 'reference' ? null
+            : <button type="button" className="v-btn v-btn--primary" onClick={() => setCreatingKey(true)}><Plus size={15} strokeWidth={2} />New API key</button>;
 
     return (
         <>
             <Head title="Developer" />
             <PageHeader
                 title="Developer"
-                description="Keys for the public API, and webhooks that tell your own systems when something happens in Veyra."
-                meta={<><Badge>{activeKeys} active {activeKeys === 1 ? 'key' : 'keys'}</Badge><Badge>{webhooks.length} {webhooks.length === 1 ? 'endpoint' : 'endpoints'}</Badge></>}
-                actions={<button type="button" className="v-btn v-btn--primary" onClick={() => setCreatingKey(true)}><Plus size={15} strokeWidth={2} />New API key</button>}
+                description="Run Veyra behind your own platform: a REST API over your contacts, conversations, tickets, leads, calls and knowledge, and webhooks that tell your systems the moment something changes."
+                meta={<><Badge>{activeKeys} active {activeKeys === 1 ? 'key' : 'keys'}</Badge><Badge>{webhooks.length} {webhooks.length === 1 ? 'endpoint' : 'endpoints'}</Badge><Badge>API v1</Badge></>}
+                actions={action}
             />
+
+            <div className="-mx-1 mb-10 max-w-[calc(100%+8px)] overflow-x-auto px-1 pb-1">
+                <SegmentedControl<Tab> value={tab} onChange={setTab} options={[
+                    { value: 'start', label: 'Get started' },
+                    { value: 'keys', label: <>API keys{activeKeys > 0 && <span className="text-2xs text-tertiary tabular-nums">{activeKeys}</span>}</> },
+                    { value: 'webhooks', label: <>Webhooks{webhooks.length > 0 && <span className="text-2xs text-tertiary tabular-nums">{webhooks.length}</span>}</> },
+                    { value: 'reference', label: 'API reference' },
+                ]} />
+            </div>
 
             {flash.new_key && (
                 <Secret title="Copy your new API key now" value={flash.new_key}>
@@ -57,88 +91,57 @@ export default function Developer({ keys, scopes, webhooks, events, base_url }: 
                 </Secret>
             )}
 
-            <Card className="mb-6">
-                <CardHeader title="Connect" description="Every request goes to the base URL with a server key in the Authorization header." />
-                <CardBody>
-                    <KeyValues items={[
-                        { label: 'Base URL', value: <Inline value={base_url} /> },
-                        { label: 'Authentication', value: <Inline value="Authorization: Bearer vy_sk_…" copy={false} /> },
-                        { label: 'Webhook signature', value: <Inline value="X-Veyra-Signature: sha256=<hex>" copy={false} /> },
-                    ]} />
-                </CardBody>
-            </Card>
+            {tab === 'start' && (
+                <GetStarted baseUrl={base_url} docsUrl={docsUrl} hasKey={activeKeys > 0}
+                    onCreateKey={() => setCreatingKey(true)} onWebhooks={() => setTab('webhooks')} onReference={() => setTab('reference')} />
+            )}
 
-            <Card className="mb-8">
-                <CardHeader
-                    icon={<Key size={16} strokeWidth={1.9} />}
-                    title="API keys"
-                    description="A server key can do whatever its scopes allow; keep it out of browsers and repositories. A publishable key is safe to embed, and only its read scopes take effect."
-                />
-                {keys.length === 0 ? (
-                    <EmptyState icon={<Key size={20} strokeWidth={1.8} />} title="No API keys yet" action={<button type="button" className="v-btn v-btn--quiet" onClick={() => setCreatingKey(true)}><Plus size={14} strokeWidth={2} />Create a key</button>}>
-                        Create a key for each system that calls the API, so you can revoke one without breaking the others.
-                    </EmptyState>
-                ) : (
-                    <List>{keys.map((k) => <KeyRow key={k.id} apiKey={k} />)}</List>
-                )}
-            </Card>
+            {tab === 'keys' && (
+                <Section title="API keys" description="A server key can do whatever its scopes allow — keep it on your servers. A publishable key is safe in a web page and can only search knowledge. Revoking a key stops it at once.">
+                    <KeyList keys={keys} onCreate={() => setCreatingKey(true)} />
+                </Section>
+            )}
 
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <h2 className="text-lg font-semibold tracking-tight text-primary">Webhooks</h2>
-                    <p className="mt-0.5 max-w-[68ch] text-sm text-secondary">Events are delivered as signed JSON POSTs. An endpoint that keeps failing is worth a look before it misses something that matters.</p>
+            {tab === 'webhooks' && (
+                <div className="flex flex-col gap-12">
+                    <Section title="Endpoints" description={`Signed JSON POSTs, sent a moment after the change. An endpoint that fails ${disable_after} times in a row is turned off so it stops costing requests; switch it back on once it is fixed.`}>
+                        <WebhookList webhooks={webhooks} onCreate={() => setCreatingHook(true)} disableAfter={disable_after} />
+                    </Section>
+                    <Section title="Verifying deliveries" description="Check the signature before trusting a payload.">
+                        <SignatureHelp />
+                    </Section>
+                    <Section title="Event catalog" description="What an endpoint can subscribe to. Choose All events to also receive ones added later. Click a name to copy it.">
+                        <EventCatalog events={events} descriptions={event_descriptions} />
+                    </Section>
                 </div>
-                <button type="button" className="v-btn v-btn--quiet" onClick={() => setCreatingHook(true)}><Webhook size={14} strokeWidth={2} />Add endpoint</button>
-            </div>
-            <div className="mb-8 flex flex-col gap-4">
-                {webhooks.length === 0 && (
-                    <Card>
-                        <EmptyState icon={<Webhook size={20} strokeWidth={1.8} />} title="No endpoints yet">
-                            Add an HTTPS URL and Veyra will POST to it when a call ends, a ticket is created, a run completes and more. Send a test first to see the payload.
-                        </EmptyState>
-                    </Card>
-                )}
-                {webhooks.map((w) => <WebhookCard key={w.id} hook={w} />)}
-            </div>
+            )}
 
-            <Card>
-                <CardHeader title="Event catalog" description="Everything an endpoint can subscribe to. Choose All events to also receive ones added later. Click a name to copy it." />
-                <CardBody className="flex flex-col gap-4">
-                    {groupBy(events, '.').map(([group, list]) => (
-                        <div key={group} className="grid items-start gap-2 sm:grid-cols-[110px_1fr]">
-                            <Eyebrow className="pt-1.5">{humanize(group)}</Eyebrow>
-                            <div className="flex flex-wrap gap-1.5">
-                                {list.map((e) => (
-                                    <button key={e} type="button" onClick={() => { navigator.clipboard?.writeText(e); toast(`Copied ${e}`); }}
-                                        className="h-7 rounded-full px-2.5 font-mono text-xs text-secondary transition-colors hover:text-primary"
-                                        style={{ background: 'var(--surface-sunken)', boxShadow: 'inset 0 0 0 1px var(--border)' }}>
-                                        {e}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </CardBody>
-            </Card>
+            {tab === 'reference' && (spec ? <ApiReference spec={spec} baseUrl={base_url} /> : (
+                <div className="grid gap-10 xl:grid-cols-[220px_minmax(0,1fr)]" aria-busy="true">
+                    <div className="hidden flex-col gap-2 xl:flex">{Array.from({ length: 9 }).map((_, i) => <Skeleton key={i} className="h-8" />)}</div>
+                    <div className="flex flex-col gap-4"><Skeleton className="h-9 w-72" /><Skeleton className="h-5 w-full max-w-xl" /><Skeleton className="mt-6 h-64" /></div>
+                </div>
+            ))}
 
-            <KeyDialog open={creatingKey} onClose={() => setCreatingKey(false)} scopes={scopes} />
+            <KeyDialog open={creatingKey} onClose={() => setCreatingKey(false)} scopes={scopes} descriptions={scope_descriptions} publishableScopes={publishable_scopes} />
             <HookDialog open={creatingHook} onClose={() => setCreatingHook(false)} events={events} />
         </>
     );
 }
 
-function Inline({ value, copy = true }: { value: string; copy?: boolean }) {
+function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
     return (
-        <span className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 truncate font-mono text-sm text-primary">{value}</span>
-            {copy && <CopyButton value={value} />}
-        </span>
+        <section>
+            <h2 className="text-xl font-semibold tracking-tight text-primary">{title}</h2>
+            {description && <p className="mt-1.5 mb-6 max-w-[72ch] text-base text-secondary">{description}</p>}
+            {children}
+        </section>
     );
 }
 
 function Secret({ title, value, children }: { title: string; value: string; children: ReactNode }) {
     return (
-        <div className="mb-6 animate-rise">
+        <div className="mb-10 animate-rise">
             <Callout tone="success" icon={<CheckCircle2 size={16} strokeWidth={2} />} title={title}>
                 <p>{children}</p>
                 <div className="mt-3 flex items-center gap-2 rounded-md px-3 py-2" style={{ background: 'var(--surface)', boxShadow: 'inset 0 0 0 1px var(--border-strong)' }}>
@@ -147,206 +150,5 @@ function Secret({ title, value, children }: { title: string; value: string; chil
                 </div>
             </Callout>
         </div>
-    );
-}
-
-function KeyRow({ apiKey: k }: { apiKey: ApiKeyRow }) {
-    const revoke = () => confirm(`Revoke "${k.name}"? Anything using it stops working immediately.`) && router.delete(`/studio/developer/keys/${k.id}`, { preserveScroll: true });
-
-    return (
-        <ListRow
-            dim={!k.active}
-            leading={<IconTile tone={k.active ? (k.publishable ? 'info' : 'muted') : 'muted'}><Key size={16} strokeWidth={1.9} /></IconTile>}
-            title={
-                <span className="flex items-center gap-2">
-                    <span className="truncate">{k.name}</span>
-                    {k.publishable ? <Badge tone="info">Publishable</Badge> : <Badge>Server</Badge>}
-                    {!k.active && <Badge tone="danger">Revoked</Badge>}
-                </span>
-            }
-            subtitle={
-                <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="mr-1 font-mono text-xs text-secondary">{k.prefix}••••••••</span>
-                    {k.scopes.map((s) => <Badge key={s} tone={s.endsWith(':write') ? 'warning' : 'muted'}>{s}</Badge>)}
-                </span>
-            }
-            trailing={
-                <>
-                    <div className="hidden text-right md:block">
-                        <div className="text-xs text-secondary">{k.last_used_at ? <>Used <RelativeTime at={k.last_used_at} /></> : 'Never used'}</div>
-                        <div className="text-xs text-tertiary">Created <RelativeTime at={k.created_at} />{k.created_by && <> by {k.created_by}</>}</div>
-                    </div>
-                    <RowMenu label={`More for ${k.name}`}>
-                        {(close) => (
-                            <>
-                                <MenuItem icon={<Copy size={14} strokeWidth={2} />} onSelect={() => { close(); navigator.clipboard?.writeText(k.prefix); toast('Key prefix copied.'); }}>Copy prefix</MenuItem>
-                                {k.active && (
-                                    <>
-                                        <MenuSeparator />
-                                        <MenuItem danger icon={<Ban size={14} strokeWidth={2} />} onSelect={() => { close(); revoke(); }}>Revoke key</MenuItem>
-                                    </>
-                                )}
-                            </>
-                        )}
-                    </RowMenu>
-                </>
-            }
-        />
-    );
-}
-
-function health(w: WebhookRow): { tone: Tone; label: string } {
-    if (!w.enabled) return { tone: 'muted', label: 'Off' };
-    if (w.consecutive_failures > 2) return { tone: 'danger', label: `Failing · ${w.consecutive_failures} in a row` };
-    if (w.consecutive_failures > 0) return { tone: 'warning', label: `${w.consecutive_failures} recent ${w.consecutive_failures === 1 ? 'failure' : 'failures'}` };
-    if (w.deliveries_count === 0) return { tone: 'info', label: 'No deliveries yet' };
-    return { tone: 'success', label: 'Healthy' };
-}
-
-function WebhookCard({ hook: w }: { hook: WebhookRow }) {
-    const [sending, setSending] = useState(false);
-    const h = health(w);
-    // Oldest on the left, newest on the right, the way a timeline reads.
-    const recent = [...w.recent].reverse().slice(-STRIP);
-    const delivered = recent.filter((d) => d.status === 'delivered').length;
-    const all = w.events.includes('*');
-
-    const test = () => router.post(`/studio/developer/webhooks/${w.id}/test`, {}, { preserveScroll: true, onStart: () => setSending(true), onFinish: () => setSending(false) });
-
-    return (
-        <Card className={w.enabled ? '' : 'opacity-75'}>
-            <div className="flex items-start gap-3.5 px-5 pt-4 pb-3.5">
-                <IconTile tone={h.tone === 'muted' ? 'muted' : h.tone}><Webhook size={16} strokeWidth={1.9} /></IconTile>
-                <div className="min-w-0 flex-1">
-                    <div className="truncate font-mono text-sm font-medium text-primary" title={w.url}>{w.url}</div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <Badge tone={h.tone} dot>{h.label}</Badge>
-                        {all ? <Badge>All events</Badge> : w.events.slice(0, 4).map((e) => <Badge key={e}><span className="font-mono">{e}</span></Badge>)}
-                        {!all && w.events.length > 4 && <Badge>+{w.events.length - 4} more</Badge>}
-                    </div>
-                </div>
-                <Switch checked={w.enabled} label={`Deliver to ${w.url}`} onChange={(v) => router.patch(`/studio/developer/webhooks/${w.id}`, { enabled: v }, { preserveScroll: true })} />
-            </div>
-
-            <div className="px-5 pb-4">
-                <div className="flex items-center justify-between gap-3 rounded-md px-3.5 py-3" style={{ background: 'var(--surface-sunken)' }}>
-                    <div className="flex items-center gap-1.5" role="img" aria-label={recent.length ? `${delivered} of the last ${recent.length} deliveries succeeded` : 'No deliveries yet'}>
-                        {Array.from({ length: STRIP - recent.length }).map((_, i) => (
-                            <span key={`empty-${i}`} className="size-2 rounded-full" style={{ background: 'var(--border)' }} />
-                        ))}
-                        {recent.map((d) => (
-                            <span key={d.id} className="size-2 rounded-full" title={`${d.event} · ${d.response_status ? `HTTP ${d.response_status}` : 'no response'} · ${new Date(d.at).toLocaleString()}`}
-                                style={{ background: d.status === 'delivered' ? 'var(--success-fill)' : 'var(--danger-fill)' }} />
-                        ))}
-                    </div>
-                    <span className="text-right text-xs text-secondary tabular-nums">
-                        {recent.length ? <><span className="font-medium text-primary">{delivered} of {recent.length}</span> recent delivered</> : 'Nothing delivered yet'}
-                    </span>
-                </div>
-                {w.consecutive_failures > 2 && w.enabled && (
-                    <p className="mt-2 text-xs text-danger">The last {w.consecutive_failures} deliveries failed. Check the endpoint is reachable and answers with a 2xx status.</p>
-                )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 px-5 py-3" style={{ borderTop: '1px solid var(--separator)' }}>
-                <span className="mr-auto text-xs text-tertiary tabular-nums">
-                    {w.deliveries_count} {w.deliveries_count === 1 ? 'delivery' : 'deliveries'} in total
-                    {w.last_delivered_at && <> · last success <RelativeTime at={w.last_delivered_at} /></>}
-                </span>
-                <button type="button" className="v-btn v-btn--quiet v-btn--sm" onClick={test} disabled={sending}>
-                    <Send size={13} strokeWidth={2} />{sending ? 'Sending…' : 'Send test'}
-                </button>
-                <RowMenu label={`More for ${w.url}`} side="top">
-                    {(close) => (
-                        <>
-                            <MenuItem icon={<Copy size={14} strokeWidth={2} />} onSelect={() => { close(); navigator.clipboard?.writeText(w.url); toast('Endpoint URL copied.'); }}>Copy URL</MenuItem>
-                            <MenuSeparator />
-                            <MenuItem danger icon={<Trash2 size={14} strokeWidth={2} />} onSelect={() => { close(); if (confirm('Delete this endpoint? It stops receiving events immediately.')) router.delete(`/studio/developer/webhooks/${w.id}`, { preserveScroll: true }); }}>Delete endpoint</MenuItem>
-                        </>
-                    )}
-                </RowMenu>
-            </div>
-        </Card>
-    );
-}
-
-/** A pill that toggles one value in or out of a list. */
-function ChipToggle({ on, onClick, children, mono = true }: { on: boolean; onClick: () => void; children: ReactNode; mono?: boolean }) {
-    return (
-        <button type="button" role="checkbox" aria-checked={on} onClick={onClick}
-            className={`h-7 rounded-full px-2.5 text-xs font-medium transition-colors ${mono ? 'font-mono' : ''}`}
-            style={on
-                ? { background: 'var(--accent-subtle)', color: 'var(--accent-text)', boxShadow: 'inset 0 0 0 1px var(--border-accent)' }
-                : { background: 'transparent', color: 'var(--text-secondary)', boxShadow: 'inset 0 0 0 1px var(--border-strong)' }}>
-            {children}
-        </button>
-    );
-}
-
-function KeyDialog({ open, onClose, scopes }: { open: boolean; onClose: () => void; scopes: string[] }) {
-    const { data, setData, post, processing, errors, reset, clearErrors } = useForm({ name: '', scopes: ['calls:read'] as string[], publishable: false });
-    const close = () => { clearErrors(); onClose(); };
-    const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/developer/keys', { onSuccess: () => { reset(); onClose(); } }); };
-    const toggle = (s: string) => setData('scopes', data.scopes.includes(s) ? data.scopes.filter((x) => x !== s) : [...data.scopes, s]);
-
-    return (
-        <Dialog open={open} onClose={close} title="New API key" description="The full key is shown once, right after you create it.">
-            <form onSubmit={submit}>
-                <Field label="Name" hint="Name it after what uses it, so you know what breaks if you revoke it." error={errors.name}>
-                    <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Website booking widget" autoFocus />
-                </Field>
-                <Field label="Scopes" error={errors.scopes}>
-                    <div className="rounded-md" style={{ boxShadow: 'inset 0 0 0 1px var(--border)' }}>
-                        {groupBy(scopes, ':').map(([resource, list], i) => (
-                            <div key={resource} className="flex items-center justify-between gap-3 px-3.5 py-2.5" style={{ borderTop: i ? '1px solid var(--separator)' : undefined }}>
-                                <span className="text-sm font-medium text-primary">{humanize(resource)}</span>
-                                <div className="flex gap-1.5">
-                                    {list.map((s) => <ChipToggle key={s} on={data.scopes.includes(s)} onClick={() => toggle(s)} mono={false}>{humanize(s.split(':')[1] ?? s)}</ChipToggle>)}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </Field>
-                <Toggle checked={data.publishable} onChange={(v) => setData('publishable', v)} label="Publishable" hint="Safe to embed in a browser or app. Only read scopes take effect." />
-                <div className="mt-6 flex justify-end gap-2">
-                    <button type="button" className="v-btn v-btn--ghost" onClick={close}>Cancel</button>
-                    <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.name.trim() || data.scopes.length === 0}>{processing ? 'Creating…' : 'Create key'}</button>
-                </div>
-            </form>
-        </Dialog>
-    );
-}
-
-function HookDialog({ open, onClose, events }: { open: boolean; onClose: () => void; events: string[] }) {
-    const { data, setData, post, processing, errors, reset, clearErrors } = useForm({ url: '', events: ['*'] as string[] });
-    const close = () => { clearErrors(); onClose(); };
-    const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/developer/webhooks', { onSuccess: () => { reset(); onClose(); } }); };
-    const all = data.events.includes('*');
-    const toggle = (ev: string) => setData('events', data.events.includes(ev) ? data.events.filter((x) => x !== ev) : [...data.events, ev]);
-
-    return (
-        <Dialog open={open} onClose={close} title="Add a webhook endpoint" description="Veyra POSTs signed JSON to this URL. The signing secret is shown once, after you add it." width={560}>
-            <form onSubmit={submit}>
-                <Field label="HTTPS URL" hint="Must start with https://. Answer with any 2xx status to acknowledge a delivery." error={errors.url}>
-                    <input className="v-field font-mono" value={data.url} onChange={(e) => setData('url', e.target.value)} placeholder="https://hooks.example.com/veyra" autoFocus spellCheck={false} />
-                </Field>
-                <Toggle checked={all} onChange={(v) => setData('events', v ? ['*'] : [])} label="All events" hint="Includes event types added in the future." />
-                {!all && (
-                    <div className="mt-3 flex flex-col gap-3 rounded-md p-3.5" style={{ background: 'var(--surface-sunken)' }}>
-                        {groupBy(events, '.').map(([group, list]) => (
-                            <div key={group} className="flex flex-wrap items-center gap-1.5">
-                                <span className="w-20 text-xs font-medium text-tertiary">{humanize(group)}</span>
-                                {list.map((ev) => <ChipToggle key={ev} on={data.events.includes(ev)} onClick={() => toggle(ev)}>{ev}</ChipToggle>)}
-                            </div>
-                        ))}
-                    </div>
-                )}
-                {errors.events && <p className="mt-1.5 text-sm text-danger">{errors.events}</p>}
-                <div className="mt-6 flex justify-end gap-2">
-                    <button type="button" className="v-btn v-btn--ghost" onClick={close}>Cancel</button>
-                    <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.url || data.events.length === 0}>{processing ? 'Adding…' : 'Add endpoint'}</button>
-                </div>
-            </form>
-        </Dialog>
     );
 }

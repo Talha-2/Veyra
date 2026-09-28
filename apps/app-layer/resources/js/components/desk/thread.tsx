@@ -1,21 +1,23 @@
 import { router, useForm } from '@inertiajs/react';
 import {
-    AlarmClock, AlertCircle, AlertTriangle, ArrowUp, Ban, BellOff, Bot, CheckCircle2, ChevronDown, Clock, MessagesSquare, MoreHorizontal,
-    PanelRight, Paperclip, PhoneIncoming, PhoneOutgoing, Pin, RotateCcw, StickyNote, Star, Tag as TagIcon, ThumbsDown, ThumbsUp,
+    AlarmClock, AlertCircle, ArrowUp, Ban, BellOff, Bot, Check, CheckCheck, CheckCircle2, Clock, Lock, MessagesSquare, MoreHorizontal,
+    PanelRight, Paperclip, Pin, RotateCcw, StickyNote, Star, Tag as TagIcon, ThumbsDown, ThumbsUp,
     Ticket as TicketIcon, UserPlus,
 } from 'lucide-react';
 import { forwardRef, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from '../shell/menu';
 import { SegmentedControl } from '../ui/kit';
-import { Avatar, Badge, EmptyState, Kbd, Mono, UserText } from '../ui/primitives';
+import { Avatar, Badge, EmptyState, Kbd, UserText } from '../ui/primitives';
+import AgentSteps from '../desk-inbox/agent-steps';
+import CallCard from '../desk-inbox/call-card';
 import { AutoTextarea, AvatarStack, IconButton } from '../desk-inbox/controls';
 import { channelIcon, dateTimeLabel, fileSize, initialsOf, sameDay, snoozeOptions, timeLabel } from '../desk-inbox/helpers';
 import TagEditor from '../desk-inbox/tag-editor';
 import { DaySeparator, NoteCard, ReminderCard, TicketCard } from '../desk-inbox/timeline-cards';
 import ComposeDialog, { type Composition } from './compose-dialog';
 import AssignDialog from './assign-dialog';
-import type { DelegationView, TeamMember, ThreadView, TicketSummary, TimelineCall, TimelineMessage } from '../../types/desk';
+import type { TeamMember, ThreadView, TicketSummary, TimelineCall, TimelineMessage } from '../../types/desk';
 
 interface Props {
     thread: ThreadView | null;
@@ -129,12 +131,14 @@ export default function Thread({ thread: raw, team, ticketTypes, detailsOpen, on
                 )}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pt-4 pb-2">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pt-2 pb-4">
                 <div className="mx-auto mt-auto flex w-full max-w-[760px] flex-col">
                     {visible.length === 0 && (
-                        <p className="py-10 text-center text-sm text-tertiary">{filter === 'all' ? 'No messages yet.' : 'Nothing from this sender yet.'}</p>
+                        <p className="py-10 text-center text-sm text-tertiary">{filter === 'all' ? 'No messages yet.' : filter === 'calls' ? 'No calls on this conversation.' : 'Nothing from this sender yet.'}</p>
                     )}
-                    <Timeline items={visible} />
+                    <Timeline items={visible} statuses={thread.ticket_statuses}
+                        contact={{ name: thread.contact?.name ?? thread.identifier?.value ?? thread.title, initials: thread.contact?.initials ?? initialsOf(thread.identifier?.value ?? thread.title) }}
+                        callerName={thread.contact?.name ?? 'Caller'} />
                     <div ref={bottom} />
                 </div>
             </div>
@@ -164,7 +168,9 @@ function buildItems(thread: Thread): Item[] {
     return items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 }
 
-function Timeline({ items }: { items: Item[] }) {
+function Timeline({ items, statuses, contact, callerName }: {
+    items: Item[]; statuses?: ThreadView['ticket_statuses']; contact: { name: string; initials: string }; callerName: string;
+}) {
     // The last outbound message is the one whose delivery status matters.
     const lastOutbound = [...items].reverse().find((i) => i.kind === 'message' && i.entry.direction === 'outbound');
 
@@ -182,21 +188,21 @@ function Timeline({ items }: { items: Item[] }) {
                     const joinsPrev = !separator && prev?.kind === 'message' && sameSender(prev.entry, item.entry) && gap < GROUP_GAP_MS;
                     const nextGap = next ? new Date(next.at).getTime() - new Date(item.at).getTime() : Infinity;
                     const joinsNext = next?.kind === 'message' && sameSender(item.entry, next.entry) && nextGap < GROUP_GAP_MS && sameDay(item.at, next.at);
-                    body = <Bubble entry={item.entry} first={!joinsPrev} last={!joinsNext} showStatus={item === lastOutbound} />;
+                    body = <MessageRow entry={item.entry} first={!joinsPrev} last={!joinsNext} showStatus={item === lastOutbound} contact={contact} />;
                 } else if (item.kind === 'call') {
-                    body = <CallEntry call={item.entry} />;
+                    body = <CallCard call={item.entry} callerName={callerName} />;
                 } else if (item.kind === 'note') {
-                    body = <NoteCard note={item.note} />;
+                    body = <NoteCard note={item.note} when="time" />;
                 } else if (item.kind === 'reminder') {
                     body = <ReminderCard reminder={item.reminder} />;
                 } else {
-                    body = <TicketCard ticket={item.ticket} />;
+                    body = <TicketCard ticket={item.ticket} statuses={statuses} />;
                 }
 
                 return (
                     <div key={key}>
                         {separator && <DaySeparator at={item.at} />}
-                        {body}
+                        {item.kind === 'message' ? body : <div className={separator ? 'mb-3' : 'my-3'}>{body}</div>}
                     </div>
                 );
             })}
@@ -333,44 +339,69 @@ function ThreadHeader({ thread, existingTags, detailsOpen, onToggleDetails, onAs
 
 // ── messages ─────────────────────────────────────────────────────────────
 
-function Bubble({ entry, first, last, showStatus }: { entry: TimelineMessage; first: boolean; last: boolean; showStatus: boolean }) {
+/**
+ * One message. The first of a run carries the face and the name; the rest
+ * sit tight under it. Customer on the left, the team and the agent on the
+ * right: the agent in an Ember-tinted bubble with an Agent badge, a
+ * colleague in ink, so a person's promise never reads as the agent's.
+ */
+function MessageRow({ entry, first, last, showStatus, contact }: {
+    entry: TimelineMessage; first: boolean; last: boolean; showStatus: boolean; contact: { name: string; initials: string };
+}) {
     const inbound = entry.direction === 'inbound';
+    const agent = entry.from_agent;
     const feedback = (rating: 'up' | 'down') => router.post(`/desk/messages/${entry.id}/feedback`, { rating }, { preserveScroll: true });
+    const failed = entry.status === 'failed' || entry.status === 'undelivered';
+    const steps = entry.steps ?? [];
 
-    // Messages-style: the corners that face the rest of the group tighten.
-    const near = 6;
-    const far = 18;
+    // The corners that face the rest of the run tighten, as in Messages.
+    const near = 4;
+    const far = 14;
     const radius = inbound
         ? { borderTopLeftRadius: first ? far : near, borderBottomLeftRadius: last ? far : near, borderTopRightRadius: far, borderBottomRightRadius: far }
         : { borderTopRightRadius: first ? far : near, borderBottomRightRadius: last ? far : near, borderTopLeftRadius: far, borderBottomLeftRadius: far };
 
     const look = inbound
         ? { background: 'var(--surface-sunken)', color: 'var(--text-primary)', border: '1px solid var(--border)' }
-        : entry.from_agent
-            ? { background: 'var(--accent-subtle)', color: 'var(--text-primary)', border: '1px solid color-mix(in srgb, var(--accent) 18%, transparent)' }
+        : agent
+            ? { background: 'var(--accent-subtle)', color: 'var(--text-primary)', border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)' }
             : { background: 'var(--primary)', color: 'var(--primary-text)', border: '1px solid transparent' };
 
-    const failed = entry.status === 'failed' || entry.status === 'undelivered';
+    const name = inbound ? contact.name : agent ? null : entry.author;
 
     return (
-        <div data-mid={entry.id} className={`group flex scroll-mt-4 ${inbound ? 'justify-start' : 'justify-end'} ${first ? 'mt-3' : 'mt-0.5'}`}>
-            <div className={`flex max-w-[78%] flex-col ${inbound ? 'items-start' : 'items-end'}`}>
+        <div data-mid={entry.id} className={`group/msg flex scroll-mt-4 gap-2.5 ${inbound ? '' : 'flex-row-reverse'} ${first ? 'mt-5' : 'mt-1'}`}>
+            <span className="w-7 shrink-0 pt-0.5">
+                {first && (agent
+                    ? <span className="flex size-7 items-center justify-center rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }} title="The agent"><Bot size={14} strokeWidth={2} /></span>
+                    : inbound
+                        ? <Avatar initials={contact.initials} name={contact.name} size={28} />
+                        : <Avatar initials={initialsOf(entry.author)} name={entry.author} size={28} />)}
+            </span>
+
+            <div className={`flex min-w-0 max-w-[80%] flex-col ${inbound ? 'items-start' : 'items-end'}`}>
                 {first && (
-                    <div className="mb-1 flex items-center gap-1.5 px-1 text-xs text-tertiary">
-                        {entry.from_agent && <Bot size={14} strokeWidth={2} className="text-accent" aria-label="Sent by the agent" />}
-                        <span className="font-medium text-secondary">{entry.author}</span>
-                        <span className="tabular-nums">{timeLabel(entry.at)}</span>
+                    <div className={`mb-1 flex items-center gap-1.5 px-0.5 text-xs text-tertiary ${inbound ? '' : 'flex-row-reverse'}`}>
+                        {name && <span className="max-w-[240px] truncate font-medium text-secondary"><UserText>{name}</UserText></span>}
+                        {agent && (
+                            <span className="inline-flex h-4.5 items-center gap-1 rounded-xs px-1.5 text-2xs font-semibold" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }}>
+                                <Bot size={11} strokeWidth={2.2} aria-hidden="true" />Agent
+                            </span>
+                        )}
+                        <time dateTime={entry.at} title={new Date(entry.at).toLocaleString()} className="tabular-nums">{timeLabel(entry.at)}</time>
                         {entry.pinned && <Pin size={12} strokeWidth={2.2} className="text-accent" aria-label="Pinned" />}
                     </div>
                 )}
 
-                <div className={`flex max-w-full items-center gap-1.5 ${inbound ? '' : 'flex-row-reverse'}`}>
-                    <div className="min-w-0 px-3.5 py-2 text-base" style={{ ...look, ...radius }} title={first ? undefined : timeLabel(entry.at)}>
-                        {entry.body && <UserText className="block whitespace-pre-wrap [overflow-wrap:anywhere]">{entry.body}</UserText>}
+                {agent && steps.length > 0 && <AgentSteps steps={steps} align="end" />}
+
+                <div className={`flex max-w-full items-center gap-2 ${inbound ? '' : 'flex-row-reverse'}`}>
+                    <div className="min-w-0 px-3.5 py-2 text-base" style={{ ...look, ...radius }}>
+                        {entry.body && <UserText className="block whitespace-pre-wrap wrap-anywhere">{entry.body}</UserText>}
                         {entry.attachments.length > 0 && (
                             <div className={`flex flex-col gap-1 ${entry.body ? 'mt-2' : ''}`}>
                                 {entry.attachments.map((a) => (
-                                    <span key={a.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm" style={{ background: 'color-mix(in srgb, currentColor 8%, transparent)' }}>
+                                    <span key={a.id} className="flex items-center gap-2 rounded-sm px-2 py-1 text-sm" style={{ background: 'color-mix(in srgb, currentColor 8%, transparent)' }}>
                                         <Paperclip size={14} strokeWidth={1.9} className="shrink-0 opacity-70" />
                                         <span className="min-w-0 flex-1 truncate">{a.filename}</span>
                                         <span className="shrink-0 text-xs opacity-60">{fileSize(a.size_bytes)}</span>
@@ -380,31 +411,40 @@ function Bubble({ entry, first, last, showStatus }: { entry: TimelineMessage; fi
                         )}
                     </div>
 
-                    {/* Hover actions: pin for anyone; thumbs only on agent messages. */}
-                    <div className="flex shrink-0 items-center gap-0.5 rounded-full px-1 py-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
-                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
-                        <BubbleAction label={entry.pinned ? 'Unpin' : 'Pin'} on={entry.pinned} onClick={() => router.post(`/desk/messages/${entry.id}/pin`, {}, { preserveScroll: true })}>
-                            <Pin size={14} strokeWidth={2} />
-                        </BubbleAction>
-                        {entry.from_agent && (
-                            <>
-                                <BubbleAction label="Good reply" on={entry.my_feedback === 'up'} color="var(--success)" onClick={() => feedback('up')}><ThumbsUp size={14} strokeWidth={2} /></BubbleAction>
-                                <BubbleAction label="Bad reply" on={entry.my_feedback === 'down'} color="var(--danger)" onClick={() => feedback('down')}><ThumbsDown size={14} strokeWidth={2} /></BubbleAction>
-                                {(entry.feedback_counts.up > 0 || entry.feedback_counts.down > 0) && (
-                                    <span className="px-1 text-2xs text-tertiary tabular-nums" title="Team ratings">{entry.feedback_counts.up}↑ {entry.feedback_counts.down}↓</span>
-                                )}
-                            </>
-                        )}
+                    {/* On hover: pin, ratings on the agent's replies, and the time for a message deeper in a run. */}
+                    <div className={`flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100 ${inbound ? '' : 'flex-row-reverse'}`}>
+                        <div className="flex items-center gap-0.5 rounded-md p-0.5" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+                            <BubbleAction label={entry.pinned ? 'Unpin' : 'Pin'} on={entry.pinned} onClick={() => router.post(`/desk/messages/${entry.id}/pin`, {}, { preserveScroll: true })}>
+                                <Pin size={14} strokeWidth={2} />
+                            </BubbleAction>
+                            {agent && (
+                                <>
+                                    <BubbleAction label="Good reply" on={entry.my_feedback === 'up'} color="var(--success)" onClick={() => feedback('up')}><ThumbsUp size={14} strokeWidth={2} /></BubbleAction>
+                                    <BubbleAction label="Bad reply" on={entry.my_feedback === 'down'} color="var(--danger)" onClick={() => feedback('down')}><ThumbsDown size={14} strokeWidth={2} /></BubbleAction>
+                                    {(entry.feedback_counts.up > 0 || entry.feedback_counts.down > 0) && (
+                                        <span className="px-1 text-2xs text-tertiary tabular-nums" title="Team ratings">{entry.feedback_counts.up}↑ {entry.feedback_counts.down}↓</span>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                        {!first && <time dateTime={entry.at} className="text-2xs text-tertiary tabular-nums">{timeLabel(entry.at)}</time>}
                     </div>
                 </div>
 
-                {(showStatus || failed) && !inbound && (
-                    <div className={`mt-1 flex items-center gap-1 px-1 text-2xs ${failed ? 'text-danger' : 'text-tertiary'}`}>
-                        {failed && <AlertCircle size={12} strokeWidth={2.2} />}
-                        {failed ? 'Not delivered' : statusLabel(entry.status)}
-                    </div>
-                )}
+                {(showStatus || failed) && !inbound && <Delivery status={entry.status} failed={failed} />}
             </div>
+        </div>
+    );
+}
+
+function Delivery({ status, failed }: { status: string; failed: boolean }) {
+    const sending = status === 'queued' || status === 'sending';
+    const Icon = failed ? AlertCircle : sending ? Clock : status === 'delivered' || status === 'read' ? CheckCheck : Check;
+
+    return (
+        <div className={`mt-1 flex items-center gap-1 px-0.5 text-2xs ${failed ? 'text-danger' : 'text-tertiary'}`}>
+            <Icon size={12} strokeWidth={2.2} aria-hidden="true" style={{ color: status === 'read' && !failed ? 'var(--accent-text)' : undefined }} />
+            {failed ? 'Not delivered' : statusLabel(status)}
         </div>
     );
 }
@@ -417,97 +457,25 @@ function statusLabel(status: string): string {
 function BubbleAction({ label, on, color = 'var(--accent)', onClick, children }: { label: string; on: boolean; color?: string; onClick: () => void; children: ReactNode }) {
     return (
         <button type="button" title={label} aria-label={label} aria-pressed={on} onClick={onClick}
-            className="flex size-6 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-surface-hover hover:text-primary"
+            className="flex size-6 items-center justify-center rounded-sm text-tertiary transition-colors hover:bg-surface-hover hover:text-primary"
             style={{ color: on ? color : undefined }}>
             {children}
         </button>
     );
 }
 
-// ── calls ────────────────────────────────────────────────────────────────
-
-function CallEntry({ call }: { call: TimelineCall }) {
-    const [open, setOpen] = useState(false);
-    const trouble = call.work.some((d) => d.failed || d.tool_calls.some((t) => t.needs_reconciliation));
-    const inbound = call.direction === 'inbound';
-    const Icon = inbound ? PhoneIncoming : PhoneOutgoing;
-
-    return (
-        <div className="mx-auto my-2 w-full max-w-[520px] overflow-hidden rounded-lg"
-            style={{ background: 'var(--surface)', border: `1px solid ${trouble ? 'var(--danger-border)' : 'var(--border)'}`, boxShadow: 'var(--shadow-card)' }}>
-            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-surface-hover">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px]" style={{ background: trouble ? 'var(--danger-subtle)' : 'var(--info-subtle)', color: trouble ? 'var(--danger)' : 'var(--info)' }}>
-                    <Icon size={15} strokeWidth={2} />
-                </span>
-                <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-primary">{inbound ? 'Incoming call' : 'Outgoing call'}</span>
-                    <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-tertiary tabular-nums">
-                        <span>{call.duration}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{timeLabel(call.at)}</span>
-                        {call.p95_ms != null && <><span aria-hidden="true">·</span><span style={{ color: call.p95_ms > 1200 ? 'var(--warning)' : undefined }}>p95 {call.p95_ms} ms</span></>}
-                    </span>
-                </span>
-                {call.language && call.language !== 'en' && <Badge tone="info">{call.language.toUpperCase()}</Badge>}
-                {trouble && <Badge tone="danger"><AlertTriangle size={12} strokeWidth={2.2} aria-hidden="true" />Needs review</Badge>}
-                <ChevronDown size={15} strokeWidth={2} aria-hidden="true" className="shrink-0 text-tertiary transition-transform" style={{ transform: open ? 'rotate(180deg)' : 'none' }} />
-            </button>
-
-            {open && (
-                <div className="animate-fade-in px-3.5 pt-1 pb-3.5" style={{ borderTop: '1px solid var(--separator)' }}>
-                    {call.recording_url && <audio controls src={call.recording_url} className="mt-3 h-8 w-full" />}
-                    {call.transcript && call.transcript.length > 0 && (
-                        <div className="mt-3">
-                            <Mono className="mb-2 block">Transcript</Mono>
-                            <div className="flex flex-col gap-1.5">
-                                {call.transcript.map((turn, i) => (
-                                    <div key={i} className="flex gap-3 text-sm">
-                                        <span className="w-12 shrink-0 text-xs font-medium" style={{ color: turn.role === 'agent' ? 'var(--voice-agent)' : 'var(--voice-caller)' }}>{turn.role === 'agent' ? 'Agent' : 'Caller'}</span>
-                                        <UserText className="min-w-0 flex-1 text-primary">{turn.text}</UserText>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    {call.work.length > 0 && <div className="mt-3">{call.work.map((d) => <Delegation key={d.sequence} delegation={d} />)}</div>}
-                    {!call.recording_url && !(call.transcript?.length) && call.work.length === 0 && <p className="mt-3 text-sm text-tertiary">No recording or transcript was kept for this call.</p>}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function Delegation({ delegation }: { delegation: DelegationView }) {
-    return (
-        <div className="mt-3 pt-3 first:mt-0 first:pt-0" style={{ borderTop: '1px solid var(--separator)' }}>
-            <div className="mb-1.5 flex items-center gap-2">
-                <span className="text-xs font-semibold text-secondary">{delegation.is_finalization ? 'After the call' : `Handoff ${delegation.sequence}`}</span>
-                {delegation.failed && <Badge tone="danger">{delegation.status}</Badge>}
-                {delegation.duration_ms != null && <Mono>{(delegation.duration_ms / 1000).toFixed(1)}s</Mono>}
-            </div>
-            {delegation.reply && <p className="mb-2 text-sm text-secondary italic">“{delegation.reply}”</p>}
-            {delegation.error && <p className="mb-2 text-sm text-danger">{delegation.error}</p>}
-            <div className="flex flex-col gap-1.5">
-                {delegation.tool_calls.map((t) => (
-                    <div key={t.id} className="flex flex-wrap items-center gap-2 text-sm">
-                        <Badge tone={t.tone} dot>{t.status_label}</Badge>
-                        <span className="text-primary">{t.action}</span>
-                        {t.durable && <Mono>writes</Mono>}
-                        {t.duration_ms != null && <Mono>{t.duration_ms} ms</Mono>}
-                        {t.needs_reconciliation && <span className="w-full text-xs text-danger">May or may not have completed. Check before telling the customer.</span>}
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
 // ── composer ─────────────────────────────────────────────────────────────
 
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const MOD = isMac ? '⌘' : 'Ctrl';
+
 /**
- * Docked at the bottom, as in Messages. It sends a reply on the thread's
- * channel or, switched to Note, leaves something only the team can read.
- * Reminders and tickets need more fields, so they still open their dialogs.
+ * Docked at the bottom. Two modes, switched by the tabs on top: Reply goes
+ * to the customer on the thread's channel; Internal note turns the whole
+ * composer amber and stays with the team. Enter sends a reply; a note is
+ * longer-form, so Enter is a new line there and Cmd/Ctrl+Enter saves (it
+ * sends in either mode). Reminders and tickets need more fields, so they
+ * open their dialogs.
  */
 const Composer = forwardRef<HTMLTextAreaElement, {
     thread: Thread; mode: Mode; onMode: (m: Mode) => void; canReply: boolean; onCompose: (c: Composition) => void;
@@ -515,6 +483,7 @@ const Composer = forwardRef<HTMLTextAreaElement, {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({ body: '' });
     const note = mode === 'note';
     const ChannelIcon = channelIcon(thread.channel);
+    const inner = useRef<HTMLTextAreaElement | null>(null);
 
     const submit = (event?: FormEvent) => {
         event?.preventDefault();
@@ -525,80 +494,106 @@ const Composer = forwardRef<HTMLTextAreaElement, {
         });
     };
 
-    const blockedReason = thread.identifier?.blocked
-        ? `${thread.identifier.value} is blocked. Unblock it from the details pane to reply.`
+    const switchTo = (next: Mode) => { onMode(next); requestAnimationFrame(() => inner.current?.focus()); };
+
+    // Why Reply is off, short enough for the tab row; the full reason is its tooltip.
+    const blocked = thread.identifier?.blocked
+        ? { short: `${thread.identifier.value} is blocked`, full: `${thread.identifier.value} is blocked. Unblock it in the details pane to reply.` }
         : !thread.can_compose
-            ? thread.channel === 'call' ? 'Calls cannot be answered in text. Text them from the contact instead.' : 'This channel needs a live visitor session, which has ended.'
+            ? thread.channel === 'call'
+                ? { short: 'Calls can’t be answered in text', full: 'A call can’t be answered in text. Text them from their contact page; notes still work here.' }
+                : { short: 'The visitor has left the chat', full: 'The visitor has left the chat, so a reply can’t reach them. Notes still work.' }
             : null;
 
     return (
-        <div className="shrink-0 px-5 pt-2 pb-4">
-            {blockedReason && (
-                <p className="mx-auto mb-2 flex max-w-[760px] items-center gap-2 px-1 text-xs text-tertiary">
-                    {thread.identifier?.blocked ? <Ban size={14} strokeWidth={1.9} className="shrink-0 text-danger" /> : <AlertCircle size={14} strokeWidth={1.9} className="shrink-0" />}
-                    {blockedReason} Notes still work.
-                </p>
-            )}
+        <div className="shrink-0 px-6 pt-2 pb-5">
             <form onSubmit={submit}
-                className="mx-auto max-w-[760px] rounded-xl transition-[background-color,border-color,box-shadow] focus-within:[box-shadow:var(--ring)]"
+                className="mx-auto max-w-[760px] overflow-hidden rounded-lg transition-[background-color,border-color,box-shadow] focus-within:[box-shadow:var(--ring)]"
                 style={{
                     background: note ? 'var(--warning-subtle)' : 'var(--surface)',
                     border: `1px solid ${note ? 'var(--warning-border)' : 'var(--border-strong)'}`,
                     boxShadow: 'var(--shadow-card)',
                 }}>
-                <AutoTextarea ref={ref} value={data.body} dir="auto" maxHeight={200}
+                <div className="flex items-center gap-1 px-2 pt-2" role="tablist" aria-label="Write a">
+                    <ModeTab active={!note} disabled={!canReply} title={blocked?.full ?? `Reply to the customer by ${thread.channel_label}`} onClick={() => switchTo('reply')}>
+                        <ChannelIcon size={14} strokeWidth={1.9} /> Reply
+                    </ModeTab>
+                    <ModeTab active={note} tone="warning" title="Only your team can see notes" onClick={() => switchTo('note')}>
+                        <Lock size={13} strokeWidth={2} /> Internal note
+                    </ModeTab>
+                    {blocked ? (
+                        <span className="ml-auto flex min-w-0 items-center gap-1.5 pr-2 pl-3 text-xs text-tertiary" title={blocked.full}>
+                            {thread.identifier?.blocked
+                                ? <Ban size={13} strokeWidth={2} className="shrink-0 text-danger" aria-hidden="true" />
+                                : <AlertCircle size={13} strokeWidth={2} className="shrink-0" aria-hidden="true" />}
+                            <span className="truncate">{blocked.short}</span>
+                            <span className="sr-only">{blocked.full}</span>
+                        </span>
+                    ) : (
+                        <span className="ml-auto truncate pr-2 pl-3 text-xs" style={{ color: note ? 'var(--warning)' : 'var(--text-tertiary)' }}>
+                            {note ? 'Only your team sees this' : `The customer gets this by ${thread.channel_label.toLowerCase()}`}
+                        </span>
+                    )}
+                </div>
+
+                <AutoTextarea
+                    ref={(el) => {
+                        inner.current = el;
+                        if (typeof ref === 'function') ref(el);
+                        else if (ref) ref.current = el;
+                    }}
+                    value={data.body} dir="auto" maxHeight={260}
                     onChange={(e) => { setData('body', e.target.value); if (errors.body) clearErrors('body'); }}
                     onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); }
+                        if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                            if (e.metaKey || e.ctrlKey) { e.preventDefault(); submit(); }
+                            else if (!note && !e.shiftKey) { e.preventDefault(); submit(); }
+                        }
                         if (e.key === 'Escape' && note && canReply) onMode('reply');
                     }}
-                    placeholder={note ? 'Note for the team. The customer never sees this.' : `Reply by ${thread.channel_label.toLowerCase()}`}
-                    aria-label={note ? 'Note' : 'Reply'}
-                    className="px-4 pt-3 pb-1.5" />
+                    placeholder={note ? 'Write a note for the team. The customer never sees it.' : `Reply by ${thread.channel_label.toLowerCase()}…`}
+                    aria-label={note ? 'Internal note' : 'Reply'}
+                    className="v-bare px-4 pt-2.5 pb-2 text-md"
+                    style={{ minHeight: note ? 80 : 52 }} />
                 {errors.body && <p className="px-4 pb-1 text-xs text-danger">{errors.body}</p>}
 
                 <div className="flex items-center gap-0.5 px-2 pb-2">
-                    <Menu side="top" width={240} trigger={(open, toggle) => (
-                        <button type="button" onClick={toggle} aria-expanded={open} aria-haspopup="menu" title="Choose how to send"
-                            className="flex h-8 items-center gap-1.5 rounded-full pr-2 pl-2.5 text-sm font-medium transition-colors hover:bg-surface-hover"
-                            style={{ color: note ? 'var(--warning)' : 'var(--text-secondary)' }}>
-                            {note ? <StickyNote size={15} strokeWidth={1.9} /> : <ChannelIcon size={15} strokeWidth={1.9} />}
-                            {note ? 'Internal note' : thread.channel_label}
-                            <ChevronDown size={14} strokeWidth={2} className="opacity-70" />
-                        </button>
-                    )}>
-                        {(close) => (
-                            <>
-                                <MenuLabel>Send as</MenuLabel>
-                                {canReply && (
-                                    <MenuItem icon={<ChannelIcon size={14} />} active={!note} onSelect={() => { onMode('reply'); close(); }}
-                                        trailing={!note ? <span className="text-xs text-tertiary">Customer sees</span> : undefined}>
-                                        Reply by {thread.channel_label}
-                                    </MenuItem>
-                                )}
-                                <MenuItem icon={<StickyNote size={14} />} active={note} onSelect={() => { onMode('note'); close(); }}
-                                    trailing={note ? <span className="text-xs text-tertiary">Team only</span> : undefined}>
-                                    Internal note
-                                </MenuItem>
-                                <MenuSeparator />
-                                <MenuItem icon={<AlarmClock size={14} />} onSelect={() => { onCompose('reminder'); close(); }}>Reminder…</MenuItem>
-                                <MenuItem icon={<TicketIcon size={14} />} onSelect={() => { onCompose('ticket'); close(); }}>Ticket…</MenuItem>
-                            </>
-                        )}
-                    </Menu>
-
                     <IconButton size="sm" label="Set a reminder" onClick={() => onCompose('reminder')}><AlarmClock size={15} strokeWidth={1.9} /></IconButton>
                     <IconButton size="sm" label="Raise a ticket" onClick={() => onCompose('ticket')}><TicketIcon size={15} strokeWidth={1.9} /></IconButton>
 
                     <div className="flex-1" />
-                    <span className="mr-2 hidden items-center gap-1 text-2xs text-tertiary 2xl:flex"><Kbd>↵</Kbd> to {note ? 'save' : 'send'} · <Kbd>⇧</Kbd><Kbd>↵</Kbd> new line</span>
+                    <span className="mr-3 hidden items-center gap-1 text-2xs text-tertiary xl:flex">
+                        {note
+                            ? <><Kbd>{MOD}</Kbd><Kbd>↵</Kbd> to save</>
+                            : <><Kbd>↵</Kbd> to send · <Kbd>⇧</Kbd><Kbd>↵</Kbd> new line</>}
+                    </span>
 
-                    <button type="submit" disabled={processing || !data.body.trim()} title={note ? 'Save note' : 'Send'} aria-label={note ? 'Save note' : 'Send'}
-                        className="v-btn v-btn--primary v-btn--icon size-8 rounded-full">
-                        {processing ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <ArrowUp size={16} strokeWidth={2.2} />}
+                    <button type="submit" disabled={processing || !data.body.trim()} className="v-btn v-btn--primary v-btn--sm"
+                        title={note ? `Save note (${MOD}+Enter)` : 'Send (Enter)'}>
+                        {processing
+                            ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+                            : note ? <StickyNote size={14} strokeWidth={2} /> : <ArrowUp size={14} strokeWidth={2.2} />}
+                        {note ? 'Save note' : 'Send'}
                     </button>
                 </div>
             </form>
         </div>
     );
 });
+
+function ModeTab({ active, disabled = false, tone, title, onClick, children }: {
+    active: boolean; disabled?: boolean; tone?: 'warning'; title: string; onClick: () => void; children: ReactNode;
+}) {
+    const on = active && !disabled;
+
+    return (
+        <button type="button" role="tab" aria-selected={on} disabled={disabled} title={title} onClick={onClick}
+            className="inline-flex h-7 items-center gap-1.5 rounded-sm px-2.5 text-xs font-medium transition-colors enabled:hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45"
+            style={{
+                color: on ? (tone ? `var(--${tone})` : 'var(--text-primary)') : 'var(--text-secondary)',
+                background: on ? (tone ? 'color-mix(in srgb, var(--warning-fill) 16%, transparent)' : 'var(--surface-active)') : undefined,
+            }}>
+            {children}
+        </button>
+    );
+}

@@ -41,6 +41,14 @@ return [
     // contract: the agent sends it to /api/agent/v1/*, and AgentGateway sends
     // it to the agent's gateway. `url` unset means "no agent layer": Studio
     // pages that need one say so instead of pretending.
+    // LiveKit: the browser joins a room with a token signed here, and the
+    // voice worker (same agent as phone calls) answers in it. Studio's Talk.
+    'livekit' => [
+        'url' => env('LIVEKIT_URL'),
+        'key' => env('LIVEKIT_API_KEY'),
+        'secret' => env('LIVEKIT_API_SECRET'),
+    ],
+
     'agent' => [
         'url' => env('AGENT_GATEWAY_URL'),
         'secret' => env('AGENT_SHARED_SECRET'),

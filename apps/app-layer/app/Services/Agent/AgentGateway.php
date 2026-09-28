@@ -4,6 +4,7 @@ namespace App\Services\Agent;
 
 use App\Models\AgentThread;
 use App\Models\AutomationRun;
+use App\Models\Conversation;
 use App\Models\Organization;
 use App\Models\Skill;
 use GuzzleHttp\Handler\StreamHandler;
@@ -111,34 +112,59 @@ class AgentGateway
      */
     public function streamThread(AgentThread $thread, string $message, array $history): StreamInterface
     {
+        return $this->streamPost('/v1/threads/stream', [
+            'organization_id' => Organization::currentId(),
+            'thread_id' => $thread->id,
+            'message' => $message,
+            'history' => $history,
+        ]);
+    }
+
+    /**
+     * One live-chat turn with the customer-facing agent (Studio Talk, and
+     * later the public chat API), streamed like Ask. The app sends the
+     * conversation's context bundle with the message, so the gateway does not
+     * make a second round trip before the first token.
+     *
+     * @param  list<array{role: string, content: string}>  $history
+     */
+    public function streamChat(Conversation $conversation, string $message, array $history, array $context): StreamInterface
+    {
+        return $this->streamPost('/v1/chat/stream', [
+            'organization_id' => Organization::currentId(),
+            'conversation_id' => $conversation->id,
+            'message' => $message,
+            'history' => $history,
+            'context' => $context,
+        ]);
+    }
+
+    /**
+     * POST that returns the open SSE body. Guzzle's default curl handler
+     * ignores `stream` and downloads the whole body before returning, which
+     * relayed every token at once at the end of the turn; the PHP-stream
+     * handler reads as bytes arrive. HTTP/1.0 keeps the gateway from
+     * chunk-encoding the body: PHP's dechunk filter fills 8 KB before handing
+     * anything over. Http::fake still applies: fakes are stack middleware.
+     */
+    private function streamPost(string $path, array $payload): StreamInterface
+    {
         if (! $this->configured()) {
             throw AgentUnavailable::notConfigured();
         }
 
         try {
-            // Guzzle's default curl handler ignores `stream` and downloads the
-            // whole body before returning, which relayed every token at once
-            // at the end of the turn. The PHP-stream handler reads as bytes
-            // arrive. HTTP/1.0 keeps the gateway from chunk-encoding the body:
-            // PHP's dechunk filter fills 8 KB before handing anything over,
-            // which relayed tokens in bursts. Http::fake still applies: fakes
-            // are stack middleware.
             $response = $this->client(timeout: 180)
                 ->setHandler(new StreamHandler)
                 ->withOptions(['stream' => true, 'read_timeout' => 180, 'version' => '1.0'])
                 ->withHeaders(['Accept' => 'text/event-stream'])
-                ->post('/v1/threads/stream', [
-                    'organization_id' => Organization::currentId(),
-                    'thread_id' => $thread->id,
-                    'message' => $message,
-                    'history' => $history,
-                ])
+                ->post($path, $payload)
                 ->throw();
         } catch (ConnectionException $e) {
             Cache::forget('agent-gateway:available');
             throw AgentUnavailable::because($e->getMessage());
         } catch (RequestException $e) {
-            throw AgentUnavailable::because("HTTP {$e->response->status()} from /v1/threads/stream");
+            throw AgentUnavailable::because("HTTP {$e->response->status()} from {$path}");
         }
 
         return $response->toPsrResponse()->getBody();

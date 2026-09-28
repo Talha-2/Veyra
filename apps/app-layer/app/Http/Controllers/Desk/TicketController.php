@@ -18,29 +18,62 @@ use Inertia\Response;
 
 class TicketController extends Controller
 {
+    /** Filters on which tickets are shown. `view` used to carry these, so it still does for old links. */
+    private const SCOPES = ['open', 'mine', 'agent', 'resolved'];
+
+    /** How they are shown: `?view=board|list|table`. */
+    private const LAYOUTS = ['board', 'list', 'table'];
+
+    /** Table columns that sort on the server (the table is paginated). */
+    private const SORTS = ['reference', 'subject', 'priority', 'status', 'updated'];
+
+    private const PRIORITY_ORDER = "case priority when 'urgent' then 0 when 'high' then 1 when 'normal' then 2 else 3 end";
+
+    private const STATUS_ORDER = "case status when 'open' then 0 when 'in_progress' then 1 when 'pending' then 2 when 'resolved' then 3 else 4 end";
+
     public function index(Request $request): Response
     {
-        $view = $request->query('view', 'open');
-        $layout = in_array($request->query('layout'), ['list', 'kanban'], true) ? $request->query('layout') : 'list';
+        $param = $request->query('view');
+        $layout = in_array($param, self::LAYOUTS, true)
+            ? $param
+            : match ($request->query('layout')) { 'kanban' => 'board', 'list' => 'table', default => 'list' };
+        $scope = in_array($request->query('scope'), self::SCOPES, true)
+            ? $request->query('scope')
+            : (in_array($param, self::SCOPES, true) ? $param : 'open');
+
+        $sort = in_array($request->query('sort'), self::SORTS, true) ? $request->query('sort') : null;
+        $dir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
 
         $query = Ticket::query()
             ->with(['contact:id,name,phone,email', 'assignees:id,name', 'ticketType:id,name,color'])
-            ->when($view === 'open', fn ($q) => $q->unresolved())
-            ->when($view === 'mine', fn ($q) => $q->unresolved()->assignedTo($request->user()))
-            ->when($view === 'agent', fn ($q) => $q->unresolved()->raisedByAgent())
-            ->when($view === 'resolved', fn ($q) => $q->whereIn('status', [TicketStatus::Resolved, TicketStatus::Closed]))
+            ->when($scope === 'open', fn ($q) => $q->unresolved())
+            ->when($scope === 'mine', fn ($q) => $q->unresolved()->assignedTo($request->user()))
+            ->when($scope === 'agent', fn ($q) => $q->unresolved()->raisedByAgent())
+            ->when($scope === 'resolved', fn ($q) => $q->whereIn('status', [TicketStatus::Resolved, TicketStatus::Closed]))
             ->when($request->query('search'), fn ($q, $s) => $q->where(fn ($w) => $w
                 ->where('subject', 'ilike', "%{$s}%")
                 ->orWhereHas('contact', fn ($c) => $c->where('name', 'ilike', "%{$s}%"))))
             ->when($request->query('type'), fn ($q, $t) => $q->where('ticket_type_id', $t))
             ->when($request->query('priority'), fn ($q, $p) => $q->where('priority', $p));
 
-        // Kanban wants every open ticket ordered by column position; the list
-        // wants priority-first and paginated.
-        $tickets = $layout === 'kanban'
-            ? $query->orderBy('position')->orderByDesc('updated_at')->limit(400)->get()
-            : $query->orderByRaw("case priority when 'urgent' then 0 when 'high' then 1 when 'normal' then 2 else 3 end")
-                ->orderByDesc('updated_at')->paginate(40)->withQueryString();
+        // The board and the grouped list show every ticket in scope at once (a
+        // column or a group must add up); the table is paginated and sorts on
+        // the server so the order holds across pages.
+        if ($layout === 'table') {
+            match ($sort) {
+                'reference' => $query->orderBy('number', $dir),
+                'subject' => $query->orderBy('subject', $dir),
+                'priority' => $query->orderByRaw(self::PRIORITY_ORDER.' '.$dir),
+                'status' => $query->orderByRaw(self::STATUS_ORDER.' '.$dir),
+                'updated' => $query->orderBy('updated_at', $dir),
+                default => $query->orderByRaw(self::PRIORITY_ORDER)->orderByDesc('updated_at'),
+            };
+            $tickets = $query->orderByDesc('id')->paginate(50)->withQueryString();
+        } elseif ($layout === 'board') {
+            $tickets = $query->orderBy('position')->orderByDesc('updated_at')->limit(400)->get();
+        } else {
+            $tickets = $query->orderByRaw(self::PRIORITY_ORDER)->orderByDesc('updated_at')->limit(400)->get();
+        }
 
         $shape = fn (Ticket $t) => [
             'id' => $t->id,
@@ -57,13 +90,17 @@ class TicketController extends Controller
             'created_by_agent' => $t->created_by_agent,
             'contact' => $t->contact ? ['id' => $t->contact->id, 'name' => $t->contact->displayName()] : null,
             'assignees' => $t->assignees->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->all(),
+            'created_at' => $t->created_at?->toIso8601String(),
             'updated_at' => $t->updated_at?->toIso8601String(),
         ];
 
         return Inertia::render('desk/tickets', [
-            'tickets' => $layout === 'kanban' ? ['data' => $tickets->map($shape)->all()] : $tickets->through($shape),
-            'view' => $view,
+            'tickets' => $layout === 'table' ? $tickets->through($shape) : ['data' => $tickets->map($shape)->all()],
+            'scope' => $scope,
+            // Kept for anything that still reads the old name: it is the scope.
+            'view' => $scope,
             'layout' => $layout,
+            'sort' => ['key' => $sort, 'dir' => $dir],
             'filters' => ['search' => $request->query('search'), 'type' => $request->query('type'), 'priority' => $request->query('priority')],
             'counts' => [
                 'open' => Ticket::query()->unresolved()->count(),
@@ -115,7 +152,7 @@ class TicketController extends Controller
                 ] : null,
                 'assignee_ids' => $ticket->assignees->pluck('id')->all(),
                 'tags' => $ticket->tags->pluck('name')->all(),
-                'notes' => $ticket->notes->map(fn ($n) => ['id' => $n->id, 'body' => $n->body, 'author' => $n->author?->name ?? 'Agent', 'at' => $n->created_at?->toIso8601String()])->all(),
+                'notes' => $ticket->notes->map(fn ($n) => ['id' => $n->id, 'body' => $n->body, 'author' => $n->author?->name ?? 'Agent', 'at' => $n->created_at?->toIso8601String(), 'by_agent' => $n->author_id === null])->all(),
                 'activities' => $ticket->activities->map(fn ($a) => ['id' => $a->id, 'actor' => $a->actorLabel(), 'is_agent' => $a->actor === 'agent', 'description' => $a->description, 'at' => $a->created_at?->toIso8601String()])->all(),
             ],
             'statuses' => collect(TicketStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'tone' => $s->tone()])->all(),
@@ -131,6 +168,8 @@ class TicketController extends Controller
             'subject' => ['required', 'string', 'max:255'],
             'body' => ['nullable', 'string', 'max:10000'],
             'priority' => ['required', Rule::enum(TicketPriority::class)],
+            // Set when the ticket is added from a board column or a list group.
+            'status' => ['nullable', Rule::enum(TicketStatus::class)],
             'ticket_type_id' => ['nullable', 'integer', 'exists:ticket_types,id'],
             'contact_id' => ['nullable', 'integer', 'exists:contacts,id'],
             'assignee_ids' => ['array'],
@@ -138,14 +177,18 @@ class TicketController extends Controller
         ]);
 
         $type = isset($validated['ticket_type_id']) ? TicketType::find($validated['ticket_type_id']) : null;
+        $status = isset($validated['status']) ? TicketStatus::from($validated['status']) : TicketStatus::Open;
 
         $ticket = Ticket::create([
-            ...collect($validated)->except('assignee_ids')->all(),
-            'status' => TicketStatus::Open,
+            ...collect($validated)->except(['assignee_ids', 'status'])->all(),
+            'status' => $status,
             'channel' => 'manual',
             'created_by_id' => $request->user()->getKey(),
         ]);
-        $ticket->assignees()->sync($validated['assignee_ids'] ?: ($type?->default_assignee_ids ?? []));
+        if ($status->isTerminal()) {
+            $ticket->forceFill(['resolved_at' => now()])->save();
+        }
+        $ticket->assignees()->sync(($validated['assignee_ids'] ?? []) ?: ($type?->default_assignee_ids ?? []));
         Activity::log($ticket, 'created', 'Ticket created', $request->user());
 
         return redirect()->route('desk.tickets.show', $ticket)->with('success', "Ticket {$ticket->reference()} created.");
@@ -165,27 +208,60 @@ class TicketController extends Controller
             'tags' => ['sometimes', 'array'],
         ]);
 
+        $this->apply($ticket, $validated, $request->user());
+
+        return back();
+    }
+
+    /**
+     * The same change on many tickets at once, from the table's selection.
+     * Each ticket goes through the single-ticket path, so every one logs its
+     * own activity and stamps its own resolution time.
+     */
+    public function bulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer'],
+            'status' => ['sometimes', Rule::enum(TicketStatus::class)],
+            'priority' => ['sometimes', Rule::enum(TicketPriority::class)],
+            'assignee_ids' => ['sometimes', 'array'],
+            'assignee_ids.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        $changes = collect($validated)->except('ids')->all();
+        $tickets = Ticket::query()->whereIn('id', $validated['ids'])->get();
+
+        foreach ($tickets as $ticket) {
+            $this->apply($ticket, $changes, $request->user());
+        }
+
+        $n = $tickets->count();
+
+        return back()->with('success', $n === 1 ? '1 ticket updated.' : "{$n} tickets updated.");
+    }
+
+    private function apply(Ticket $ticket, array $validated, User $user): void
+    {
         $ticket->fill(collect($validated)->except(['assignee_ids', 'tags'])->all());
 
         if ($ticket->isDirty('status')) {
             $ticket->resolved_at = $ticket->status->isTerminal() ? now() : null;
-            Activity::log($ticket, 'status_changed', "Status set to {$ticket->status->label()}", $request->user());
+            Activity::log($ticket, 'status_changed', "Status set to {$ticket->status->label()}", $user);
         }
         if ($ticket->isDirty('priority')) {
-            Activity::log($ticket, 'priority_changed', "Priority set to {$ticket->priority->label()}", $request->user());
+            Activity::log($ticket, 'priority_changed', "Priority set to {$ticket->priority->label()}", $user);
         }
 
         $ticket->save();
 
         if (array_key_exists('assignee_ids', $validated)) {
             $ticket->assignees()->sync($validated['assignee_ids']);
-            Activity::log($ticket, 'assigned', 'Assignment changed', $request->user());
+            Activity::log($ticket, 'assigned', 'Assignment changed', $user);
         }
         if (array_key_exists('tags', $validated)) {
             $ticket->syncTags($validated['tags']);
         }
-
-        return back();
     }
 
     public function storeNote(Request $request, Ticket $ticket): RedirectResponse

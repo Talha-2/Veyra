@@ -1,16 +1,14 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import {
-    ChevronDown, ChevronRight, FileText, FileUp, Folder as FolderIcon, FolderInput, FolderPlus, Globe, Library, MoreHorizontal,
-    PenLine, Pencil, Plus, Search, SearchX, Sparkles, Trash2, UploadCloud, X,
-} from 'lucide-react';
-import { useMemo, useRef, useState, type DragEvent as ReactDragEvent, type FormEvent, type ReactNode } from 'react';
+import { Brain, ChevronDown, ChevronRight, Code2, FileText, FileUp, Folder as FolderIcon, FolderInput, FolderPlus, Globe, Library, MoreHorizontal, PenLine, Pencil, Plus, Search, SearchX, Trash2, UploadCloud, X } from 'lucide-react';
+import { useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type FormEvent, type ReactNode } from 'react';
 
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from '../../components/shell/menu';
 import { Field } from '../../components/studio/form';
 import { ACCEPT_ATTR, DropOverlay, isAccepted, useWindowFileDrop } from '../../components/studio-knowledge/file-drop';
 import { formatBytes, plural, searchTerms, splitHits } from '../../components/studio-knowledge/format';
+import { DialogActions, PageSection } from '../../components/studio-ops/page-parts';
 import Dialog from '../../components/ui/dialog';
-import { Callout, Card, IconTile, Meter, SearchField, StatTile, Toolbar } from '../../components/ui/kit';
+import { Callout, Card, IconTile, Meter, SearchField } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, EmptyState, RelativeTime, UserText, type Tone } from '../../components/ui/primitives';
 import { toast } from '../../components/ui/toaster';
@@ -28,17 +26,22 @@ interface Props {
 
 type DialogKind = 'doc' | 'upload' | 'scrape' | 'folder';
 
-/** Finder's column layout: select, name, source, status, size, updated, menu. Middle columns fold away on a phone. */
-const COLUMNS = 'grid grid-cols-[20px_minmax(0,1fr)_32px] md:grid-cols-[20px_minmax(0,1fr)_104px_132px_76px_80px_32px] items-center gap-x-4';
+/**
+ * Finder's list: select, name, status, updated, menu. Status and date fold
+ * away on a phone, where the subtitle carries them instead.
+ */
+const COLUMNS = 'grid grid-cols-[20px_minmax(0,1fr)_40px] md:grid-cols-[20px_minmax(0,1fr)_168px_96px_40px] items-center gap-x-5';
 
 const SOURCE: Record<string, { label: string; icon: ReactNode }> = {
-    created: { label: 'Written', icon: <PenLine size={16} strokeWidth={1.8} /> },
+    created: { label: 'Written here', icon: <PenLine size={16} strokeWidth={1.8} /> },
     upload: { label: 'Uploaded', icon: <FileUp size={16} strokeWidth={1.8} /> },
     scrape: { label: 'Web page', icon: <Globe size={16} strokeWidth={1.8} /> },
+    agent: { label: 'Agent memory', icon: <Brain size={16} strokeWidth={1.8} /> },
+    api: { label: 'Added by API', icon: <Code2 size={16} strokeWidth={1.8} /> },
 };
 
 function docStatus(d: Doc): { tone: Tone; label: string } {
-    if (d.retrievable) return { tone: 'success', label: plural(d.chunk_count, 'chunk') };
+    if (d.retrievable) return { tone: 'success', label: `Searchable · ${plural(d.chunk_count, 'chunk')}` };
     if (d.status === 'error') return { tone: 'danger', label: 'Failed' };
     if (d.status === 'processing') return { tone: 'warning', label: 'Processing' };
     return { tone: 'muted', label: 'Not searchable' };
@@ -54,7 +57,6 @@ export default function Knowledge({ folder, breadcrumbs, folders, all_folders, d
 
     const here = folder?.name ?? 'All documents';
     const failed = totals.failed ?? Math.max(0, totals.documents - totals.retrievable - totals.processing);
-    const waiting = totals.processing + failed;
 
     const needle = filter.trim().toLowerCase();
     const shownFolders = needle ? folders.filter((f) => f.name.toLowerCase().includes(needle)) : folders;
@@ -120,6 +122,14 @@ export default function Knowledge({ folder, breadcrumbs, folders, all_folders, d
             <PageHeader
                 title="Knowledge"
                 description="What the agent can look up on a call: prices, policies, service areas. It searches every document, whatever folder it sits in."
+                meta={totals.documents > 0 ? (
+                    <>
+                        <Badge>{plural(totals.documents, 'document')}</Badge>
+                        <Badge tone={totals.retrievable > 0 ? 'success' : 'muted'} dot>{totals.retrievable.toLocaleString()} searchable</Badge>
+                        {totals.processing > 0 && <Badge tone="warning" dot>{totals.processing.toLocaleString()} processing</Badge>}
+                        {failed > 0 && <Badge tone="danger" dot>{failed.toLocaleString()} failed</Badge>}
+                    </>
+                ) : undefined}
                 actions={
                     <Menu align="right" width={280} trigger={(open, t) => (
                         <button type="button" className="v-btn v-btn--primary" onClick={t} aria-expanded={open} aria-haspopup="menu">
@@ -140,219 +150,202 @@ export default function Knowledge({ folder, breadcrumbs, folders, all_folders, d
                 }
             />
 
-            <div className="mb-6 grid gap-4 sm:grid-cols-3">
-                <StatTile label="Documents" icon={<FileText size={15} strokeWidth={1.8} />} value={totals.documents.toLocaleString()} hint="Across every folder" />
-                <StatTile
-                    label="Searchable"
-                    icon={<Search size={15} strokeWidth={1.8} />}
-                    value={totals.retrievable.toLocaleString()}
-                    tone={totals.retrievable > 0 ? 'success' : undefined}
-                    hint={totals.documents === 0 ? 'Nothing indexed yet' : `${Math.round((totals.retrievable / totals.documents) * 100)}% of documents the agent can quote`}
-                />
-                <StatTile
-                    label="Processing or failed"
-                    value={waiting.toLocaleString()}
-                    tone={failed > 0 ? 'danger' : totals.processing > 0 ? 'warning' : undefined}
-                    hint={failed > 0
-                        ? `${failed} failed: listed here, invisible to the agent${totals.processing ? ` · ${totals.processing} processing` : ''}`
-                        : totals.processing > 0 ? `${totals.processing} waiting for their text to be extracted` : 'Everything is indexed'}
-                />
-            </div>
-
-            {/* The retrieval test: what a caller's question would actually surface. */}
-            <Card className="mb-8">
-                <div className="px-5 pt-5 pb-5 sm:px-6">
-                    <div className="mb-4 flex items-start gap-3">
-                        <IconTile tone="accent"><Sparkles size={16} strokeWidth={1.8} /></IconTile>
-                        <div className="min-w-0">
-                            <h2 className="text-md font-semibold text-primary">Ask what the agent would find</h2>
-                            <p className="mt-0.5 text-sm text-secondary">Type what a caller might say. This runs the exact search the agent runs mid-call, across every folder, and shows the passages it would read from.</p>
-                        </div>
-                    </div>
-                    <form className="flex flex-col gap-2 sm:flex-row" onSubmit={runSearch}>
-                        <div className="relative flex-1">
-                            <Search size={16} strokeWidth={2} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-tertiary" />
-                            <input
-                                type="search"
-                                className="v-field h-11 rounded-full pr-4 pl-11 text-md"
-                                placeholder="e.g. Do you service Evanston on weekends?"
-                                value={q}
-                                onChange={(e) => setQ(e.target.value)}
-                                aria-label="Test question"
-                                dir="auto"
-                            />
-                        </div>
-                        <button type="submit" className="v-btn v-btn--quiet h-11 px-5" disabled={!q.trim()}>Test retrieval</button>
-                    </form>
-                </div>
-
-                {search && <SearchResults search={search} onClear={clearSearch} />}
-            </Card>
-
-            <Toolbar trailing={!empty && <SearchField value={filter} onChange={setFilter} placeholder={`Filter ${folder ? 'this folder' : 'documents'}`} className="w-full sm:w-60" />}>
-                <nav className="flex min-w-0 flex-wrap items-center gap-1 text-base" aria-label="Folder path">
-                    {folder ? (
-                        <Link href="/studio/knowledge" className="flex items-center gap-1.5 rounded-md px-1 text-secondary transition-colors hover:text-primary">
-                            <Library size={15} strokeWidth={1.8} />All documents
-                        </Link>
-                    ) : (
-                        <span className="flex items-center gap-1.5 px-1 font-semibold text-primary"><Library size={15} strokeWidth={1.8} />All documents</span>
-                    )}
-                    {breadcrumbs.map((b, i) => (
-                        <span key={b.id} className="flex min-w-0 items-center gap-1">
-                            <ChevronRight size={14} strokeWidth={2} className="shrink-0 text-tertiary" />
-                            {i === breadcrumbs.length - 1
-                                ? <span className="truncate px-1 font-semibold text-primary" aria-current="page">{b.name}</span>
-                                : <Link href={`/studio/knowledge?folder=${b.id}`} className="truncate rounded-md px-1 text-secondary transition-colors hover:text-primary">{b.name}</Link>}
-                        </span>
-                    ))}
-                </nav>
-            </Toolbar>
-
-            {uploading && (
-                <div className="mb-4">
-                    <Callout tone="info" icon={<UploadCloud size={16} strokeWidth={1.8} />} title={`Uploading ${plural(uploading.count, 'file')} to ${here}`}>
-                        <div className="mt-2 flex items-center gap-3">
-                            <Meter value={uploading.progress} tone="info" label="Upload progress" />
-                            <span className="text-xs text-tertiary tabular-nums">{Math.round(uploading.progress)}%</span>
-                        </div>
-                    </Callout>
-                </div>
-            )}
-
-            {empty ? (
-                <Card>
-                    <EmptyState
-                        icon={folder ? <FolderIcon size={22} strokeWidth={1.6} /> : <FileText size={22} strokeWidth={1.6} />}
-                        title={folder ? `${folder.name} is empty` : 'Teach the agent what your business knows'}
-                        action={
-                            <div className="flex flex-wrap justify-center gap-2">
-                                <button type="button" className="v-btn v-btn--quiet" onClick={() => setDialog('upload')}><UploadCloud size={15} strokeWidth={1.8} />Upload files</button>
-                                <button type="button" className="v-btn v-btn--ghost" onClick={() => setDialog('doc')}><PenLine size={15} strokeWidth={1.8} />Write a document</button>
-                            </div>
-                        }
-                    >
-                        {folder
-                            ? 'Drop files anywhere on this page, or write a document here. Folders are for you; the agent searches everything regardless.'
-                            : 'Add what callers ask about: pricing, policies, service areas, hours. Drop files anywhere on this page, or write one from scratch.'}
-                    </EmptyState>
-                </Card>
-            ) : (
-                <Card className="overflow-hidden">
-                    <div className={`${COLUMNS} h-10 px-5 text-xs font-medium text-tertiary`} style={{ borderBottom: '1px solid var(--separator)' }}>
-                        <input
-                            type="checkbox"
-                            aria-label="Select all documents"
-                            checked={allShownSelected}
-                            ref={(el) => { if (el) el.indeterminate = someShownSelected && !allShownSelected; }}
-                            onChange={toggleAll}
-                            disabled={shownDocs.length === 0}
-                        />
-                        <span>Name</span>
-                        <span className="hidden md:block">Source</span>
-                        <span className="hidden md:block">Status</span>
-                        <span className="hidden text-right md:block">Size</span>
-                        <span className="hidden text-right md:block">Updated</span>
-                        <span />
-                    </div>
-
-                    <div className="divide-y" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
-                        {shownFolders.map((f) => (
-                            <div key={`f${f.id}`} className={`${COLUMNS} px-5 py-3 transition-colors hover:bg-surface-hover`}>
-                                <span />
-                                {renaming?.id === f.id ? (
-                                    <div className="flex min-w-0 items-center gap-3">
-                                        <IconTile tone="info"><FolderIcon size={16} strokeWidth={1.8} /></IconTile>
-                                        <input
-                                            className="v-field h-8 max-w-[320px]"
-                                            value={renaming.name}
-                                            autoFocus
-                                            onFocus={(e) => e.currentTarget.select()}
-                                            onChange={(e) => setRenaming({ id: f.id, name: e.target.value })}
-                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitRename(); } if (e.key === 'Escape') setRenaming(null); }}
-                                            onBlur={submitRename}
-                                            aria-label="Folder name"
-                                        />
-                                    </div>
-                                ) : (
-                                    <Link href={`/studio/knowledge?folder=${f.id}`} className="flex min-w-0 items-center gap-3">
-                                        <IconTile tone="info"><FolderIcon size={16} strokeWidth={1.8} /></IconTile>
-                                        <span className="min-w-0">
-                                            <span className="block truncate text-base font-medium text-primary">{f.name}</span>
-                                            <span className="block text-sm text-secondary md:hidden">{plural(f.documents_count, 'document')}</span>
-                                        </span>
-                                    </Link>
-                                )}
-                                <span className="hidden text-sm text-secondary md:block">Folder</span>
-                                <span className="hidden text-sm text-secondary md:block">{plural(f.documents_count, 'document')}</span>
-                                <span className="hidden text-right text-sm text-tertiary md:block">—</span>
-                                <span className="hidden md:block" />
-                                <RowMenu label={`Actions for ${f.name}`}>
-                                    {(close) => (
-                                        <>
-                                            <MenuItem icon={<Pencil size={14} strokeWidth={1.8} />} onSelect={() => { close(); setRenaming({ id: f.id, name: f.name }); }}>Rename</MenuItem>
-                                            <MenuSeparator />
-                                            <MenuItem danger icon={<Trash2 size={14} strokeWidth={1.8} />} onSelect={() => {
-                                                close();
-                                                if (confirm(`Delete folder "${f.name}"? Its documents move up a level; nothing is deleted.`)) router.delete(`/studio/knowledge/folders/${f.id}`, { preserveScroll: true });
-                                            }}>Delete folder</MenuItem>
-                                        </>
-                                    )}
-                                </RowMenu>
-                            </div>
-                        ))}
-
-                        {shownDocs.map((d) => {
-                            const status = docStatus(d);
-                            const source = SOURCE[d.source_type] ?? { label: d.source_type, icon: <FileText size={16} strokeWidth={1.8} /> };
-                            const isSelected = selected.has(d.id);
-
-                            return (
-                                <div key={`d${d.id}`} className={`${COLUMNS} px-5 py-3 transition-colors ${isSelected ? '' : 'hover:bg-surface-hover'}`} style={{ background: isSelected ? 'var(--accent-subtle)' : undefined }}>
-                                    <input type="checkbox" checked={isSelected} onChange={() => toggle(d.id)} aria-label={`Select ${d.name}`} />
-                                    <Link href={`/studio/knowledge/documents/${d.id}`} className="flex min-w-0 items-center gap-3">
-                                        <IconTile tone={d.status === 'error' ? 'danger' : 'muted'}>{source.icon}</IconTile>
-                                        <span className="min-w-0">
-                                            <UserText className="block truncate text-base font-medium text-primary">{d.name}</UserText>
-                                            {d.error
-                                                ? <span className="block truncate text-sm text-danger" title={d.error}>{d.error}</span>
-                                                : <span className="block truncate text-sm text-secondary md:hidden">{status.label} · {formatBytes(d.size_bytes)}</span>}
-                                        </span>
-                                    </Link>
-                                    <span className="hidden md:block"><Badge>{source.label}</Badge></span>
-                                    <span className="hidden md:block"><Badge tone={status.tone} dot>{status.label}</Badge></span>
-                                    <span className="hidden text-right text-sm text-secondary tabular-nums md:block">{formatBytes(d.size_bytes)}</span>
-                                    <span className="hidden text-right md:block"><RelativeTime at={d.updated_at} /></span>
-                                    <RowMenu label={`Actions for ${d.name}`}>
-                                        {(close) => (
-                                            <>
-                                                <MenuItem icon={<PenLine size={14} strokeWidth={1.8} />} onSelect={() => { close(); router.visit(`/studio/knowledge/documents/${d.id}`); }}>Open</MenuItem>
-                                                <MenuItem icon={<FolderInput size={14} strokeWidth={1.8} />} onSelect={() => { close(); setSelected(new Set([d.id])); }}>Select to move</MenuItem>
-                                                <MenuSeparator />
-                                                <MenuItem danger icon={<Trash2 size={14} strokeWidth={1.8} />} onSelect={() => {
-                                                    close();
-                                                    if (confirm(`Delete "${d.name}"? The agent stops finding it on the next call.`)) router.delete(`/studio/knowledge/documents/${d.id}`, { preserveScroll: true });
-                                                }}>Delete</MenuItem>
-                                            </>
-                                        )}
-                                    </RowMenu>
+            <div className="mt-3">
+                <PageSection
+                    title={
+                        <nav className="flex min-w-0 flex-wrap items-center gap-1" aria-label="Folder path">
+                            {folder ? (
+                                <Link href="/studio/knowledge" className="flex items-center gap-2 rounded-md text-secondary transition-colors hover:text-primary">
+                                    <Library size={18} strokeWidth={1.8} />Library
+                                </Link>
+                            ) : (
+                                <span className="flex items-center gap-2"><Library size={18} strokeWidth={1.8} className="text-tertiary" />Library</span>
+                            )}
+                            {breadcrumbs.map((b, i) => (
+                                <span key={b.id} className="flex min-w-0 items-center gap-1">
+                                    <ChevronRight size={16} strokeWidth={2} className="shrink-0 text-tertiary" />
+                                    {i === breadcrumbs.length - 1
+                                        ? <span className="truncate" aria-current="page">{b.name}</span>
+                                        : <Link href={`/studio/knowledge?folder=${b.id}`} className="truncate rounded-md text-secondary transition-colors hover:text-primary">{b.name}</Link>}
+                                </span>
+                            ))}
+                        </nav>
+                    }
+                    description={folder ? 'Folders are for you; the agent searches every folder regardless.' : 'Drop files anywhere on this page to upload them here.'}
+                    actions={!empty && <SearchField value={filter} onChange={setFilter} placeholder={`Filter ${folder ? 'this folder' : 'by name'}`} className="w-full sm:w-64" />}
+                >
+                    {uploading && (
+                        <div className="mb-5">
+                            <Callout tone="info" icon={<UploadCloud size={16} strokeWidth={1.8} />} title={`Uploading ${plural(uploading.count, 'file')} to ${here}`}>
+                                <div className="mt-2 flex items-center gap-3">
+                                    <Meter value={uploading.progress} tone="info" label="Upload progress" />
+                                    <span className="text-xs text-tertiary tabular-nums">{Math.round(uploading.progress)}%</span>
                                 </div>
-                            );
-                        })}
+                            </Callout>
+                        </div>
+                    )}
 
-                        {shownFolders.length === 0 && shownDocs.length === 0 && (
-                            <div className="px-5 py-10 text-center">
-                                <p className="text-base font-medium text-primary">Nothing here matches “{filter}”</p>
-                                <p className="mt-1 text-sm text-secondary">This filters names in {here} only. To check what the agent would find, use the retrieval test above.</p>
+                    {empty ? (
+                        <Card>
+                            <EmptyState
+                                icon={folder ? <FolderIcon size={22} strokeWidth={1.6} /> : <FileText size={22} strokeWidth={1.6} />}
+                                title={folder ? `${folder.name} is empty` : 'Teach the agent what your business knows'}
+                                action={
+                                    <div className="flex flex-wrap justify-center gap-2">
+                                        <button type="button" className="v-btn v-btn--quiet" onClick={() => setDialog('upload')}><UploadCloud size={15} strokeWidth={1.8} />Upload files</button>
+                                        <button type="button" className="v-btn v-btn--ghost" onClick={() => setDialog('doc')}><PenLine size={15} strokeWidth={1.8} />Write a document</button>
+                                    </div>
+                                }
+                            >
+                                {folder
+                                    ? 'Drop files anywhere on this page, or write a document here. Folders are for you; the agent searches everything regardless.'
+                                    : 'Add what callers ask about: pricing, policies, service areas, hours. Drop files anywhere on this page, or write one from scratch.'}
+                            </EmptyState>
+                        </Card>
+                    ) : (
+                        <Card>
+                            <div className={`${COLUMNS} h-11 px-5 text-xs font-medium text-tertiary`} style={{ borderBottom: '1px solid var(--separator)' }}>
+                                <input
+                                    type="checkbox"
+                                    aria-label="Select all documents"
+                                    checked={allShownSelected}
+                                    ref={(el) => { if (el) el.indeterminate = someShownSelected && !allShownSelected; }}
+                                    onChange={toggleAll}
+                                    disabled={shownDocs.length === 0}
+                                />
+                                <span>Name</span>
+                                <span className="hidden md:block">Status</span>
+                                <span className="hidden text-right md:block">Updated</span>
+                                <span />
                             </div>
-                        )}
-                    </div>
 
-                    <div className="px-5 py-2.5 text-xs text-tertiary" style={{ borderTop: '1px solid var(--separator)', background: 'var(--bg-subtle)' }}>
-                        {plural(folders.length, 'folder')} · {plural(documents.length, 'document')} in {here}. Drag files onto the page to upload here.
-                    </div>
-                </Card>
-            )}
+                            <div className="divide-y" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
+                                {shownFolders.map((f) => (
+                                    <div key={`f${f.id}`} className={`${COLUMNS} min-h-14 px-5 py-2 transition-colors hover:bg-surface-hover`}>
+                                        <span />
+                                        {renaming?.id === f.id ? (
+                                            <div className="flex min-w-0 items-center gap-3.5">
+                                                <IconTile tone="info" size={36}><FolderIcon size={17} strokeWidth={1.8} /></IconTile>
+                                                <input
+                                                    className="v-field h-9 max-w-[320px]"
+                                                    value={renaming.name}
+                                                    autoFocus
+                                                    onFocus={(e) => e.currentTarget.select()}
+                                                    onChange={(e) => setRenaming({ id: f.id, name: e.target.value })}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitRename(); } if (e.key === 'Escape') setRenaming(null); }}
+                                                    onBlur={submitRename}
+                                                    aria-label="Folder name"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <Link href={`/studio/knowledge?folder=${f.id}`} className="flex min-w-0 items-center gap-3.5">
+                                                <IconTile tone="info" size={36}><FolderIcon size={17} strokeWidth={1.8} /></IconTile>
+                                                <span className="min-w-0">
+                                                    <span className="block truncate text-base font-medium text-primary">{f.name}</span>
+                                                    <span className="block truncate text-sm text-secondary">Folder · {plural(f.documents_count, 'document')}</span>
+                                                </span>
+                                            </Link>
+                                        )}
+                                        <span className="hidden md:block" />
+                                        <span className="hidden md:block" />
+                                        <RowMenu label={`Actions for ${f.name}`}>
+                                            {(close) => (
+                                                <>
+                                                    <MenuItem icon={<Pencil size={14} strokeWidth={1.8} />} onSelect={() => { close(); setRenaming({ id: f.id, name: f.name }); }}>Rename</MenuItem>
+                                                    <MenuSeparator />
+                                                    <MenuItem danger icon={<Trash2 size={14} strokeWidth={1.8} />} onSelect={() => {
+                                                        close();
+                                                        if (confirm(`Delete folder "${f.name}"? Its documents move up a level; nothing is deleted.`)) router.delete(`/studio/knowledge/folders/${f.id}`, { preserveScroll: true });
+                                                    }}>Delete folder</MenuItem>
+                                                </>
+                                            )}
+                                        </RowMenu>
+                                    </div>
+                                ))}
+
+                                {shownDocs.map((d) => {
+                                    const status = docStatus(d);
+                                    const source = SOURCE[d.source_type] ?? { label: d.source_type, icon: <FileText size={16} strokeWidth={1.8} /> };
+                                    const isSelected = selected.has(d.id);
+
+                                    return (
+                                        <div key={`d${d.id}`} className={`${COLUMNS} min-h-14 px-5 py-2 transition-colors ${isSelected ? '' : 'hover:bg-surface-hover'}`} style={{ background: isSelected ? 'var(--accent-subtle)' : undefined }}>
+                                            <input type="checkbox" checked={isSelected} onChange={() => toggle(d.id)} aria-label={`Select ${d.name}`} />
+                                            <Link href={`/studio/knowledge/documents/${d.id}`} className="flex min-w-0 items-center gap-3.5">
+                                                <IconTile tone={d.status === 'error' ? 'danger' : 'muted'} size={36}>{source.icon}</IconTile>
+                                                <span className="min-w-0">
+                                                    <UserText className="block truncate text-base font-medium text-primary">{d.name}</UserText>
+                                                    {d.error
+                                                        ? <span className="block truncate text-sm text-danger" title={d.error}>{d.error}</span>
+                                                        : (
+                                                            <span className="block truncate text-sm text-secondary">
+                                                                {source.label} · {formatBytes(d.size_bytes)}
+                                                                <span className="md:hidden"> · {status.label}</span>
+                                                            </span>
+                                                        )}
+                                                </span>
+                                            </Link>
+                                            <span className="hidden md:block"><Badge tone={status.tone} dot>{status.label}</Badge></span>
+                                            <span className="hidden text-right md:block"><RelativeTime at={d.updated_at} className="text-sm" /></span>
+                                            <RowMenu label={`Actions for ${d.name}`}>
+                                                {(close) => (
+                                                    <>
+                                                        <MenuItem icon={<PenLine size={14} strokeWidth={1.8} />} onSelect={() => { close(); router.visit(`/studio/knowledge/documents/${d.id}`); }}>Open</MenuItem>
+                                                        <MenuItem icon={<FolderInput size={14} strokeWidth={1.8} />} onSelect={() => { close(); setSelected(new Set([d.id])); }}>Select to move</MenuItem>
+                                                        <MenuSeparator />
+                                                        <MenuItem danger icon={<Trash2 size={14} strokeWidth={1.8} />} onSelect={() => {
+                                                            close();
+                                                            if (confirm(`Delete "${d.name}"? The agent stops finding it on the next call.`)) router.delete(`/studio/knowledge/documents/${d.id}`, { preserveScroll: true });
+                                                        }}>Delete</MenuItem>
+                                                    </>
+                                                )}
+                                            </RowMenu>
+                                        </div>
+                                    );
+                                })}
+
+                                {shownFolders.length === 0 && shownDocs.length === 0 && (
+                                    <div className="px-6 py-12 text-center">
+                                        <p className="text-base font-medium text-primary">Nothing here matches “{filter}”</p>
+                                        <p className="mt-1 text-sm text-secondary">This filters names in {here} only. To check what the agent would find, use Test retrieval below.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="rounded-b-lg px-5 py-3 text-xs text-tertiary" style={{ borderTop: '1px solid var(--separator)', background: 'var(--bg-subtle)' }}>
+                                {plural(folders.length, 'folder')} · {plural(documents.length, 'document')} in {here}
+                            </div>
+                        </Card>
+                    )}
+                </PageSection>
+
+                {/* The retrieval test: what a caller's question would actually surface. */}
+                <PageSection
+                    id="test"
+                    title="Test retrieval"
+                    description="Type what a caller might say. This runs the exact search the agent runs mid-call, across every folder, and shows the passages it would read from."
+                >
+                    <Card>
+                        <form className="flex flex-col gap-3 p-6 sm:flex-row sm:p-7" onSubmit={runSearch}>
+                            <div className="relative flex-1">
+                                <Search size={17} strokeWidth={2} className="pointer-events-none absolute top-1/2 left-4.5 -translate-y-1/2 text-tertiary" />
+                                <input
+                                    type="search"
+                                    className="v-field h-12 rounded-full pr-5 pl-12 text-md"
+                                    placeholder="e.g. Do you service Evanston on weekends?"
+                                    value={q}
+                                    onChange={(e) => setQ(e.target.value)}
+                                    aria-label="Test question"
+                                    dir="auto"
+                                />
+                            </div>
+                            <button type="submit" className="v-btn v-btn--quiet v-btn--lg" disabled={!q.trim()}><Search size={15} strokeWidth={2} />Search</button>
+                        </form>
+
+                        {search && <SearchResults search={search} onClear={clearSearch} />}
+                    </Card>
+                </PageSection>
+            </div>
 
             <SelectionBar
                 count={selected.size}
@@ -381,7 +374,7 @@ function SearchResults({ search, onClear }: { search: NonNullable<Props['search'
 
     return (
         <div style={{ borderTop: '1px solid var(--separator)' }}>
-            <div className="flex items-center gap-3 px-5 py-3 sm:px-6" style={{ background: 'var(--bg-subtle)' }}>
+            <div className="flex items-center gap-3 px-6 py-3.5 sm:px-7" style={{ background: 'var(--bg-subtle)' }}>
                 <p className="min-w-0 flex-1 truncate text-sm text-secondary">
                     {search.results.length === 0
                         ? <>No passages for <span className="font-medium text-primary">“{search.query}”</span></>
@@ -400,8 +393,8 @@ function SearchResults({ search, onClear }: { search: NonNullable<Props['search'
                         const pct = (r.score / top) * 100;
 
                         return (
-                            <li key={`${r.document_id}-${r.position}`} className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3 px-5 py-4 sm:grid-cols-[28px_minmax(0,1fr)_140px] sm:gap-x-4 sm:px-6">
-                                <span className="mt-0.5 flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums"
+                            <li key={`${r.document_id}-${r.position}`} className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-4 px-6 py-5 sm:grid-cols-[28px_minmax(0,1fr)_150px] sm:gap-x-5 sm:px-7">
+                                <span className="mt-0.5 flex size-7 items-center justify-center rounded-full text-xs font-semibold tabular-nums"
                                     style={i === 0 ? { background: 'var(--accent-subtle)', color: 'var(--accent-text)' } : { background: 'var(--surface-sunken)', color: 'var(--text-secondary)' }}>
                                     {i + 1}
                                 </span>
@@ -410,13 +403,13 @@ function SearchResults({ search, onClear }: { search: NonNullable<Props['search'
                                         <Link href={`/studio/knowledge/documents/${r.document_id}`} className="truncate text-base font-medium text-primary hover:text-accent-text">{r.document}</Link>
                                         <span className="text-xs text-tertiary">Chunk {r.position + 1}</span>
                                     </div>
-                                    <p className="mt-1 text-sm text-secondary" dir="auto">
+                                    <p className="mt-1.5 text-base text-secondary" dir="auto">
                                         {splitHits(r.excerpt, terms).map((part, j) => part.hit
                                             ? <mark key={j} className="rounded-[4px] px-0.5 text-primary" style={{ background: 'var(--accent-subtle-hover)' }}>{part.text}</mark>
                                             : <span key={j}>{part.text}</span>)}
                                     </p>
                                 </div>
-                                <div className="col-start-2 mt-3 sm:col-start-3 sm:mt-1">
+                                <div className="col-start-2 mt-3 sm:col-start-3 sm:mt-1.5">
                                     <Meter value={pct} tone={i === 0 ? 'accent' : 'muted'} label={`Relevance of result ${i + 1}`} />
                                     <p className="mt-1.5 text-xs text-tertiary tabular-nums">{plural(r.score, 'term match', 'term matches')}</p>
                                 </div>
@@ -435,8 +428,8 @@ function RowMenu({ label, children }: { label: string; children: (close: () => v
     return (
         <div className="flex justify-end">
             <Menu align="right" width={220} trigger={(open, t) => (
-                <button type="button" className="v-btn v-btn--ghost v-btn--icon size-8" onClick={t} aria-label={label} aria-expanded={open} aria-haspopup="menu">
-                    <MoreHorizontal size={16} strokeWidth={2} />
+                <button type="button" className="v-btn v-btn--ghost v-btn--icon size-9" onClick={t} aria-label={label} aria-expanded={open} aria-haspopup="menu">
+                    <MoreHorizontal size={17} strokeWidth={2} />
                 </button>
             )}>
                 {children}
@@ -459,7 +452,7 @@ function SelectionBar({ count, folders, currentFolderId, onMove, onDelete, onCle
         <div aria-live="polite" className="pointer-events-none sticky bottom-5 z-30 mt-4 flex justify-center transition-all duration-300"
             style={{ opacity: visible ? 1 : 0, transform: visible ? 'none' : 'translateY(12px)', transitionTimingFunction: 'var(--ease-entrance)' }}>
             {visible && (
-                <div className="v-glass pointer-events-auto flex items-center gap-1.5 rounded-full py-1.5 pr-1.5 pl-4" style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-overlay)' }}>
+                <div className="v-glass pointer-events-auto flex items-center gap-1.5 rounded-full py-1.5 pr-1.5 pl-5" style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-overlay)' }}>
                     <span className="mr-2 text-sm font-medium text-primary tabular-nums">{plural(count, 'document')} selected</span>
                     <Menu side="top" align="right" width={260} trigger={(open, t) => (
                         <button type="button" className="v-btn v-btn--quiet v-btn--sm" onClick={t} aria-expanded={open} aria-haspopup="menu">
@@ -467,9 +460,9 @@ function SelectionBar({ count, folders, currentFolderId, onMove, onDelete, onCle
                         </button>
                     )}>
                         {(close) => (
-                            <div className="max-h-[280px] overflow-y-auto">
+                            <div className="max-h-70 overflow-y-auto">
                                 <MenuLabel>Move to</MenuLabel>
-                                <MenuItem icon={<Library size={14} strokeWidth={1.8} />} active={currentFolderId === null} onSelect={() => { close(); onMove(null); }}>All documents (top level)</MenuItem>
+                                <MenuItem icon={<Library size={14} strokeWidth={1.8} />} active={currentFolderId === null} onSelect={() => { close(); onMove(null); }}>Library (top level)</MenuItem>
                                 {folders.map((f) => (
                                     <MenuItem key={f.id} icon={<FolderIcon size={14} strokeWidth={1.8} />} active={currentFolderId === f.id} onSelect={() => { close(); onMove(f.id); }}>{f.name}</MenuItem>
                                 ))}
@@ -488,12 +481,15 @@ function SelectionBar({ count, folders, currentFolderId, onMove, onDelete, onCle
 
 function Footer({ onClose, processing, label, disabled = false }: { onClose: () => void; processing: boolean; label: string; disabled?: boolean }) {
     return (
-        <div className="mt-6 flex justify-end gap-2">
+        <DialogActions>
             <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
             <button type="submit" className="v-btn v-btn--primary" disabled={processing || disabled}>{processing ? 'Working…' : label}</button>
-        </div>
+        </DialogActions>
     );
 }
+
+/** The writing surface: 15px at 1.6, the same measure as the document editor. */
+const WRITING: CSSProperties = { lineHeight: 1.6 };
 
 function WriteDialog({ open, onClose, folderId, here }: { open: boolean; onClose: () => void; folderId: number | null; here: string }) {
     const { data, setData, post, processing, errors, reset } = useForm({ name: '', content: '', folder_id: folderId });
@@ -501,16 +497,18 @@ function WriteDialog({ open, onClose, folderId, here }: { open: boolean; onClose
     const words = data.content.trim() ? data.content.trim().split(/\s+/).length : 0;
 
     return (
-        <Dialog open={open} onClose={onClose} title="Write a document" description={`Saved to ${here} and searchable by the agent as soon as you create it.`} width={720}>
+        <Dialog open={open} onClose={onClose} title="Write a document" description={`Saved to ${here} and searchable by the agent as soon as you create it.`} width={760}>
             <form onSubmit={submit}>
                 <Field label="Title" error={errors.name}>
                     <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Service area and call-out fees" autoFocus dir="auto" />
                 </Field>
                 <Field label="Content" error={errors.content} hint="Write it the way you would explain it to a new hire. Keep one topic per paragraph: paragraphs are what the agent retrieves.">
-                    <textarea className="v-field h-auto text-base leading-relaxed" rows={12} value={data.content} onChange={(e) => setData('content', e.target.value)} dir="auto" placeholder="Plain text or Markdown." />
+                    <textarea className="v-field h-auto px-4 py-3.5 text-md" style={WRITING} rows={14} value={data.content} onChange={(e) => setData('content', e.target.value)} dir="auto" placeholder="Plain text or Markdown." />
                 </Field>
-                <p className="-mt-2 text-xs text-tertiary tabular-nums">{plural(words, 'word')}</p>
-                <Footer onClose={onClose} processing={processing} label="Create" disabled={!data.name.trim() || !data.content.trim()} />
+                <DialogActions start={<span className="text-xs text-tertiary tabular-nums">{plural(words, 'word')}</span>}>
+                    <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
+                    <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.name.trim() || !data.content.trim()}>{processing ? 'Working…' : 'Create'}</button>
+                </DialogActions>
             </form>
         </Dialog>
     );
@@ -530,7 +528,7 @@ function UploadDialog({ open, onClose, folderId, here }: { open: boolean; onClos
     const fileError = Object.entries(errors as Record<string, string>).find(([k]) => k.startsWith('files'))?.[1];
 
     return (
-        <Dialog open={open} onClose={onClose} title="Upload files" description={`Into ${here}. Text, Markdown, CSV and HTML are searchable immediately; PDF and Word show as processing until their text is extracted.`}>
+        <Dialog open={open} onClose={onClose} title="Upload files" description={`Into ${here}. Text, Markdown, CSV and HTML are searchable immediately; PDF and Word show as processing until their text is extracted.`} width={600}>
             <form onSubmit={submit}>
                 <button
                     type="button"
@@ -538,29 +536,29 @@ function UploadDialog({ open, onClose, folderId, here }: { open: boolean; onClos
                     onDragOver={(e) => { e.preventDefault(); setOver(true); }}
                     onDragLeave={() => setOver(false)}
                     onDrop={onDrop}
-                    className="flex w-full flex-col items-center rounded-lg px-6 py-8 text-center transition-colors"
+                    className="flex w-full flex-col items-center rounded-lg px-6 py-10 text-center transition-colors"
                     style={{ border: `1.5px dashed ${over ? 'var(--accent)' : 'var(--border-strong)'}`, background: over ? 'var(--accent-subtle)' : 'var(--surface-sunken)' }}
                 >
-                    <UploadCloud size={24} strokeWidth={1.6} className="mb-2 text-tertiary" />
+                    <UploadCloud size={26} strokeWidth={1.6} className="mb-3 text-tertiary" />
                     <span className="text-base font-medium text-primary">Drop files here, or choose</span>
-                    <span className="mt-0.5 text-xs text-tertiary">TXT, MD, CSV, HTML, PDF, DOCX · up to 20 files, 20 MB each</span>
+                    <span className="mt-1 text-xs text-tertiary">TXT, MD, CSV, HTML, PDF, DOCX · up to 20 files, 20 MB each</span>
                 </button>
                 <input ref={input} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
 
                 {data.files.length > 0 && (
-                    <ul className="mt-3 divide-y rounded-md" style={{ border: '1px solid var(--border)', ['--tw-divide-color' as string]: 'var(--separator)' }}>
+                    <ul className="mt-4 divide-y rounded-md" style={{ border: '1px solid var(--border)', ['--tw-divide-color' as string]: 'var(--separator)' }}>
                         {data.files.map((f, i) => (
-                            <li key={`${f.name}-${i}`} className="flex items-center gap-3 px-3 py-2">
+                            <li key={`${f.name}-${i}`} className="flex min-h-12 items-center gap-3 px-4 py-2">
                                 <FileText size={15} strokeWidth={1.8} className="shrink-0 text-tertiary" />
                                 <span className="min-w-0 flex-1 truncate text-sm text-primary">{f.name}</span>
                                 <span className="text-xs text-tertiary tabular-nums">{formatBytes(f.size)}</span>
-                                <button type="button" className="v-btn v-btn--ghost v-btn--icon size-6" aria-label={`Remove ${f.name}`} onClick={() => setData('files', data.files.filter((_, j) => j !== i))}><X size={13} strokeWidth={2} /></button>
+                                <button type="button" className="v-btn v-btn--ghost v-btn--icon size-7" aria-label={`Remove ${f.name}`} onClick={() => setData('files', data.files.filter((_, j) => j !== i))}><X size={13} strokeWidth={2} /></button>
                             </li>
                         ))}
                     </ul>
                 )}
                 {fileError && <p className="mt-2 text-sm text-danger">{fileError}</p>}
-                {data.files.length > 0 && <p className="mt-2 text-xs text-tertiary tabular-nums">{plural(data.files.length, 'file')} · {formatBytes(data.files.reduce((a, f) => a + f.size, 0))}</p>}
+                {data.files.length > 0 && <p className="mt-2.5 text-xs text-tertiary tabular-nums">{plural(data.files.length, 'file')} · {formatBytes(data.files.reduce((a, f) => a + f.size, 0))}</p>}
                 <Footer onClose={onClose} processing={processing} label={data.files.length ? `Upload ${plural(data.files.length, 'file')}` : 'Upload'} disabled={data.files.length === 0} />
             </form>
         </Dialog>
@@ -572,7 +570,7 @@ function ScrapeDialog({ open, onClose, folderId, here }: { open: boolean; onClos
     const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/knowledge/scrape', { onSuccess: () => { reset(); onClose(); } }); };
 
     return (
-        <Dialog open={open} onClose={onClose} title="Import a web page" description={`Fetched once and its text indexed into ${here}. One page only: links are not followed, and later changes to the page are not picked up.`}>
+        <Dialog open={open} onClose={onClose} title="Import a web page" description={`Fetched once and its text indexed into ${here}. One page only: links are not followed, and later changes to the page are not picked up.`} width={580}>
             <form onSubmit={submit}>
                 <Field label="URL" error={errors.url} hint="Navigation, headers and footers are stripped; the page title becomes the document name.">
                     <input className="v-field" type="url" value={data.url} onChange={(e) => setData('url', e.target.value)} placeholder="https://northwind.example/services" autoFocus />
@@ -588,7 +586,7 @@ function FolderDialog({ open, onClose, parentId, here }: { open: boolean; onClos
     const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/knowledge/folders', { onSuccess: () => { reset(); onClose(); } }); };
 
     return (
-        <Dialog open={open} onClose={onClose} title="New folder" description={`Inside ${here}. Folders organise things for you; the agent searches every folder.`}>
+        <Dialog open={open} onClose={onClose} title="New folder" description={`Inside ${here}. Folders organise things for you; the agent searches every folder.`} width={560}>
             <form onSubmit={submit}>
                 <Field label="Name" error={errors.name}>
                     <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Pricing" autoFocus />

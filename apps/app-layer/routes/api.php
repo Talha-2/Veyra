@@ -43,9 +43,18 @@ Route::post('site/inquiries', [\App\Http\Controllers\Site\InquiryController::cla
     ->middleware('throttle:6,1')
     ->name('site.inquiries.store');
 
+/*
+| The PUBLIC API for customers' own integrations, v1. Separate file, separate
+| auth (API keys, not the agent secret). See routes/api_v1.php.
+*/
+Route::prefix('v1')->name('v1.')->group(base_path('routes/api_v1.php'));
+
 Route::prefix('agent/v1')->name('agent.')->middleware('agent.auth')->group(function () {
     Route::get('/health', HealthController::class)->name('health');
     Route::post('/calls/inbound', [CallController::class, 'inbound'])->name('calls.inbound');
+    // A browser voice session (Studio Talk): the room was created by the app,
+    // so the room name alone identifies the tenant and the call.
+    Route::post('/calls/web', [CallController::class, 'web'])->name('calls.web');
     // The gateway's pull loop does not know which tenants have work; this
     // claims across all of them and names the tenant on each run.
     Route::post('/automations/claim', [AutomationController::class, 'claimAll'])->name('automations.claim-all');

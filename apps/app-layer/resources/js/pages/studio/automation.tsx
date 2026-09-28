@@ -3,8 +3,10 @@ import { ChevronDown, Clock, Eye, EyeOff, History, LocateFixed, Play, Trash2, We
 import { useState, type FormEvent, type ReactNode } from 'react';
 
 import { ChoiceCard } from '../../components/studio-capability/choice-card';
-import { Field, SaveBar, Section, Toggle } from '../../components/studio/form';
-import { Callout, Card, CardHeader, CopyButton, SegmentedControl } from '../../components/ui/kit';
+import { EditorWell } from '../../components/studio-capability/editor-well';
+import { SaveBar, Toggle } from '../../components/studio/form';
+import { Disclosure, PageStack, Panel, SideCard, Stacked, WithSide } from '../../components/studio/space';
+import { Callout, CopyButton, SegmentedControl } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, EmptyState, Mono, RelativeTime, StatusDot, type Tone } from '../../components/ui/primitives';
 
@@ -120,30 +122,47 @@ export default function AutomationDetail({ automation: a, actions, events, trigg
                 }
             />
 
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-                <div className="min-w-0">
-                    <Section title="What it does" description="Brief it the way you would brief a new colleague: the task, who it is for, and what good looks like.">
-                        <Field label="Name" error={errors.name}>
-                            <input className="v-field max-w-90" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} />
-                        </Field>
-                        <Field label="Description" error={errors.description} hint="One line, shown in the list.">
-                            <input className="v-field" value={data.description} maxLength={300} onChange={(e) => setData('description', e.target.value)} />
-                        </Field>
-                        <Field label="Goal" error={errors.goal} hint="The task itself. Every scheduled, webhook and manual run starts from this.">
-                            <textarea className="v-field h-auto leading-relaxed" rows={4} maxLength={5000} value={data.goal} onChange={(e) => setData('goal', e.target.value)} dir="auto"
-                                placeholder="Summarise yesterday’s missed calls and open tickets for the front desk, most urgent first." />
-                        </Field>
-                        <Field label="Standing instructions" error={errors.system_prompt} hint="Tone, audience, what to lead with. Applies to every run.">
-                            <textarea className="v-field h-auto leading-relaxed" rows={5} maxLength={20000} value={data.system_prompt} onChange={(e) => setData('system_prompt', e.target.value)} dir="auto"
-                                placeholder="Write for the owner. Plain sentences, no headings. Lead with anything that needs a reply today." />
-                        </Field>
-                        <Field label="Reasoning" error={errors.reasoning} hint={reasoning?.hint}>
-                            <SegmentedControl value={data.reasoning} onChange={(v) => setData('reasoning', v)} options={REASONING.map((r) => ({ value: r.value, label: r.label }))} />
-                        </Field>
-                    </Section>
+            <PageStack>
+                <WithSide
+                    side={
+                        <>
+                            <SideCard title="Status">
+                                <Toggle checked={data.enabled} onChange={(v) => setData('enabled', v)} label="Enabled"
+                                    hint={a.next_run_at ? `Next run ${new Date(a.next_run_at).toLocaleString()}. Pausing clears it.` : 'Scheduled, webhook and event triggers only fire while enabled.'} />
+                            </SideCard>
+                            <RunHistory runs={a.runs} />
+                            <SideCard title="Delete" tone="danger">
+                                <p className="text-sm text-secondary">Stops every trigger and deletes its run history. This cannot be undone.</p>
+                                <button type="button" className="v-btn v-btn--danger mt-4 w-full" onClick={destroy}>
+                                    <Trash2 size={14} strokeWidth={1.9} />
+                                    Delete automation
+                                </button>
+                            </SideCard>
+                        </>
+                    }
+                >
+                    <Panel title="What it does" description="A name and one line, for the list.">
+                        <Stacked label="Name" htmlFor="automation-name" error={errors.name}>
+                            <input id="automation-name" className="v-field max-w-md" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} />
+                        </Stacked>
+                        <Stacked label="Description" htmlFor="automation-description" error={errors.description}>
+                            <input id="automation-description" className="v-field" value={data.description} maxLength={300} onChange={(e) => setData('description', e.target.value)} />
+                        </Stacked>
+                    </Panel>
 
-                    <Section title="Triggers" description="What starts a run. Any combination; it needs at least one.">
-                        <div className="grid gap-2 sm:grid-cols-2">
+                    <Panel title="The brief" description="Brief it the way you would brief a new colleague: the task, who it is for, and what good looks like.">
+                        <Stacked label="Goal" htmlFor="automation-goal" hint="The task itself. Every scheduled, webhook and manual run starts from this.">
+                            <EditorWell id="automation-goal" value={data.goal} onChange={(v) => setData('goal', v)} max={5000} minRows={4} error={errors.goal}
+                                placeholder="Summarise yesterday’s missed calls and open tickets for the front desk, most urgent first." />
+                        </Stacked>
+                        <Stacked label="Standing instructions" htmlFor="automation-instructions" hint="Tone, audience, what to lead with. Applies to every run.">
+                            <EditorWell id="automation-instructions" value={data.system_prompt} onChange={(v) => setData('system_prompt', v)} max={20000} minRows={5} error={errors.system_prompt}
+                                placeholder="Write for the owner. Plain sentences, no headings. Lead with anything that needs a reply today." />
+                        </Stacked>
+                    </Panel>
+
+                    <Panel title="Triggers" description="What starts a run. Any combination; it needs at least one.">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             {triggers.map((t) => {
                                 const m = triggerMeta(t);
                                 return (
@@ -152,87 +171,82 @@ export default function AutomationDetail({ automation: a, actions, events, trigg
                                 );
                             })}
                         </div>
-                        {errors.triggers && <p className="mt-2 text-sm text-danger">{errors.triggers}</p>}
+                        {errors.triggers && <p className="text-sm text-danger">{errors.triggers}</p>}
 
-                        {configured.length > 0 && (
-                            <div className="mt-4 flex flex-col gap-3">
-                                {configured.map((t) => (
-                                    <TriggerConfig key={t} icon={triggerMeta(t).icon} title={triggerMeta(t).title}>
-                                        {t === 'schedule' && (
-                                            <>
-                                                <div className="mb-4">
-                                                    <span className="v-label">Repeats</span>
-                                                    <SegmentedControl value={data.schedule.kind} onChange={(v) => setSchedule({ kind: v })} options={[
-                                                        { value: 'hourly', label: 'Hourly' }, { value: 'daily', label: 'Daily' },
-                                                        { value: 'weekly', label: 'Weekly' }, { value: 'interval', label: 'Every N minutes' },
-                                                    ]} />
-                                                    {fieldErrors['schedule.kind'] && <p className="mt-1.5 text-sm text-danger">{fieldErrors['schedule.kind']}</p>}
-                                                </div>
-                                                <div className="grid gap-4 sm:grid-cols-3">
-                                                    {data.schedule.kind === 'weekly' && (
-                                                        <Field label="On" error={fieldErrors['schedule.weekday']}>
-                                                            <select className="v-field" value={data.schedule.weekday} onChange={(e) => setSchedule({ weekday: e.target.value })}>
-                                                                {WEEKDAYS.map((d) => <option key={d} value={d}>{cap(d)}</option>)}
-                                                            </select>
-                                                        </Field>
-                                                    )}
-                                                    {(data.schedule.kind === 'daily' || data.schedule.kind === 'weekly') && (
-                                                        <Field label="At" error={fieldErrors['schedule.at']}>
-                                                            <input type="time" className="v-field" value={data.schedule.at} onChange={(e) => setSchedule({ at: e.target.value })} />
-                                                        </Field>
-                                                    )}
-                                                    {data.schedule.kind === 'interval' && (
-                                                        <Field label="Every" error={fieldErrors['schedule.interval_minutes']} hint="5 to 1,440 minutes.">
-                                                            <div className="relative">
-                                                                <input type="number" min={5} max={1440} className="v-field pr-12" value={data.schedule.interval_minutes} onChange={(e) => setSchedule({ interval_minutes: Number(e.target.value) })} />
-                                                                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-tertiary">min</span>
-                                                            </div>
-                                                        </Field>
-                                                    )}
-                                                    <Field label="Timezone" error={fieldErrors['schedule.tz']}>
-                                                        <input className="v-field" value={data.schedule.tz} onChange={(e) => setSchedule({ tz: e.target.value })} placeholder="Europe/London" spellCheck={false} />
-                                                    </Field>
-                                                </div>
-                                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                                                    <p className="text-sm text-secondary">{scheduleSummary(data.schedule)}{!data.enabled && ' Nothing fires while the automation is paused.'}</p>
-                                                    <LocalTimezone current={data.schedule.tz} onUse={(tz) => setSchedule({ tz })} />
-                                                </div>
-                                            </>
-                                        )}
+                        {configured.map((t) => (
+                            <TriggerConfig key={t} icon={triggerMeta(t).icon} title={triggerMeta(t).title}>
+                                {t === 'schedule' && (
+                                    <>
+                                        <Stacked label="Repeats" error={fieldErrors['schedule.kind']}>
+                                            <SegmentedControl value={data.schedule.kind} onChange={(v) => setSchedule({ kind: v })} options={[
+                                                { value: 'hourly', label: 'Hourly' }, { value: 'daily', label: 'Daily' },
+                                                { value: 'weekly', label: 'Weekly' }, { value: 'interval', label: 'Every N minutes' },
+                                            ]} />
+                                        </Stacked>
+                                        <div className="grid gap-5 sm:grid-cols-3">
+                                            {data.schedule.kind === 'weekly' && (
+                                                <Stacked label="On" htmlFor="schedule-weekday" error={fieldErrors['schedule.weekday']}>
+                                                    <select id="schedule-weekday" className="v-field" value={data.schedule.weekday} onChange={(e) => setSchedule({ weekday: e.target.value })}>
+                                                        {WEEKDAYS.map((d) => <option key={d} value={d}>{cap(d)}</option>)}
+                                                    </select>
+                                                </Stacked>
+                                            )}
+                                            {(data.schedule.kind === 'daily' || data.schedule.kind === 'weekly') && (
+                                                <Stacked label="At" htmlFor="schedule-at" error={fieldErrors['schedule.at']}>
+                                                    <input id="schedule-at" type="time" className="v-field" value={data.schedule.at} onChange={(e) => setSchedule({ at: e.target.value })} />
+                                                </Stacked>
+                                            )}
+                                            {data.schedule.kind === 'interval' && (
+                                                <Stacked label="Every" htmlFor="schedule-interval" error={fieldErrors['schedule.interval_minutes']}>
+                                                    <div className="relative">
+                                                        <input id="schedule-interval" type="number" min={5} max={1440} className="v-field pr-12" value={data.schedule.interval_minutes} onChange={(e) => setSchedule({ interval_minutes: Number(e.target.value) })} />
+                                                        <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-tertiary">min</span>
+                                                    </div>
+                                                    <p className="mt-1.5 text-xs text-tertiary">5 to 1,440 minutes.</p>
+                                                </Stacked>
+                                            )}
+                                            <Stacked label="Timezone" htmlFor="schedule-tz" error={fieldErrors['schedule.tz']}>
+                                                <input id="schedule-tz" className="v-field" value={data.schedule.tz} onChange={(e) => setSchedule({ tz: e.target.value })} placeholder="Europe/London" spellCheck={false} />
+                                            </Stacked>
+                                        </div>
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <p className="text-sm text-secondary">{scheduleSummary(data.schedule)}{!data.enabled && ' Nothing fires while the automation is paused.'}</p>
+                                            <LocalTimezone current={data.schedule.tz} onUse={(tz) => setSchedule({ tz })} />
+                                        </div>
+                                    </>
+                                )}
 
-                                        {t === 'app_event' && (
-                                            <Field label="When this happens" error={fieldErrors['app_trigger.event']} hint="Runs once for each event while the automation is enabled.">
-                                                <select className="v-field max-w-80" value={data.app_trigger?.event ?? ''} onChange={(e) => setData('app_trigger', { event: e.target.value })}>
-                                                    <option value="">Choose an event</option>
-                                                    {events.map((ev) => <option key={ev} value={ev}>{ev}</option>)}
-                                                </select>
-                                            </Field>
-                                        )}
+                                {t === 'app_event' && (
+                                    <Stacked label="When this happens" htmlFor="automation-event" error={fieldErrors['app_trigger.event']} hint="Runs once for each event while the automation is enabled.">
+                                        <select id="automation-event" className="v-field max-w-md" value={data.app_trigger?.event ?? ''} onChange={(e) => setData('app_trigger', { event: e.target.value })}>
+                                            <option value="">Choose an event</option>
+                                            {events.map((ev) => <option key={ev} value={ev}>{ev}</option>)}
+                                        </select>
+                                    </Stacked>
+                                )}
 
-                                        {t === 'webhook' && <WebhookConfig url={a.webhook_url} secret={a.webhook_secret} />}
-                                    </TriggerConfig>
-                                ))}
-                            </div>
-                        )}
-                    </Section>
+                                {t === 'webhook' && <WebhookConfig url={a.webhook_url} secret={a.webhook_secret} />}
+                            </TriggerConfig>
+                        ))}
+                    </Panel>
 
-                    <Section
+                    <Panel
                         title="What it may use"
                         description="Only these actions are offered to a run. A digest that can only read cannot accidentally send."
                         aside={actions.length > 0 ? <Mono>{data.allowed_action_ids.length} of {actions.length} allowed</Mono> : undefined}
                         flush
                     >
                         {actions.length === 0 ? (
-                            <p className="px-6 pb-5 text-sm text-secondary">
+                            <p className="px-7 pb-7 text-sm text-secondary">
                                 No actions are turned on yet. Enable the ones you trust in <Link href="/studio/integrations" className="text-accent-text hover:underline">Integrations</Link>, then allow them here.
                             </p>
                         ) : (
-                            <div className="mx-6 overflow-hidden rounded-md" style={{ border: '1px solid var(--border)' }}>
+                            <div style={{ borderTop: '1px solid var(--separator)' }}>
                                 {actions.map((act, i) => (
-                                    <label key={act.id} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-hover"
-                                        style={{ borderTop: i === 0 ? undefined : '1px solid var(--separator)', background: allowed(act.id) ? 'var(--bg-subtle)' : undefined }}>
+                                    <label key={act.id} className="flex min-h-14 cursor-pointer items-center gap-4 px-7 transition-colors last:rounded-b-lg hover:bg-surface-hover"
+                                        style={{ borderTop: i === 0 ? undefined : '1px solid var(--separator)', background: allowed(act.id) ? 'color-mix(in srgb, var(--accent) 3%, transparent)' : undefined }}>
                                         <input type="checkbox" checked={allowed(act.id)} onChange={() => toggleAction(act.id)} />
-                                        <span className="min-w-0 flex-1 truncate text-base text-primary">{act.name}</span>
+                                        <span className="min-w-0 flex-1 truncate text-base font-medium" style={{ color: allowed(act.id) ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{act.name}</span>
                                         <Mono className="hidden sm:inline">{act.kind}</Mono>
                                         {act.durable ? <Badge tone="warning">Writes</Badge> : <Badge>Reads</Badge>}
                                     </label>
@@ -240,38 +254,29 @@ export default function AutomationDetail({ automation: a, actions, events, trigg
                             </div>
                         )}
                         {writers.length > 0 && (
-                            <div className="mx-6 mt-3">
+                            <div className="px-7 pt-2 pb-7">
                                 <Callout tone="warning" title="This automation can change things">
                                     {writers.map((w) => w.name).join(', ')} {writers.length === 1 ? 'writes' : 'write'} to your systems. Runs act on their own; nobody reviews them first.
                                 </Callout>
                             </div>
                         )}
-                        <div className="px-6 pt-4 pb-6">
+                    </Panel>
+
+                    <Disclosure
+                        title="Advanced"
+                        summary={`${reasoning?.label ?? cap(data.reasoning)} reasoning · ${data.can_search_knowledge ? 'may search the knowledge base' : 'no knowledge search'}`}
+                        defaultOpen={!!errors.reasoning}
+                    >
+                        <Stacked label="Reasoning" error={errors.reasoning} hint={reasoning?.hint}>
+                            <SegmentedControl value={data.reasoning} onChange={(v) => setData('reasoning', v)} options={REASONING.map((r) => ({ value: r.value, label: r.label }))} />
+                        </Stacked>
+                        <div className="border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
                             <Toggle checked={data.can_search_knowledge} onChange={(v) => setData('can_search_knowledge', v)} label="May search the knowledge base"
                                 hint="Lets a run look things up in your documents and saved answers." />
                         </div>
-                    </Section>
-
-                    <Section title="Status">
-                        <Toggle checked={data.enabled} onChange={(v) => setData('enabled', v)} label="Enabled"
-                            hint={a.next_run_at ? `Next run ${new Date(a.next_run_at).toLocaleString()}. Pausing clears it.` : 'Scheduled, webhook and event triggers only fire while enabled.'} />
-                        <div className="mt-4 flex items-start justify-between gap-6 border-t pt-4" style={{ borderColor: 'var(--separator)' }}>
-                            <div>
-                                <div className="text-base font-medium text-primary">Delete automation</div>
-                                <div className="mt-0.5 text-sm text-secondary">Stops every trigger and deletes its run history. This cannot be undone.</div>
-                            </div>
-                            <button type="button" className="v-btn v-btn--danger v-btn--sm" onClick={destroy}>
-                                <Trash2 size={14} strokeWidth={1.9} />
-                                Delete
-                            </button>
-                        </div>
-                    </Section>
-                </div>
-
-                <aside className="lg:sticky lg:top-6">
-                    <RunHistory runs={a.runs} />
-                </aside>
-            </div>
+                    </Disclosure>
+                </WithSide>
+            </PageStack>
 
             <SaveBar processing={processing} dirty={isDirty} onDiscard={reset} />
         </form>
@@ -280,8 +285,8 @@ export default function AutomationDetail({ automation: a, actions, events, trigg
 
 function TriggerConfig({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
     return (
-        <div className="animate-rise rounded-md px-4 pt-3.5 pb-4" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary">
+        <div className="animate-rise flex flex-col gap-5 rounded-lg p-6" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
+            <div className="flex items-center gap-2 text-base font-semibold text-primary">
                 <span className="text-tertiary">{icon}</span>
                 {title}
             </div>
@@ -345,21 +350,22 @@ function RunHistory({ runs }: { runs: Run[] }) {
     const failed = runs.filter((r) => r.status === 'error').length;
 
     return (
-        <Card className="flex flex-col overflow-hidden lg:max-h-[calc(100vh-3rem)]">
-            <CardHeader
-                title="Run history"
-                description={runs.length === 0 ? 'Every run shows here with what it did.' : `The last ${runs.length} ${runs.length === 1 ? 'run' : 'runs'}: ${done} done${failed ? `, ${failed} failed` : ''}.`}
-            />
+        <SideCard title="Run history">
+            <p className="-mt-2 text-sm text-secondary">
+                {runs.length === 0 ? 'Every run shows here with what it did.' : `The last ${runs.length} ${runs.length === 1 ? 'run' : 'runs'}: ${done} done${failed ? `, ${failed} failed` : ''}.`}
+            </p>
             {runs.length === 0 ? (
-                <EmptyState icon={<History size={20} strokeWidth={1.6} />} title="No runs yet">
-                    Press Run now to try it, or wait for its first trigger.
-                </EmptyState>
+                <div className="-mx-6 -mb-6">
+                    <EmptyState icon={<History size={20} strokeWidth={1.6} />} title="No runs yet">
+                        Press Run now to try it, or wait for its first trigger.
+                    </EmptyState>
+                </div>
             ) : (
-                <ol className="min-h-0 flex-1 overflow-y-auto py-2">
+                <ol className="-mx-3 mt-3">
                     {runs.map((r, i) => <RunRow key={r.id} run={r} last={i === runs.length - 1} />)}
                 </ol>
             )}
-        </Card>
+        </SideCard>
     );
 }
 
@@ -380,11 +386,11 @@ function RunRow({ run, last }: { run: Run; last: boolean }) {
     const hasDetail = !!(run.error || run.result || run.steps.length);
 
     return (
-        <li className="relative px-3">
+        <li className="relative">
             {/* the timeline rail */}
-            {!last && <span className="absolute top-7 bottom-0 left-7 w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />}
+            {!last && <span className="absolute top-8 bottom-0 left-[19px] w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />}
             <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} disabled={!hasDetail}
-                className="flex w-full items-start gap-3 rounded-md px-2 py-2 text-left transition-colors enabled:hover:bg-surface-hover">
+                className="flex min-h-13 w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors enabled:hover:bg-surface-hover">
                 <span className="relative mt-1.5 flex size-4 shrink-0 items-center justify-center">
                     <StatusDot tone={status.tone} live={run.status === 'running'} label={status.label} />
                 </span>

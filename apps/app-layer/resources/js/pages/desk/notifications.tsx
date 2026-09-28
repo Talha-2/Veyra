@@ -3,7 +3,8 @@ import { AlertTriangle, Bell, CalendarClock, CheckCheck, Inbox, Settings, Ticket
 import { useState } from 'react';
 
 import { clockTime, isToday } from '../../components/desk-pages/format';
-import { Card, IconTile, SegmentedControl, Toolbar } from '../../components/ui/kit';
+import { DeskPage, Panel } from '../../components/desk-pages/layout';
+import { IconTile, SegmentedControl } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, EmptyState, Eyebrow, RelativeTime, UserText, type Tone } from '../../components/ui/primitives';
 
@@ -56,8 +57,7 @@ export default function Notifications({ notifications, unread }: Props) {
     return (
         <>
             <Head title="Notifications" />
-            <div className="mx-auto max-w-[1320px] px-6 py-7 md:px-8">
-                <div className="mx-auto max-w-[760px]">
+            <DeskPage width="narrow" header={
                     <PageHeader
                         title="Notifications"
                         description={unread > 0 ? `${unread} unread. Opening one marks it read.` : 'You are all caught up.'}
@@ -72,38 +72,39 @@ export default function Notifications({ notifications, unread }: Props) {
                             </>
                         }
                     />
-
+            }>
+                <section className="flex flex-col gap-10">
                     {notifications.length > 0 && (
-                        <Toolbar>
+                        <div className="-mb-4">
                             <SegmentedControl value={filter} onChange={setFilter} options={[
                                 { value: 'all', label: 'All' },
                                 { value: 'unread', label: <>Unread{unread > 0 && <span className="text-2xs text-tertiary tabular-nums">{unread}</span>}</> },
                             ]} />
-                        </Toolbar>
+                        </div>
                     )}
 
                     {groups.length === 0 ? (
-                        <Card>
+                        <Panel>
                             <EmptyState icon={<Bell size={20} strokeWidth={1.8} />} title={filter === 'unread' ? 'Nothing unread' : 'No notifications'}
                                 action={<Link href="/desk/notifications/preferences" className="v-btn v-btn--quiet">Choose what reaches you</Link>}>
                                 Assignments, tickets the agent raises and actions that need a human to check will appear here.
                             </EmptyState>
-                        </Card>
+                        </Panel>
                     ) : (
                         groups.map((g) => (
-                            <section key={g.label} className="mb-6 last:mb-0">
-                                <div className="mb-2 flex items-center justify-between px-1">
+                            <section key={g.label}>
+                                <div className="mb-3 flex items-center justify-between px-1">
                                     <Eyebrow>{g.label}</Eyebrow>
                                     <span className="text-xs text-tertiary tabular-nums">{g.items.length}</span>
                                 </div>
-                                <Card className="overflow-hidden">
+                                <Panel className="overflow-hidden">
                                     <ul className="divide-y" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
                                         {g.items.map((n) => {
                                             const kind = kindOf(n.type);
                                             const Icon = kind.icon;
                                             const body = (
                                                 <>
-                                                    <span className="flex w-2 shrink-0 justify-center pt-3.5" aria-hidden="true">
+                                                    <span className="flex w-2 shrink-0 justify-center pt-4" aria-hidden="true">
                                                         {!n.read && <span className="size-2 rounded-full" style={{ background: 'var(--accent)' }} />}
                                                     </span>
                                                     <IconTile tone={kind.tone}><Icon size={16} strokeWidth={1.8} /></IconTile>
@@ -117,7 +118,7 @@ export default function Notifications({ notifications, unread }: Props) {
                                                     </span>
                                                 </>
                                             );
-                                            const className = 'flex w-full items-start gap-3 py-3.5 pr-5 pl-3 text-left transition-colors hover:bg-surface-hover';
+                                            const className = 'flex min-h-16 w-full items-start gap-3.5 py-4 pr-7 pl-4 text-left transition-colors hover:bg-surface-hover';
                                             return (
                                                 <li key={n.id} style={{ background: n.read ? undefined : 'color-mix(in srgb, var(--accent) 4%, transparent)' }}>
                                                     {n.url
@@ -127,12 +128,12 @@ export default function Notifications({ notifications, unread }: Props) {
                                             );
                                         })}
                                     </ul>
-                                </Card>
+                                </Panel>
                             </section>
                         ))
                     )}
-                </div>
-            </div>
+                </section>
+            </DeskPage>
         </>
     );
 }

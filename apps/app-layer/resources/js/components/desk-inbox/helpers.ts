@@ -59,6 +59,31 @@ export function dateTimeLabel(at: string): string {
     return new Date(at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+/** 83 → "1:23": a position in a recording. */
+export function clock(seconds: number): string {
+    const s = Math.max(0, Math.floor(seconds));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const rest = String(s % 60).padStart(2, '0');
+
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${rest}` : `${m}:${rest}`;
+}
+
+/** Voice-to-voice latency, rounded the way a person reads it: "256 ms", "1.66 s". */
+export function latencyLabel(ms: number): string {
+    return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`;
+}
+
+/** Seconds from the start of a call to a moment in it, or null when either is unknown. */
+export function offsetSeconds(at: string | undefined | null, start: string | undefined | null): number | null {
+    if (!at || !start) return null;
+    const a = Date.parse(at);
+    const b = Date.parse(start);
+    if (Number.isNaN(a) || Number.isNaN(b)) return null;
+
+    return Math.max(0, (a - b) / 1000);
+}
+
 export function fileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;

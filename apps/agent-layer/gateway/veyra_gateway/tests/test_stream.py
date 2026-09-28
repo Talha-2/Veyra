@@ -124,3 +124,39 @@ async def test_the_openai_client_assembles_streamed_tool_call_fragments():
     assert completion.text == "Let me check."
     assert completion.tool_calls == [ToolCall(id="c1", name="search_knowledge", arguments={"query": "fees"})]
     assert completion.tokens == 19
+
+
+async def test_live_chat_answers_as_the_customer_agent_with_the_workers_tools(monkeypatch: pytest.MonkeyPatch):
+    """Talk's chat: the same worker and tools a call uses, the customer-facing
+    chat prompt, and the caller from the conversation's context bundle."""
+    from veyra_harness.tests.fakes import CALL_CONTEXT
+
+    monkeypatch.setenv("AGENT_SHARED_SECRET", SECRET)
+    sdk = GatewayFakeSdk()
+    model = StreamingModel(call(("search_knowledge", {"query": "evanston"})), say("We do. Evanston is in our service area."))
+    app = create_app(sdk=sdk, runner=TextRunner(sdk, model_factory=lambda r, ref=None: model), claim_interval=0)
+    context = {k: v for k, v in CALL_CONTEXT.items() if k not in ("call", "line")}
+
+    events = await post_chat(app, {"organization_id": 7, "conversation_id": 42, "message": "Do you come out to Evanston?", "history": [], "context": context})
+
+    assert [e["status"] for e in events if e["type"] == "tool"] == ["running", "done"]
+    assert events[-1]["type"] == "done" and "Evanston" in events[-1]["content"]
+    system = model.requests[0][0][0]["content"]
+    assert "live text chat" in system, "the customer-facing chat prompt, not the team-facing Ask prompt"
+    assert "Status:" in system, "the caller block from the conversation is in the prompt"
+
+
+async def test_live_chat_reports_a_malformed_context_instead_of_guessing(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AGENT_SHARED_SECRET", SECRET)
+    sdk = GatewayFakeSdk()
+    app = create_app(sdk=sdk, runner=TextRunner(sdk, model_factory=lambda r, ref=None: StreamingModel(say("x"))), claim_interval=0)
+    events = await post_chat(app, {"organization_id": 7, "conversation_id": 43, "message": "hi", "context": {"contract": "v1"}})
+    assert events[-1]["type"] == "error" and "context" in events[-1]["message"]
+
+
+async def post_chat(app, payload: dict) -> list[dict]:
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://gw", headers={"Authorization": f"Bearer {SECRET}"}) as client:
+            response = await client.post("/v1/chat/stream", json=payload)
+            assert response.status_code == 200
+            return parse(response.text)

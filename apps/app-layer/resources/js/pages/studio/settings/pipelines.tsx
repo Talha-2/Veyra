@@ -6,7 +6,8 @@ import { StageStrip, SwatchInput } from '../../../components/studio-ops/color-sw
 import { Field, SaveBar } from '../../../components/studio/form';
 import SettingsShell from '../../../components/studio/settings-shell';
 import Dialog from '../../../components/ui/dialog';
-import { Card, CardBody } from '../../../components/ui/kit';
+import { DialogActions } from '../../../components/studio-ops/page-parts';
+import { Card } from '../../../components/ui/kit';
 import { Badge, EmptyState, Eyebrow } from '../../../components/ui/primitives';
 
 interface Pipeline { id: number; name: string; is_default: boolean; leads_count: number; stages: { id: number; name: string; color: string; position: number }[] }
@@ -44,15 +45,15 @@ function NewPipelineDialog({ open, onClose }: { open: boolean; onClose: () => vo
     };
 
     return (
-        <Dialog open={open} onClose={onClose} title="New pipeline" description="It starts with New, Contacted, Won and Lost. Rename, recolour or reorder them after.">
+        <Dialog open={open} onClose={onClose} title="New pipeline" description="It starts with New, Contacted, Won and Lost. Rename, recolour or reorder them after." width={560}>
             <form onSubmit={submit}>
                 <Field label="Name">
                     <input className="v-field" placeholder="Enterprise sales" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
                 </Field>
-                <div className="mt-6 flex justify-end gap-2">
+                <DialogActions>
                     <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || !name.trim()}>{processing ? 'Creating…' : 'Create pipeline'}</button>
-                </div>
+                </DialogActions>
             </form>
         </Dialog>
     );
@@ -66,11 +67,11 @@ function PipelineEditor({ pipeline }: { pipeline: Pipeline }) {
     const removed = pipeline.stages.filter((s) => !data.stages.some((d) => d.id === s.id));
 
     return (
-        <form onSubmit={submit} className="mb-6">
+        <form onSubmit={submit} className="mb-8">
             <Card>
-                <header className="flex flex-wrap items-center gap-3 px-5 pt-4 pb-3.5" style={{ borderBottom: '1px solid var(--separator)' }}>
+                <header className="flex flex-wrap items-center gap-3 px-7 pt-5 pb-4" style={{ borderBottom: '1px solid var(--separator)' }}>
                     <input
-                        className="-ml-2 h-9 min-w-0 flex-1 rounded-md bg-transparent px-2 text-md font-semibold text-primary transition-colors hover:bg-surface-hover focus:bg-surface focus:outline-none"
+                        className="-ml-2 h-10 min-w-0 flex-1 rounded-md bg-transparent px-2 text-lg font-semibold tracking-tight text-primary transition-colors hover:bg-surface-hover focus:bg-surface focus:outline-none"
                         value={data.name}
                         onChange={(e) => setData('name', e.target.value)}
                         aria-label="Pipeline name"
@@ -79,38 +80,38 @@ function PipelineEditor({ pipeline }: { pipeline: Pipeline }) {
                     <Badge>{pipeline.leads_count} {pipeline.leads_count === 1 ? 'lead' : 'leads'}</Badge>
                 </header>
 
-                <CardBody className="pt-5">
-                    <Eyebrow className="mb-2.5 block">Preview</Eyebrow>
+                <div className="px-7 py-6">
+                    <Eyebrow className="mb-3 block">Preview</Eyebrow>
                     <StageStrip stages={data.stages} />
-                </CardBody>
+                </div>
 
                 <div style={{ borderTop: '1px solid var(--separator)' }}>
-                    <div className="flex items-center justify-between px-5 pt-4 pb-2">
+                    <div className="flex items-center justify-between px-7 pt-6 pb-2">
                         <Eyebrow>Stages</Eyebrow>
                         <span className="text-xs text-tertiary tabular-nums">{data.stages.length} of 12</span>
                     </div>
-                    <ol className="px-3 pb-2">
+                    <ol className="px-4 pb-2">
                         {data.stages.map((s, i) => (
-                            <li key={s.id ?? `new-${i}`} className="group flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-surface-hover">
+                            <li key={s.id ?? `new-${i}`} className="group flex min-h-13 items-center gap-3 rounded-md px-3 py-1.5 transition-colors hover:bg-surface-hover">
                                 <span className="w-5 shrink-0 text-center text-xs text-tertiary tabular-nums">{i + 1}</span>
-                                <SwatchInput value={s.color} onChange={(c) => setStage(i, { color: c })} label={`Colour of ${s.name || 'stage'}`} size={24} />
-                                <input className="v-field h-8 max-w-75 flex-1 text-sm" value={s.name} onChange={(e) => setStage(i, { name: e.target.value })} aria-label={`Stage ${i + 1} name`} />
+                                <SwatchInput value={s.color} onChange={(c) => setStage(i, { color: c })} label={`Colour of ${s.name || 'stage'}`} size={28} />
+                                <input className="v-field max-w-80 flex-1" value={s.name} onChange={(e) => setStage(i, { name: e.target.value })} aria-label={`Stage ${i + 1} name`} />
                                 {s.id === null && <Badge tone="info">New</Badge>}
                                 <div className="flex-1" />
                                 <div className="flex items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                                    <button type="button" className="v-btn v-btn--ghost v-btn--icon size-7" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up"><ChevronUp size={15} strokeWidth={2} /></button>
-                                    <button type="button" className="v-btn v-btn--ghost v-btn--icon size-7" onClick={() => move(i, 1)} disabled={i === data.stages.length - 1} aria-label="Move down"><ChevronDown size={15} strokeWidth={2} /></button>
-                                    <button type="button" className="v-btn v-btn--ghost v-btn--icon size-7" onClick={() => data.stages.length > 1 && setData('stages', data.stages.filter((_, j) => j !== i))} disabled={data.stages.length <= 1} aria-label="Remove stage"><X size={15} strokeWidth={2} /></button>
+                                    <button type="button" className="v-btn v-btn--ghost v-btn--icon size-8" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up"><ChevronUp size={15} strokeWidth={2} /></button>
+                                    <button type="button" className="v-btn v-btn--ghost v-btn--icon size-8" onClick={() => move(i, 1)} disabled={i === data.stages.length - 1} aria-label="Move down"><ChevronDown size={15} strokeWidth={2} /></button>
+                                    <button type="button" className="v-btn v-btn--ghost v-btn--icon size-8" onClick={() => data.stages.length > 1 && setData('stages', data.stages.filter((_, j) => j !== i))} disabled={data.stages.length <= 1} aria-label="Remove stage"><X size={15} strokeWidth={2} /></button>
                                 </div>
                             </li>
                         ))}
                     </ol>
-                    <div className="flex flex-wrap items-center gap-3 px-5 pb-4">
-                        <button type="button" className="v-btn v-btn--ghost v-btn--sm -ml-2" disabled={data.stages.length >= 12} onClick={() => setData('stages', [...data.stages, { id: null, name: 'New stage', color: '#71717a' }])}>
+                    <div className="flex flex-wrap items-center gap-3 px-7 pt-1 pb-6">
+                        <button type="button" className="v-btn v-btn--quiet v-btn--sm" disabled={data.stages.length >= 12} onClick={() => setData('stages', [...data.stages, { id: null, name: 'New stage', color: '#71717a' }])}>
                             <Plus size={14} strokeWidth={2} />Add stage
                         </button>
                         {removed.length > 0 && (
-                            <span className="text-xs text-warning">
+                            <span className="text-sm text-warning">
                                 Removing {removed.map((s) => s.name).join(', ')}. Leads there move to {data.stages[0]?.name || 'the first stage'} when you save.
                             </span>
                         )}

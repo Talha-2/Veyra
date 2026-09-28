@@ -2,7 +2,8 @@ import { Head } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle2, ChevronRight, FlaskConical, Gauge, PlugZap, Users, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { Callout, Card, CardHeader, Meter, SearchField, SegmentedControl, StatTile } from '../../components/ui/kit';
+import { PageSection, StatRow } from '../../components/studio-ops/page-parts';
+import { Callout, Card, Meter, SearchField, SegmentedControl, Toolbar } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, EmptyState, RelativeTime, StatusDot, type Tone } from '../../components/ui/primitives';
 
@@ -104,107 +105,99 @@ export default function Evals({ runs, personas, runner_available }: Props) {
                 meta={runs.length > 0 ? <Badge>Last {runs.length} {runs.length === 1 ? 'run' : 'runs'}</Badge> : undefined}
             />
 
-            {!runner_available && (
-                <div className="mb-6">
-                    {/* Said plainly rather than hidden behind a disabled button. */}
-                    <Callout tone="warning" icon={<PlugZap size={16} strokeWidth={2} />} title="New runs start from the agent layer, which is not connected yet">
-                        Past results stay here. Once the agent layer is connected, runs it finishes appear in this list automatically.
-                    </Callout>
-                </div>
-            )}
-
-            {runs.length > 0 && (
-                <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatTile
-                        label="Pass rate"
-                        icon={<CheckCircle2 size={15} strokeWidth={2} />}
-                        value={judged.length ? pct(passed / judged.length) : '—'}
-                        tone={judged.length ? rateTone(passed / judged.length) : undefined}
-                        hint={judged.length ? `${passed} of ${judged.length} judged runs` : 'No run has been judged yet'}
-                    />
-                    <StatTile
-                        label="p95 voice-to-voice"
-                        icon={<Gauge size={15} strokeWidth={2} />}
-                        value={p95 != null ? ms(p95) : '—'}
-                        hint={worst != null ? `Median across ${latencies.length} runs · slowest ${ms(worst)}` : 'No latency recorded yet'}
-                    />
-                    <StatTile
-                        label="Failed"
-                        icon={<XCircle size={15} strokeWidth={2} />}
-                        value={counts.fail}
-                        tone={counts.fail > 0 ? 'danger' : undefined}
-                        hint="Judge scored the agent below the bar"
-                    />
-                    <StatTile
-                        label="Errored"
-                        icon={<AlertTriangle size={15} strokeWidth={2} />}
-                        value={errored}
-                        tone={errored > 0 ? 'warning' : undefined}
-                        hint="Run did not finish, so it was not scored"
-                    />
-                </div>
-            )}
-
-            <Card className="mb-6">
-                <CardHeader icon={<Users size={16} strokeWidth={1.9} />} title="Personas" description="Each run plays one of these callers. A persona that keeps failing points at a behaviour to fix in the prompt or a skill." />
-                <div className="grid sm:grid-cols-2">
-                    {personas.map((p, i) => {
-                        const mine = judged.filter((s) => s.run.persona === p.key);
-                        const ok = mine.filter((s) => s.outcome === 'pass').length;
-                        const rate = mine.length ? ok / mine.length : null;
-                        return (
-                            <div key={p.key} className={`flex flex-col border-separator px-5 py-4 ${i > 0 ? 'border-t' : ''} ${i === 1 ? 'sm:border-t-0' : ''} ${i % 2 ? 'sm:border-l' : ''}`}>
-                                <div className="flex items-baseline justify-between gap-3">
-                                    <span className="text-base font-medium text-primary">{humanize(p.key)}</span>
-                                    <span className="text-sm font-medium tabular-nums" style={{ color: rate == null ? 'var(--text-tertiary)' : `var(--${rateTone(rate)})` }}>{rate == null ? 'Not run' : pct(rate)}</span>
-                                </div>
-                                <p className="mt-0.5 mb-3 flex-1 text-sm text-secondary">{p.description}</p>
-                                <Meter value={rate == null ? 0 : rate * 100} tone={rate == null ? 'muted' : rateTone(rate)} label={`${humanize(p.key)} pass rate`} />
-                                <span className="mt-1.5 text-xs text-tertiary tabular-nums">{mine.length ? `${ok} of ${mine.length} judged runs passed` : 'No judged runs with this persona'}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-            </Card>
-
-            {runs.length === 0 ? (
-                <Card>
-                    <EmptyState icon={<FlaskConical size={20} strokeWidth={1.8} />} title="No evaluation runs yet">
-                        A run is one simulated call, scored by a judge on task completion, groundedness, conversation quality and safety, with its p95 latency. Results will collect here.
-                    </EmptyState>
-                </Card>
-            ) : (
-                <>
-                    <div className="mb-4 flex flex-wrap items-center gap-2.5">
-                        <SegmentedControl<Filter>
-                            value={filter}
-                            onChange={setFilter}
-                            options={(['all', 'pass', 'fail', 'error', 'running'] as Filter[])
-                                .filter((f) => f === 'all' || counts[f] > 0 || f === filter)
-                                .map((f) => ({ value: f, label: <>{f === 'all' ? 'All' : OUTCOME[f].label}<span className="text-2xs text-tertiary tabular-nums">{counts[f]}</span></> }))}
-                        />
-                        <div className="flex-1" />
-                        <SearchField value={query} onChange={setQuery} placeholder="Search runs" />
-                    </div>
-
-                    <Card>
-                        <div className="hidden gap-4 px-5 pt-3 pb-2 text-xs font-medium text-tertiary md:grid md:grid-cols-[minmax(0,1fr)_120px_84px_150px_72px_16px]" style={{ borderBottom: '1px solid var(--separator)' }}>
-                            <span>Run</span><span>Persona</span><span className="text-right">p95</span><span>Score</span><span className="text-right">When</span><span />
-                        </div>
-                        {visible.length === 0 && (
-                            <p className="px-5 py-8 text-center text-sm text-secondary">No runs match. Clear the search or pick another filter.</p>
+            <div className="mt-3">
+                {(!runner_available || runs.length > 0) && (
+                    <div className="flex flex-col gap-8">
+                        {!runner_available && (
+                            // Said plainly rather than hidden behind a disabled button.
+                            <Callout tone="warning" icon={<PlugZap size={16} strokeWidth={2} />} title="New runs start from the agent layer, which is not connected yet">
+                                Past results stay here. Once the agent layer is connected, runs it finishes appear in this list automatically.
+                            </Callout>
                         )}
-                        <div className="divide-y" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
-                            {visible.map(({ run, outcome: o, mean }) => (
-                                <RunRow key={run.id} run={run} outcome={o} mean={mean} expanded={open === run.id} onToggle={() => setOpen(open === run.id ? null : run.id)} />
-                            ))}
+                        {runs.length > 0 && (
+                            <StatRow items={[
+                                {
+                                    label: 'Pass rate', icon: <CheckCircle2 size={15} strokeWidth={2} />,
+                                    value: judged.length ? pct(passed / judged.length) : '—',
+                                    tone: judged.length ? rateTone(passed / judged.length) : undefined,
+                                    hint: judged.length ? `${passed} of ${judged.length} judged runs` : 'No run has been judged yet',
+                                },
+                                {
+                                    label: 'p95 voice-to-voice', icon: <Gauge size={15} strokeWidth={2} />,
+                                    value: p95 != null ? ms(p95) : '—',
+                                    hint: worst != null ? `Median of ${latencies.length} runs · slowest ${ms(worst)}` : 'No latency recorded yet',
+                                },
+                                { label: 'Failed', icon: <XCircle size={15} strokeWidth={2} />, value: counts.fail, tone: counts.fail > 0 ? 'danger' : undefined, hint: 'Judge scored the agent below the bar' },
+                                { label: 'Errored', icon: <AlertTriangle size={15} strokeWidth={2} />, value: errored, tone: errored > 0 ? 'warning' : undefined, hint: 'Run did not finish, so it was not scored' },
+                            ]} />
+                        )}
+                    </div>
+                )}
+
+                <PageSection title="Runs" description="One simulated call each, newest first. Open a run for the judge's scores and notes.">
+                    {runs.length === 0 ? (
+                        <Card>
+                            <EmptyState icon={<FlaskConical size={20} strokeWidth={1.8} />} title="No evaluation runs yet">
+                                A run is one simulated call, scored by a judge on task completion, groundedness, conversation quality and safety, with its p95 latency. Results will collect here.
+                            </EmptyState>
+                        </Card>
+                    ) : (
+                        <>
+                            <Toolbar trailing={<SearchField value={query} onChange={setQuery} placeholder="Search runs" className="w-full sm:w-64" />}>
+                                <SegmentedControl<Filter>
+                                    value={filter}
+                                    onChange={setFilter}
+                                    options={(['all', 'pass', 'fail', 'error', 'running'] as Filter[])
+                                        .filter((f) => f === 'all' || counts[f] > 0 || f === filter)
+                                        .map((f) => ({ value: f, label: <>{f === 'all' ? 'All' : OUTCOME[f].label}<span className="text-2xs text-tertiary tabular-nums">{counts[f]}</span></> }))}
+                                />
+                            </Toolbar>
+
+                            <Card>
+                                <div className={`hidden h-11 items-center gap-5 px-6 text-xs font-medium text-tertiary md:grid ${RUN_COLS}`} style={{ borderBottom: '1px solid var(--separator)' }}>
+                                    <span>Run</span><span>Persona</span><span className="text-right">p95</span><span>Score</span><span className="text-right">When</span><span />
+                                </div>
+                                {visible.length === 0 && (
+                                    <p className="px-6 py-12 text-center text-sm text-secondary">No runs match. Clear the search or pick another filter.</p>
+                                )}
+                                <div className="divide-y" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
+                                    {visible.map(({ run, outcome: o, mean }) => (
+                                        <RunRow key={run.id} run={run} outcome={o} mean={mean} expanded={open === run.id} onToggle={() => setOpen(open === run.id ? null : run.id)} />
+                                    ))}
+                                </div>
+                            </Card>
+                        </>
+                    )}
+                </PageSection>
+
+                <PageSection title="Personas" description="Each run plays one of these callers. A persona that keeps failing points at a behaviour to fix in the prompt or a skill.">
+                    <Card className="overflow-hidden">
+                        <div className="grid sm:grid-cols-2">
+                            {personas.map((p) => {
+                                const mine = judged.filter((s) => s.run.persona === p.key);
+                                const ok = mine.filter((s) => s.outcome === 'pass').length;
+                                const rate = mine.length ? ok / mine.length : null;
+                                return (
+                                    <div key={p.key} className="-mt-px -ml-px flex flex-col border-t border-l px-7 py-6" style={{ borderColor: 'var(--separator)' }}>
+                                        <div className="flex items-baseline justify-between gap-3">
+                                            <span className="flex items-center gap-2 text-base font-medium text-primary"><Users size={14} strokeWidth={1.9} className="text-tertiary" />{humanize(p.key)}</span>
+                                            <span className="text-sm font-medium tabular-nums" style={{ color: rate == null ? 'var(--text-tertiary)' : `var(--${rateTone(rate)})` }}>{rate == null ? 'Not run' : pct(rate)}</span>
+                                        </div>
+                                        <p className="mt-1 mb-4 flex-1 text-sm text-secondary">{p.description}</p>
+                                        <Meter value={rate == null ? 0 : rate * 100} tone={rate == null ? 'muted' : rateTone(rate)} label={`${humanize(p.key)} pass rate`} />
+                                        <span className="mt-2 text-xs text-tertiary tabular-nums">{mine.length ? `${ok} of ${mine.length} judged runs passed` : 'No judged runs with this persona'}</span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </Card>
-                </>
-            )}
+                </PageSection>
+            </div>
         </>
     );
 }
+
+const RUN_COLS = 'md:grid-cols-[minmax(0,1fr)_120px_84px_160px_72px_16px]';
 
 function RunRow({ run, outcome: o, mean, expanded, onToggle }: { run: Run; outcome: Outcome; mean: number | null; expanded: boolean; onToggle: () => void }) {
     const dims = dimensions(run.scores);
@@ -214,7 +207,7 @@ function RunRow({ run, outcome: o, mean, expanded, onToggle }: { run: Run; outco
     return (
         <div>
             <button type="button" onClick={onToggle} aria-expanded={expanded}
-                className="grid w-full items-center gap-x-4 gap-y-1.5 px-5 py-3.5 text-left transition-colors hover:bg-surface-hover md:grid-cols-[minmax(0,1fr)_120px_84px_150px_72px_16px]">
+                className={`grid min-h-15 w-full items-center gap-x-5 gap-y-1.5 px-6 py-3 text-left transition-colors hover:bg-surface-hover ${RUN_COLS}`}>
                 <div className="flex min-w-0 items-center gap-3">
                     <StatusDot tone={OUTCOME[o].tone} live={o === 'running'} label={OUTCOME[o].label} />
                     <div className="min-w-0">
@@ -237,7 +230,7 @@ function RunRow({ run, outcome: o, mean, expanded, onToggle }: { run: Run; outco
             </button>
 
             {expanded && (
-                <div className="animate-fade-in grid gap-6 px-5 pt-1 pb-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:pl-10">
+                <div className="animate-fade-in grid gap-8 px-6 pt-2 pb-7 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:pl-12">
                     <div>
                         <div className="mb-2.5 text-xs font-medium text-tertiary">Judge scores</div>
                         {dims.length === 0 && <p className="text-sm text-secondary">This run has no scores.</p>}

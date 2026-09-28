@@ -49,6 +49,17 @@ class ThreadStreamRequest(BaseModel):
     history: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ChatStreamRequest(BaseModel):
+    """One live-chat turn. The app sends the conversation's context bundle
+    (the tenant bundle plus `caller`), so no second fetch precedes the reply."""
+
+    organization_id: int
+    conversation_id: int
+    message: str = Field(min_length=1, max_length=5000)
+    history: list[dict[str, Any]] = Field(default_factory=list)
+    context: dict[str, Any]
+
+
 class SkillTestRequest(BaseModel):
     organization_id: int
     skill: str
@@ -130,6 +141,17 @@ def create_app(*, sdk: AppSdk | None = None, runner: TextRunner | None = None, c
 
         async def events():
             async for event in runner_.stream_thread(body.organization_id, body.thread_id, body.message, body.history):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+        return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    @app.post("/v1/chat/stream")
+    async def chat_stream(body: ChatStreamRequest, _: None = Depends(authenticated)) -> StreamingResponse:
+        """One live-chat turn with the customer-facing agent, streamed like Ask."""
+        runner_: TextRunner = app.state.runner
+
+        async def events():
+            async for event in runner_.stream_chat(body.organization_id, body.conversation_id, body.message, body.history, body.context):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
         return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

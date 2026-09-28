@@ -1,10 +1,11 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { AlertTriangle, ArrowRight, Bot, CalendarClock, Inbox, MessagesSquare, Phone, Target, Ticket as TicketIcon, ThumbsDown, ThumbsUp, TrendingUp, Users } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import { ChannelIcon, Delta, SplitBar } from '../../components/desk-pages/bits';
 import { firstName, greeting, humanize, initialsOf } from '../../components/desk-pages/format';
-import { Callout, Card, CardBody, CardFooter, CardHeader, IconTile, List, ListRow, Meter, StatTile, Tabs } from '../../components/ui/kit';
+import { DeskPage, MetricTile, Panel, PanelBody, PanelFooter, PanelHeader, PanelRow, PanelRows, PanelTabs, WithSidePanel } from '../../components/desk-pages/layout';
+import { Callout, IconTile, Meter } from '../../components/ui/kit';
 import { PageHeader, Segmented } from '../../components/ui/page';
 import { Avatar, Badge, EmptyState, Eyebrow, Mono, RelativeTime, UserText, type Tone } from '../../components/ui/primitives';
 import Sparkline from '../../components/ui/sparkline';
@@ -70,7 +71,7 @@ export default function Dashboard({ window_days, topline, support, ai, channels,
         <>
             <Head title="Dashboard" />
 
-            <div className="mx-auto max-w-[1320px] px-6 py-7 md:px-8">
+            <DeskPage header={
                 <PageHeader
                     eyebrow={today}
                     title={`${greeting()}${auth.user ? `, ${firstName(auth.user.name)}` : ''}`}
@@ -80,58 +81,53 @@ export default function Dashboard({ window_days, topline, support, ai, channels,
                             options={[{ key: '7', label: '7 days' }, { key: '14', label: '14 days' }, { key: '30', label: '30 days' }]} />
                     }
                 />
-
+            }>
                 {ai.actions_needing_review > 0 && (
-                    <div className="mb-6">
-                        <Callout tone="danger" icon={<AlertTriangle size={16} strokeWidth={2} />}
-                            title={`${ai.actions_needing_review} agent action${ai.actions_needing_review === 1 ? '' : 's'} need${ai.actions_needing_review === 1 ? 's' : ''} a human to check`}
-                            action={<Link href="/desk/calls?view=review" className="v-btn v-btn--quiet v-btn--sm">Review calls</Link>}>
-                            An action that changes something outside timed out, so nobody knows whether it happened. Check the other system before calling the customer back.
-                        </Callout>
-                    </div>
+                    <Callout tone="danger" icon={<AlertTriangle size={16} strokeWidth={2} />}
+                        title={`${ai.actions_needing_review} agent action${ai.actions_needing_review === 1 ? '' : 's'} need${ai.actions_needing_review === 1 ? 's' : ''} a human to check`}
+                        action={<Link href="/desk/calls?view=review" className="v-btn v-btn--quiet v-btn--sm">Review calls</Link>}>
+                        An action that changes something outside timed out, so nobody knows whether it happened. Check the other system before calling the customer back.
+                    </Callout>
                 )}
 
                 {/* The numbers, each with its shape over the window. */}
-                <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatTile label="Conversations" icon={<MessagesSquare size={15} strokeWidth={1.8} />} value={topline.support_volume.value}
+                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                    <MetricTile label="Conversations" icon={<MessagesSquare size={15} strokeWidth={1.8} />} value={topline.support_volume.value}
                         trend={<Delta pct={topline.support_volume.delta_pct} />}
-                        hint={<TileTrend caption={`${topline.support_volume.previous} the ${window_days} days before`} points={series('conversations')} color="var(--chart-1)" label="Conversations per day" />} />
-                    <StatTile label="Handled by the agent alone" icon={<Bot size={15} strokeWidth={1.8} />} value={topline.ai_handled.value}
+                        aside={<Sparkline points={series('conversations')} color="var(--chart-1)" width={76} height={28} label="Conversations per day" />}
+                        hint={`${topline.support_volume.previous} in the ${window_days} days before`} />
+                    <MetricTile label="Agent handled alone" icon={<Bot size={15} strokeWidth={1.8} />} value={topline.ai_handled.value}
                         trend={<Delta pct={topline.ai_handled.delta_pct} />}
                         hint={
-                            <div className="mt-2">
-                                <div className="mb-1.5 flex justify-between"><span>{aiShare}% of conversations</span><span className="tabular-nums">{ai.conversations_team_touched} by the team</span></div>
-                                <Meter value={aiShare} label="Share handled by the agent alone" />
+                            <div className="flex items-center gap-3">
+                                <span className="shrink-0 tabular-nums">{aiShare}% of all</span>
+                                <span className="min-w-0 flex-1"><Meter value={aiShare} label="Share handled by the agent alone" /></span>
                             </div>
                         } />
-                    <StatTile label="Calls answered" icon={<Phone size={15} strokeWidth={1.8} />} value={ai.calls_answered}
-                        hint={<TileTrend caption={`${ai.call_minutes.toLocaleString()} min on the phone`} points={series('calls')} color="var(--chart-2)" label="Calls per day" />} />
-                    <StatTile label="New leads" icon={<TrendingUp size={15} strokeWidth={1.8} />} value={topline.leads.value}
+                    <MetricTile label="Calls answered" icon={<Phone size={15} strokeWidth={1.8} />} value={ai.calls_answered}
+                        aside={<Sparkline points={series('calls')} color="var(--chart-2)" width={76} height={28} label="Calls per day" />}
+                        hint={`${ai.call_minutes.toLocaleString()} min on the phone`} />
+                    <MetricTile label="New leads" icon={<TrendingUp size={15} strokeWidth={1.8} />} value={topline.leads.value}
                         trend={<Delta pct={topline.leads.delta_pct} />}
-                        hint={<TileTrend caption={`${topline.leads.previous} the ${window_days} days before`} points={series('leads')} color="var(--chart-3)" label="Leads per day" />} />
+                        aside={<Sparkline points={series('leads')} color="var(--chart-3)" width={76} height={28} label="Leads per day" />}
+                        hint={`${topline.leads.previous} in the ${window_days} days before`} />
                 </div>
 
-                <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-                    <NeedsYou data={needs_you} unassigned={support.unassigned_conversations} />
-                    <AgentCard ai={ai} aiShare={aiShare} period={period} activity={agent_activity} />
-                </div>
-
-                <div className="mt-6 grid items-start gap-6 lg:grid-cols-3">
-                    <WorkloadCard members={workload} />
-                    <TicketHealth support={support} trend={series('tickets')} windowDays={window_days} />
-                    <ChannelsCard channels={channels} support={support} trend={series('contacts')} busiest={topline.most_active_number} period={period} />
-                </div>
-            </div>
+                {/* The work column carries what needs doing and the team's load; the
+                    agent's own report runs beside it, so neither side is left
+                    half-empty the way a short "Needs you" beside a tall report was. */}
+                <WithSidePanel
+                    main={<>
+                        <NeedsYou data={needs_you} unassigned={support.unassigned_conversations} />
+                        <div className="grid items-start gap-6 lg:grid-cols-2">
+                            <WorkloadCard members={workload} />
+                            <TicketHealth support={support} trend={series('tickets')} windowDays={window_days} />
+                        </div>
+                        <ChannelsCard channels={channels} support={support} trend={series('contacts')} busiest={topline.most_active_number} period={period} />
+                    </>}
+                    side={<AgentCard ai={ai} aiShare={aiShare} period={period} activity={agent_activity} />} />
+            </DeskPage>
         </>
-    );
-}
-
-function TileTrend({ caption, points, color, label }: { caption: ReactNode; points: number[]; color: string; label: string }) {
-    return (
-        <div className="mt-2 flex items-end justify-between gap-3">
-            <span className="min-w-0 truncate">{caption}</span>
-            <span className="shrink-0"><Sparkline points={points} color={color} width={88} height={26} label={label} /></span>
-        </div>
     );
 }
 
@@ -144,8 +140,8 @@ function NeedsYou({ data, unassigned }: { data: NonNullable<Props['needs_you']>;
     const [tab, setTab] = useState<NeedsTab>(first);
 
     return (
-        <Card>
-            <CardHeader
+        <Panel>
+            <PanelHeader
                 title="Needs you"
                 description="Assigned to you, waiting on a reply, or past its time."
                 border={false}
@@ -156,7 +152,7 @@ function NeedsYou({ data, unassigned }: { data: NonNullable<Props['needs_you']>;
                     </>
                 }
             />
-            <Tabs<NeedsTab>
+            <PanelTabs<NeedsTab>
                 value={tab}
                 onChange={setTab}
                 options={[
@@ -170,9 +166,9 @@ function NeedsYou({ data, unassigned }: { data: NonNullable<Props['needs_you']>;
                 data.conversations.length === 0
                     ? <EmptyState icon={<Inbox size={20} strokeWidth={1.8} />} title="No conversations assigned to you">Take one from the unassigned queue, or wait for the agent to hand one over.</EmptyState>
                     : (
-                        <List>
+                        <PanelRows>
                             {data.conversations.map((c) => (
-                                <ListRow key={c.id} href={`/desk/inbox/${c.id}`} onClick={() => router.visit(`/desk/inbox/${c.id}`)}
+                                <PanelRow key={c.id} href={`/desk/inbox/${c.id}`}
                                     leading={<ContactMark name={c.title} initials={c.initials} channel={c.channel} />}
                                     title={<span className="flex items-center gap-2"><span className={`truncate ${c.unread > 0 ? 'font-semibold' : ''}`}><UserText>{c.title}</UserText></span>{c.company && <span className="truncate text-sm font-normal text-tertiary">{c.company}</span>}</span>}
                                     subtitle={c.preview ? <UserText>{c.preview}</UserText> : <span className="text-tertiary">No messages yet</span>}
@@ -184,7 +180,7 @@ function NeedsYou({ data, unassigned }: { data: NonNullable<Props['needs_you']>;
                                     }
                                 />
                             ))}
-                        </List>
+                        </PanelRows>
                     )
             )}
 
@@ -192,16 +188,16 @@ function NeedsYou({ data, unassigned }: { data: NonNullable<Props['needs_you']>;
                 data.tickets.length === 0
                     ? <EmptyState icon={<TicketIcon size={20} strokeWidth={1.8} />} title="No open tickets on your plate">Tickets assigned to you land here, most urgent first.</EmptyState>
                     : (
-                        <List>
+                        <PanelRows>
                             {data.tickets.map((t) => (
-                                <ListRow key={t.id} href={`/desk/tickets/${t.id}`} onClick={() => router.visit(`/desk/tickets/${t.id}`)}
+                                <PanelRow key={t.id} href={`/desk/tickets/${t.id}`}
                                     leading={<IconTile tone={t.priority_tone}><TicketIcon size={15} strokeWidth={1.8} /></IconTile>}
                                     title={<UserText>{t.subject}</UserText>}
                                     subtitle={<span className="flex items-center gap-1.5"><Mono>{t.reference}</Mono>{t.created_by_agent && <span className="inline-flex items-center gap-1 text-xs text-tertiary"><Bot size={12} strokeWidth={2} /> raised by the agent</span>}</span>}
                                     trailing={<><Badge tone={t.status_tone}>{t.status_label}</Badge><Badge tone={t.priority_tone} dot>{t.priority_label}</Badge></>}
                                 />
                             ))}
-                        </List>
+                        </PanelRows>
                     )
             )}
 
@@ -209,36 +205,36 @@ function NeedsYou({ data, unassigned }: { data: NonNullable<Props['needs_you']>;
                 data.overdue.length === 0
                     ? <EmptyState icon={<CalendarClock size={20} strokeWidth={1.8} />} title="Nothing overdue">Reminders you set and lead follow-ups past their date show up here.</EmptyState>
                     : (
-                        <List>
+                        <PanelRows>
                             {data.overdue.map((o) => (
-                                <ListRow key={o.key} href={o.href ?? undefined} onClick={o.href ? () => router.visit(o.href!) : undefined}
+                                <PanelRow key={o.key} href={o.href ?? undefined}
                                     leading={<IconTile tone="danger">{o.kind === 'lead' ? <Target size={15} strokeWidth={1.8} /> : <CalendarClock size={15} strokeWidth={1.8} />}</IconTile>}
                                     title={<UserText>{o.title}</UserText>}
                                     subtitle={o.subtitle ? <UserText>{o.subtitle}</UserText> : (o.kind === 'lead' ? 'Lead follow-up' : 'Reminder')}
                                     trailing={<span className="flex flex-col items-end gap-0.5"><span className="text-2xs font-medium text-danger">Due</span><RelativeTime at={o.due_at} /></span>}
                                 />
                             ))}
-                        </List>
+                        </PanelRows>
                     )
             )}
 
             {unassigned > 0 && (
-                <CardFooter>
-                    <span className="flex flex-1 items-center gap-2 text-sm text-secondary">
-                        <span className="size-1.5 rounded-full" style={{ background: 'var(--warning-fill)' }} aria-hidden="true" />
+                <PanelFooter>
+                    <span className="flex flex-1 items-center gap-2.5 text-sm text-secondary">
+                        <span className="size-2 rounded-full" style={{ background: 'var(--warning-fill)' }} aria-hidden="true" />
                         <span><span className="font-semibold text-primary tabular-nums">{unassigned}</span> conversation{unassigned === 1 ? ' is' : 's are'} waiting with nobody on {unassigned === 1 ? 'it' : 'them'}.</span>
                     </span>
                     <Link href="/desk/inbox?view=unassigned" className="v-btn v-btn--ghost v-btn--sm">Open the queue <ArrowRight size={14} strokeWidth={2} /></Link>
-                </CardFooter>
+                </PanelFooter>
             )}
-        </Card>
+        </Panel>
     );
 }
 
 function ContactMark({ name, initials, channel }: { name: string; initials: string; channel: string }) {
     return (
         <span className="relative shrink-0">
-            <Avatar name={name} initials={initials} size={34} />
+            <Avatar name={name} initials={initials} size={36} />
             <span className="absolute -right-1 -bottom-1 flex size-[18px] items-center justify-center rounded-full text-secondary" style={{ background: 'var(--surface)', boxShadow: '0 0 0 1px var(--border)' }}>
                 <ChannelIcon channel={channel} size={10} />
             </span>
@@ -257,49 +253,49 @@ function AgentCard({ ai, aiShare, period, activity }: { ai: Props['ai']; aiShare
     ];
 
     return (
-        <Card>
-            <CardHeader icon={<Bot size={16} strokeWidth={1.8} />} title="What the agent did" description={`Across the ${period}.`} />
-            <CardBody>
-                <div className="flex items-baseline justify-between">
-                    <span className="text-2xl font-semibold tracking-tight tabular-nums text-primary">{aiShare}%</span>
-                    <span className="text-xs text-tertiary">of conversations handled alone</span>
+        <Panel>
+            <PanelHeader icon={<Bot size={17} strokeWidth={1.8} />} title="What the agent did" description={`Across the ${period}.`} />
+            <PanelBody>
+                <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-3xl font-semibold tracking-tight text-primary tabular-nums">{aiShare}%</span>
+                    <span className="text-right text-xs text-tertiary">of conversations handled alone</span>
                 </div>
-                <div className="mt-2.5">
+                <div className="mt-3">
                     <SplitBar parts={[
                         { value: ai.conversations_agent_only, color: 'var(--accent)', label: 'Agent alone' },
                         { value: ai.conversations_team_touched, color: 'var(--border-strong)', label: 'Team replied' },
                     ]} />
                 </div>
-                <div className="mt-2 flex gap-4 text-xs text-tertiary">
+                <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tertiary">
                     <Legend color="var(--accent)">{ai.conversations_agent_only} agent alone</Legend>
                     <Legend color="var(--border-strong)">{ai.conversations_team_touched} team replied</Legend>
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3.5">
+                <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-5">
                     {facts.map((f) => (
                         <div key={f.label}>
                             <div className="text-xl font-semibold tracking-tight tabular-nums" style={{ color: f.tone === 'danger' ? 'var(--danger)' : 'var(--text-primary)' }}>{f.n.toLocaleString()}</div>
-                            <div className="text-xs text-tertiary">{f.label}</div>
+                            <div className="mt-0.5 text-xs text-tertiary">{f.label}</div>
                         </div>
                     ))}
                 </div>
-            </CardBody>
+            </PanelBody>
 
             <div style={{ borderTop: '1px solid var(--separator)' }}>
-                <div className="flex items-center justify-between px-5 pt-3.5 pb-1.5">
+                <div className="flex items-center justify-between px-7 pt-5 pb-2">
                     <Eyebrow>Latest actions</Eyebrow>
                     <Link href="/desk/calls" className="text-xs font-medium text-accent-text">All calls</Link>
                 </div>
                 {activity.length === 0 ? (
-                    <p className="px-5 pb-4 text-sm text-tertiary">Nothing yet. Actions the agent takes, like raising a ticket or updating a contact, are listed here.</p>
+                    <p className="px-7 pb-6 text-sm text-tertiary">Nothing yet. Actions the agent takes, like raising a ticket or updating a contact, are listed here.</p>
                 ) : (
-                    <ol className="px-5 pb-3">
+                    <ol className="px-7 pb-4">
                         {activity.map((a, i) => {
                             const body = (
                                 <>
                                     <span className="relative flex w-3 shrink-0 justify-center pt-1.5">
                                         <span className="relative z-10 size-2 rounded-full" style={{ background: 'var(--accent)', boxShadow: '0 0 0 3px var(--surface)' }} />
-                                        {i < activity.length - 1 && <span className="absolute top-3 bottom-[-10px] w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />}
+                                        {i < activity.length - 1 && <span className="absolute top-3 bottom-[-14px] w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />}
                                     </span>
                                     <span className="min-w-0 flex-1">
                                         <span className="block text-sm text-primary"><UserText>{a.description}</UserText></span>
@@ -314,8 +310,8 @@ function AgentCard({ ai, aiShare, period, activity }: { ai: Props['ai']; aiShare
                             return (
                                 <li key={a.id}>
                                     {a.href
-                                        ? <Link href={a.href} className="-mx-2 flex gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-hover">{body}</Link>
-                                        : <div className="flex gap-3 py-2">{body}</div>}
+                                        ? <Link href={a.href} className="-mx-2 flex gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-surface-hover">{body}</Link>
+                                        : <div className="flex gap-3 py-2.5">{body}</div>}
                                 </li>
                             );
                         })}
@@ -323,12 +319,12 @@ function AgentCard({ ai, aiShare, period, activity }: { ai: Props['ai']; aiShare
                 )}
             </div>
 
-            <CardFooter>
+            <PanelFooter>
                 <span className="flex-1 text-xs text-tertiary">Team feedback on agent replies</span>
                 <Badge tone="success"><ThumbsUp size={11} strokeWidth={2} /> {ai.feedback.up}</Badge>
                 <Badge tone={ai.feedback.down > 0 ? 'danger' : 'muted'}><ThumbsDown size={11} strokeWidth={2} /> {ai.feedback.down}</Badge>
-            </CardFooter>
-        </Card>
+            </PanelFooter>
+        </Panel>
     );
 }
 
@@ -342,31 +338,31 @@ function WorkloadCard({ members }: { members: NonNullable<Props['workload']> }) 
     const max = Math.max(1, ...members.map((m) => m.open_conversations + m.open_tickets));
 
     return (
-        <Card>
-            <CardHeader icon={<Users size={16} strokeWidth={1.8} />} title="Team workload" description="Open conversations and tickets per person."
+        <Panel>
+            <PanelHeader icon={<Users size={17} strokeWidth={1.8} />} title="Team workload" description="Open conversations and tickets per person."
                 actions={<Link href="/desk/team" className="v-btn v-btn--ghost v-btn--sm">Team</Link>} />
             {members.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-tertiary">No one on the team yet.</p>
+                <p className="px-7 py-6 text-sm text-tertiary">No one on the team yet.</p>
             ) : (
-                <ul className="px-5 py-2">
+                <ul className="px-7 py-4">
                     {members.slice(0, 7).map((m) => {
                         const load = m.open_conversations + m.open_tickets;
                         return (
-                            <li key={m.id} className="flex items-center gap-3 py-2">
-                                <Avatar name={m.name} initials={initialsOf(m.name)} size={28} />
+                            <li key={m.id} className="flex items-center gap-3.5 py-2.5">
+                                <Avatar name={m.name} initials={initialsOf(m.name)} size={32} />
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-baseline justify-between gap-2">
                                         <span className="truncate text-sm font-medium text-primary"><UserText>{m.name}</UserText>{m.is_you && <span className="ml-1.5 text-xs font-normal text-tertiary">you</span>}</span>
-                                        <span className="shrink-0 text-xs text-tertiary tabular-nums">{m.open_conversations} · {m.open_tickets}</span>
+                                        <span className="shrink-0 text-xs text-tertiary tabular-nums" title="Open conversations · open tickets">{m.open_conversations} · {m.open_tickets}</span>
                                     </div>
-                                    <div className="mt-1.5"><Meter value={(load / max) * 100} tone={load === max && load > 0 && members.length > 1 ? 'warning' : 'accent'} label={`${m.name}: ${load} open`} /></div>
+                                    <div className="mt-2"><Meter value={(load / max) * 100} tone={load === max && load > 0 && members.length > 1 ? 'warning' : 'accent'} label={`${m.name}: ${load} open`} /></div>
                                 </div>
                             </li>
                         );
                     })}
                 </ul>
             )}
-        </Card>
+        </Panel>
     );
 }
 
@@ -383,13 +379,13 @@ function TicketHealth({ support, trend, windowDays }: { support: Props['support'
     const max = Math.max(1, ...rows.map(([, n]) => n));
 
     return (
-        <Card>
-            <CardHeader icon={<TicketIcon size={16} strokeWidth={1.8} />} title="Tickets" description="Everything not yet resolved, by where it stands."
+        <Panel>
+            <PanelHeader icon={<TicketIcon size={17} strokeWidth={1.8} />} title="Tickets" description="Everything not yet resolved, by where it stands."
                 actions={<Link href="/desk/tickets" className="v-btn v-btn--ghost v-btn--sm">Tickets</Link>} />
-            <CardBody>
+            <PanelBody>
                 <div className="flex items-end justify-between gap-4">
                     <div>
-                        <div className="text-3xl font-semibold tracking-tight tabular-nums text-primary">{support.open_tickets}</div>
+                        <div className="text-3xl font-semibold tracking-tight text-primary tabular-nums">{support.open_tickets}</div>
                         <div className="text-xs text-tertiary">unresolved</div>
                     </div>
                     <div className="text-right">
@@ -398,22 +394,22 @@ function TicketHealth({ support, trend, windowDays }: { support: Props['support'
                     </div>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-3">
+                <div className="mt-6 flex flex-col gap-4">
                     {rows.map(([label, n, tone]) => (
                         <div key={label}>
-                            <div className="mb-1.5 flex justify-between text-sm"><span className="text-secondary">{label}</span><span className="font-medium text-primary tabular-nums">{n}</span></div>
+                            <div className="mb-2 flex justify-between text-sm"><span className="text-secondary">{label}</span><span className="font-medium text-primary tabular-nums">{n}</span></div>
                             <Meter value={(n / max) * 100} tone={tone} label={`${label}: ${n}`} />
                         </div>
                     ))}
                 </div>
 
-                <div className="mt-5 flex flex-wrap gap-1.5">
+                <div className="mt-6 flex flex-wrap gap-1.5">
                     {PRIORITY_ORDER.filter((p) => (support.by_priority[p.key] ?? 0) > 0).map((p) => (
                         <Badge key={p.key} tone={p.tone} dot>{support.by_priority[p.key]} {humanize(p.key).toLowerCase()}</Badge>
                     ))}
                 </div>
-            </CardBody>
-        </Card>
+            </PanelBody>
+        </Panel>
     );
 }
 
@@ -422,23 +418,23 @@ function ChannelsCard({ channels, support, trend, busiest, period }: { channels:
     const sorted = [...channels].sort((a, b) => b.conversations - a.conversations);
 
     return (
-        <Card>
-            <CardHeader icon={<MessagesSquare size={16} strokeWidth={1.8} />} title="Channels" description={`Where conversations started, ${period}.`} />
-            <CardBody>
-                <div className="flex flex-col gap-3">
+        <Panel>
+            <PanelHeader icon={<MessagesSquare size={17} strokeWidth={1.8} />} title="Channels" description={`Where conversations started, ${period}.`} />
+            <PanelBody>
+                <div className="flex flex-col gap-4">
                     {sorted.map((c) => (
-                        <div key={c.channel} className="flex items-center gap-3">
-                            <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-secondary" style={{ background: 'var(--surface-sunken)' }}><ChannelIcon channel={c.channel} size={14} /></span>
+                        <div key={c.channel} className="flex items-center gap-3.5">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-md text-secondary" style={{ background: 'var(--surface-sunken)' }}><ChannelIcon channel={c.channel} size={14} /></span>
                             <div className="min-w-0 flex-1">
-                                <div className="mb-1 flex justify-between text-sm"><span className="text-secondary">{c.label}</span><span className="font-medium text-primary tabular-nums">{c.conversations}</span></div>
+                                <div className="mb-1.5 flex justify-between text-sm"><span className="text-secondary">{c.label}</span><span className="font-medium text-primary tabular-nums">{c.conversations}</span></div>
                                 <Meter value={(c.conversations / max) * 100} tone="info" label={`${c.label}: ${c.conversations}`} />
                             </div>
                         </div>
                     ))}
                 </div>
 
-                <div className="mt-5 flex items-end justify-between gap-3 pt-4" style={{ borderTop: '1px solid var(--separator)' }}>
-                    <div>
+                <div className="mt-6 flex items-end justify-between gap-3 pt-5" style={{ borderTop: '1px solid var(--separator)' }}>
+                    <div className="min-w-0">
                         <div className="flex items-center gap-1.5 text-sm text-secondary"><span className="font-semibold text-primary tabular-nums">{support.new_contacts.value}</span> new contacts <Delta pct={support.new_contacts.delta_pct} /></div>
                         <div className="mt-0.5 text-xs text-tertiary">
                             {busiest ? <>Busiest line <Mono>{busiest.number}</Mono> · {busiest.calls} calls</> : 'No calls in this window.'}
@@ -446,7 +442,7 @@ function ChannelsCard({ channels, support, trend, busiest, period }: { channels:
                     </div>
                     <Sparkline points={trend} color="var(--chart-1)" width={96} height={26} label="New contacts per day" />
                 </div>
-            </CardBody>
-        </Card>
+            </PanelBody>
+        </Panel>
     );
 }

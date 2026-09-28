@@ -24,15 +24,6 @@ class CreateOrganizationRequest extends FormRequest
      */
     public function slug(): string
     {
-        $base = Str::slug($this->string('name')) ?: 'org';
-        $slug = $base;
-        $suffix = 2;
-
-        while (\App\Models\Organization::withTrashed()->where('slug', $slug)->exists()) {
-            $slug = "{$base}-{$suffix}";
-            $suffix++;
-        }
-
-        return $slug;
+        return \App\Models\Organization::uniqueSlug($this->string('name'));
     }
 }

@@ -97,7 +97,15 @@ class FrontAgent(Agent):
 
     @function_tool(description=KNOWLEDGE_DESCRIPTION)
     async def search_knowledge(self, ctx: RunContext, query: str) -> str:
+        # The front desk's own lookups are shown like the worker's (Studio
+        # Talk lists them beside the orb); a phone has nobody to show them to.
+        observer = getattr(self._worker, "observer", None)
+        step = f"fd-{id(ctx)}-{abs(hash(query)) % 10**6}"
+        if observer is not None:
+            await observer({"type": "tool", "id": step, "name": "search_knowledge", "status": "running", "label": "Searching knowledge", "detail": query})
         result = await search_knowledge({"query": query}, self._state)
+        if observer is not None:
+            await observer({"type": "tool", "id": step, "name": "search_knowledge", "status": "done", "label": "Searched knowledge", "detail": query})
         return result.output
 
     @function_tool

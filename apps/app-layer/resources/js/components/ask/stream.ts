@@ -44,6 +44,7 @@ export interface ChatMessage {
 
 export type StreamEvent =
     | { type: 'thread'; id: number; title: string }
+    | { type: 'conversation'; id: number }
     | { type: 'status'; text: string }
     | { type: 'delta'; text: string }
     | ({ type: 'tool' } & Omit<ToolPart, 'type'>)
@@ -55,8 +56,9 @@ function xsrfToken(): string {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
-export async function streamTurn(body: { message: string; thread_id: number | null }, onEvent: (event: StreamEvent) => void, signal: AbortSignal): Promise<void> {
-    const response = await fetch('/studio/ask/stream', {
+/** POST one turn and read its events. Ask uses the default endpoint; Talk's live chat passes its own. */
+export async function streamTurn(body: Record<string, unknown>, onEvent: (event: StreamEvent) => void, signal: AbortSignal, url = '/studio/ask/stream'): Promise<void> {
+    const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

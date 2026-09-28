@@ -39,6 +39,7 @@ Route::post('/contacts/{contact}/notes', [ContactController::class, 'storeNote']
 Route::get('/leads', [LeadController::class, 'index'])->name('leads');
 Route::post('/leads', [LeadController::class, 'store'])->name('leads.store');
 Route::post('/leads/import', [LeadController::class, 'import'])->name('leads.import');
+Route::post('/leads/bulk', [LeadController::class, 'bulk'])->name('leads.bulk');
 Route::patch('/leads/{lead}', [LeadController::class, 'update'])->name('leads.update');
 Route::post('/leads/{lead}/move', [LeadController::class, 'move'])->name('leads.move');
 Route::delete('/leads/{lead}', [LeadController::class, 'destroy'])->name('leads.destroy');
@@ -48,6 +49,7 @@ Route::get('/calls/{call}', [CallController::class, 'show'])->name('calls.show')
 
 Route::get('/tickets', [TicketController::class, 'index'])->name('tickets');
 Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
+Route::post('/tickets/bulk', [TicketController::class, 'bulk'])->name('tickets.bulk');
 Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
 Route::patch('/tickets/{ticket}', [TicketController::class, 'update'])->name('tickets.update');
 Route::post('/tickets/{ticket}/notes', [TicketController::class, 'storeNote'])->name('tickets.notes.store');

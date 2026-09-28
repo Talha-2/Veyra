@@ -3,29 +3,21 @@ import {
     AlertTriangle,
     ArrowRight,
     ArrowUpRight,
-    AudioLines,
-    Blocks,
-    BookOpenText,
-    Bot,
     Check,
     CheckCircle2,
-    FlaskConical,
-    Library,
-    Phone,
     ShieldAlert,
     Sparkles,
     Split,
     Ticket,
     Timer,
-    UserRound,
-    type LucideIcon,
 } from 'lucide-react';
 
 import { languageLabel, sayList } from '../../components/studio-agent/languages';
 import { StatLink } from '../../components/studio-agent/stat-link';
-import { Callout, Card, CardFooter, CardHeader, IconTile, List, ListRow, Meter } from '../../components/ui/kit';
+import { Disclosure, Group, PageStack } from '../../components/studio/space';
+import { Callout, Card, IconTile, List, ListRow, Meter } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
-import { Badge, Eyebrow, Mono, RelativeTime } from '../../components/ui/primitives';
+import { Badge, Mono, RelativeTime } from '../../components/ui/primitives';
 import type { SharedProps } from '../../types';
 
 interface Props {
@@ -127,16 +119,8 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
     const done = steps.filter((s) => s.done).length;
     const next = steps.find((s) => !s.done);
 
-    const areas: { href: string; label: string; detail: string; meta?: string; icon: LucideIcon }[] = [
-        { href: '/studio/agent', label: 'Identity', detail: 'Name, greeting, languages and models', icon: UserRound },
-        { href: '/studio/voice', label: 'Voice', detail: 'What callers hear, and how fast', icon: AudioLines },
-        { href: '/studio/experts', label: 'Experts', detail: 'Who talks, who acts', meta: `${setup.experts} enabled`, icon: Bot },
-        { href: '/studio/skills', label: 'Skills', detail: 'Procedures the worker follows', meta: `${setup.skills} enabled`, icon: BookOpenText },
-        { href: '/studio/knowledge', label: 'Knowledge', detail: 'Documents it looks up mid-call', icon: Library },
-        { href: '/studio/integrations', label: 'Integrations', detail: 'Tools and actions it can take', icon: Blocks },
-        { href: '/studio/telephony', label: 'Telephony', detail: 'Numbers and call routing', meta: `${setup.numbers} active`, icon: Phone },
-        { href: '/studio/evals', label: 'Evaluations', detail: 'Test calls before customers do', icon: FlaskConical },
-    ];
+    const remaining = steps.filter((s) => !s.done);
+    const completed = steps.filter((s) => s.done);
 
     return (
         <>
@@ -173,166 +157,169 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
                 }
             />
 
-            {/* Health: the four ways the agent fails a customer. */}
-            <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <StatLink
-                    href="/studio/agent#timing"
-                    label="Response time, p95"
-                    icon={<Timer size={14} strokeWidth={1.9} />}
-                    value={health.p95_ms != null ? <>{health.p95_ms}<span className="ml-0.5 text-lg font-medium text-tertiary">ms</span></> : '—'}
-                    tone={overBudget ? 'warning' : undefined}
-                    trend={health.p95_ms != null ? <Badge tone={overBudget ? 'warning' : 'success'}>{overBudget ? 'Over budget' : 'In budget'}</Badge> : undefined}
-                    hint={
-                        health.p95_ms == null
-                            ? `No calls to measure in ${window_days} days.`
-                            : overBudget
-                              ? `Budget ${health.p95_budget_ms}ms. Past ~1.5s callers start saying “hello?”.`
-                              : `Inside the ${health.p95_budget_ms}ms budget across ${plural(health.calls, 'call')}.`
-                    }
-                />
-                <StatLink
-                    href="/studio/integrations"
-                    label="Unconfirmed actions"
-                    icon={<ShieldAlert size={14} strokeWidth={1.9} />}
-                    value={unconfirmedLabel}
-                    tone={unconfirmed > 0 ? 'danger' : undefined}
-                    hint={unconfirmed > 0 ? 'Timed out mid-write. Check each before the customer is told either way.' : 'Every write succeeded or provably did not.'}
-                />
-                <StatLink
-                    href="/desk/tickets?view=agent"
-                    external
-                    label="Agent tickets open"
-                    icon={<Ticket size={14} strokeWidth={1.9} />}
-                    value={health.agent_tickets_open}
-                    tone={health.agent_tickets_open > 3 ? 'warning' : undefined}
-                    hint={health.agent_tickets_open > 0 ? 'Promises made to callers. A growing pile means follow-up is slipping.' : 'Nothing the agent handed to the team is waiting.'}
-                />
-                <StatLink
-                    href="/studio/experts"
-                    label="Failed handoffs"
-                    icon={<Split size={14} strokeWidth={1.9} />}
-                    value={health.failed_delegations}
-                    tone={health.failed_delegations > 0 ? 'warning' : undefined}
-                    hint={health.failed_delegations > 0 ? `Worker tasks that failed, timed out or were aborted in ${window_days} days.` : 'Every task the talker handed off came back.'}
-                />
-            </div>
+            <PageStack>
+                {/* Health: the four ways the agent fails a customer. */}
+                <Group title="Is the agent behaving?" description="Each number opens the place where it is fixed.">
+                    <div className="@container">
+                        <div className="grid gap-6 @min-[560px]:grid-cols-2 @min-[1000px]:grid-cols-4">
+                            <StatLink
+                                href="/studio/agent#timing"
+                                label="Response time, p95"
+                                icon={<Timer size={14} strokeWidth={1.9} />}
+                                value={health.p95_ms != null ? latency(health.p95_ms) : '—'}
+                                tone={overBudget ? 'warning' : undefined}
+                                trend={health.p95_ms != null ? <Badge tone={overBudget ? 'warning' : 'success'}>{overBudget ? 'Over budget' : 'In budget'}</Badge> : undefined}
+                                hint={
+                                    health.p95_ms == null
+                                        ? `No calls to measure in ${window_days} days.`
+                                        : overBudget
+                                          ? `Budget ${seconds(health.p95_budget_ms)}. Past ~1.5 s callers start saying “hello?”.`
+                                          : `Inside the ${seconds(health.p95_budget_ms)} budget across ${plural(health.calls, 'call')}.`
+                                }
+                            />
+                            <StatLink
+                                href="/studio/integrations"
+                                label="Unconfirmed actions"
+                                icon={<ShieldAlert size={14} strokeWidth={1.9} />}
+                                value={unconfirmedLabel}
+                                tone={unconfirmed > 0 ? 'danger' : undefined}
+                                hint={unconfirmed > 0 ? 'Timed out mid-write. Check each before the customer is told either way.' : 'Every write succeeded or provably did not.'}
+                            />
+                            <StatLink
+                                href="/desk/tickets?view=agent"
+                                external
+                                label="Agent tickets open"
+                                icon={<Ticket size={14} strokeWidth={1.9} />}
+                                value={health.agent_tickets_open}
+                                tone={health.agent_tickets_open > 3 ? 'warning' : undefined}
+                                hint={health.agent_tickets_open > 0 ? 'Promises made to callers. A growing pile means follow-up is slipping.' : 'Nothing the agent handed to the team is waiting.'}
+                            />
+                            <StatLink
+                                href="/studio/experts"
+                                label="Failed handoffs"
+                                icon={<Split size={14} strokeWidth={1.9} />}
+                                value={health.failed_delegations}
+                                tone={health.failed_delegations > 0 ? 'warning' : undefined}
+                                hint={health.failed_delegations > 0 ? `Worker tasks that failed, timed out or were aborted in ${window_days} days.` : 'Every task the talker handed off came back.'}
+                            />
+                        </div>
+                    </div>
+                </Group>
 
-            {/* What a human must check now. */}
-            <div className="mb-8">
+                {/* What a human must check now. */}
                 {reconcile.length > 0 ? (
-                    <Card className="border-(--danger-border)">
-                        <CardHeader
-                            title="Needs a human to check"
-                            description="These writes timed out, so nobody knows whether they happened. Look each one up in the system it writes to before anyone tells the customer it did or did not."
-                            actions={<Badge tone="danger" dot>{plural(reconcile.length, 'action')}</Badge>}
-                        />
-                        <List>
-                            {reconcile.map((r) => {
-                                const href = r.conversation_id ? `/desk/inbox/${r.conversation_id}` : undefined;
-                                return (
-                                    <ListRow
-                                        key={r.id}
-                                        href={href}
-                                        leading={<IconTile tone="danger"><AlertTriangle size={15} strokeWidth={1.9} /></IconTile>}
-                                        title={r.action}
-                                        subtitle={`For ${r.contact ?? 'an unknown caller'} · timed out mid-write`}
-                                        trailing={
-                                            <>
-                                                <RelativeTime at={r.at} />
-                                                {href ? (
-                                                    <span className="inline-flex items-center gap-0.5 text-sm font-medium text-accent-text">
-                                                        Open in Desk
-                                                        <ArrowUpRight size={14} strokeWidth={1.9} />
-                                                    </span>
-                                                ) : (
-                                                    <Mono>No conversation</Mono>
-                                                )}
-                                            </>
-                                        }
-                                    />
-                                );
-                            })}
-                        </List>
-                        <CardFooter>
+                    <Group
+                        title="Needs a human to check"
+                        description="These writes timed out, so nobody knows whether they happened. Look each one up in the system it writes to before anyone tells the customer it did or did not."
+                        aside={
                             <Link href="/studio/integrations" className="v-btn v-btn--ghost v-btn--sm">
-                                Review actions in Integrations
+                                Review in Integrations
                                 <ArrowRight size={14} strokeWidth={1.9} />
                             </Link>
-                        </CardFooter>
-                    </Card>
+                        }
+                    >
+                        <Card className="border-(--danger-border)">
+                            <List>
+                                {reconcile.map((r) => {
+                                    const href = r.conversation_id ? `/desk/inbox/${r.conversation_id}` : undefined;
+                                    return (
+                                        <ListRow
+                                            key={r.id}
+                                            href={href}
+                                            leading={<IconTile tone="danger"><AlertTriangle size={15} strokeWidth={1.9} /></IconTile>}
+                                            title={r.action}
+                                            subtitle={`For ${r.contact ?? 'an unknown caller'} · timed out mid-write`}
+                                            trailing={
+                                                <>
+                                                    <RelativeTime at={r.at} />
+                                                    {href ? (
+                                                        <span className="inline-flex items-center gap-0.5 text-sm font-medium text-accent-text">
+                                                            Open in Desk
+                                                            <ArrowUpRight size={14} strokeWidth={1.9} />
+                                                        </span>
+                                                    ) : (
+                                                        <Mono>No conversation</Mono>
+                                                    )}
+                                                </>
+                                            }
+                                        />
+                                    );
+                                })}
+                            </List>
+                        </Card>
+                    </Group>
                 ) : (
                     <Callout tone="success" icon={<CheckCircle2 size={16} strokeWidth={1.9} />} title="Nothing needs a human">
                         Every durable write in the last {window_days} days either succeeded or provably did not, so nothing is waiting to be checked by hand.
                     </Callout>
                 )}
-            </div>
 
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-                {/* Setup checklist. */}
-                <Card>
-                    <CardHeader
-                        title="Setup"
-                        description={done === steps.length ? 'Everything a live call needs is in place.' : `${done} of ${steps.length} done. ${next ? `Next: ${next.title.toLowerCase()}.` : ''}`}
-                        actions={<Mono>{Math.round((done / steps.length) * 100)}%</Mono>}
-                        border={false}
-                    />
-                    <div className="px-5 pb-4">
-                        <Meter value={(done / steps.length) * 100} tone={done === steps.length ? 'success' : 'accent'} label="Setup progress" />
-                    </div>
-                    <div style={{ borderTop: '1px solid var(--separator)' }}>
-                        <List>
-                            {steps.map((s) => (
-                                <ListRow
-                                    key={s.key}
-                                    href={s.href}
-                                    onClick={() => router.visit(s.href)}
-                                    leading={
-                                        s.done ? (
-                                            <span className="flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--success-fill)', color: 'var(--text-inverse)' }}>
-                                                <Check size={14} strokeWidth={2.4} />
-                                            </span>
-                                        ) : (
-                                            <span className="size-6 shrink-0 rounded-full" style={{ border: '1.5px dashed var(--border-strong)' }} aria-hidden="true" />
-                                        )
-                                    }
-                                    title={<span className={s.done ? 'text-secondary' : undefined}>{s.title}</span>}
-                                    subtitle={s.detail}
-                                    trailing={
-                                        s.done ? <span className="sr-only">Done</span> : (
-                                            <span className="inline-flex items-center gap-0.5 text-sm font-medium text-accent-text">
-                                                Set up
-                                                <ArrowRight size={14} strokeWidth={1.9} />
-                                            </span>
-                                        )
-                                    }
-                                />
-                            ))}
-                        </List>
-                    </div>
-                </Card>
-
-                {/* The way into every area. */}
-                <section>
-                    <Eyebrow className="mb-3 block">Build and tune</Eyebrow>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        {areas.map((a) => (
-                            <Link key={a.href} href={a.href} className="v-panel v-card-hover group flex items-start gap-3.5 p-4">
-                                <IconTile>
-                                    <a.icon size={16} strokeWidth={1.8} />
-                                </IconTile>
-                                <span className="min-w-0 flex-1">
-                                    <span className="flex items-center gap-2">
-                                        <span className="text-base font-semibold text-primary">{a.label}</span>
-                                        {a.meta && <Mono>{a.meta}</Mono>}
-                                    </span>
-                                    <span className="mt-0.5 block text-sm text-secondary">{a.detail}</span>
-                                </span>
-                                <ArrowRight size={15} strokeWidth={1.9} className="mt-1 shrink-0 text-tertiary opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100" />
-                            </Link>
-                        ))}
-                    </div>
-                </section>
-            </div>
+                {/* Setup: only what is left is on the first screen. */}
+                <Group
+                    title={remaining.length === 0 ? 'Setup is complete' : 'Finish setting up'}
+                    description={remaining.length === 0 ? 'Everything a live call needs is in place.' : `${done} of ${steps.length} done. ${next ? `Next: ${next.title.toLowerCase()}.` : ''}`}
+                    aside={<Mono>{Math.round((done / steps.length) * 100)}%</Mono>}
+                >
+                    <Card>
+                        <div className="px-6 pt-6 pb-5">
+                            <Meter value={(done / steps.length) * 100} tone={done === steps.length ? 'success' : 'accent'} label="Setup progress" />
+                        </div>
+                        {remaining.length > 0 && (
+                            <div style={{ borderTop: '1px solid var(--separator)' }}>
+                                <List>
+                                    {remaining.map((s) => (
+                                        <ListRow
+                                            key={s.key}
+                                            href={s.href}
+                                            onClick={() => router.visit(s.href)}
+                                            leading={<span className="size-6 shrink-0 rounded-full" style={{ border: '1.5px dashed var(--border-strong)' }} aria-hidden="true" />}
+                                            title={s.title}
+                                            subtitle={s.detail}
+                                            trailing={
+                                                <span className="inline-flex items-center gap-0.5 text-sm font-medium text-accent-text">
+                                                    Set up
+                                                    <ArrowRight size={14} strokeWidth={1.9} />
+                                                </span>
+                                            }
+                                        />
+                                    ))}
+                                </List>
+                            </div>
+                        )}
+                        {completed.length > 0 && (
+                            <div className="px-6 pt-2 pb-4" style={{ borderTop: '1px solid var(--separator)' }}>
+                                <Disclosure inset title={`${completed.length} ${completed.length === 1 ? 'step' : 'steps'} done`} defaultOpen={remaining.length === 0}>
+                                    <ul className="-mx-3 -mt-2 flex flex-col">
+                                        {completed.map((s) => (
+                                            <li key={s.key}>
+                                                <Link href={s.href} className="flex min-h-13 items-center gap-3.5 rounded-md px-3 py-2 transition-colors hover:bg-surface-hover">
+                                                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--success-fill)', color: 'var(--text-inverse)' }}>
+                                                        <Check size={14} strokeWidth={2.4} />
+                                                    </span>
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="block text-base font-medium text-secondary">{s.title}</span>
+                                                        <span className="block truncate text-sm text-tertiary">{s.detail}</span>
+                                                    </span>
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </Disclosure>
+                            </div>
+                        )}
+                    </Card>
+                </Group>
+            </PageStack>
         </>
     );
+}
+
+/** 780 → "780 ms", 2608.9 → "2.6 s": a latency a person reads at a glance. */
+function latency(ms: number) {
+    const [value, unit] = ms < 1000 ? [Math.round(ms).toString(), 'ms'] : [(ms / 1000).toFixed(1), 's'];
+    return <>{value}<span className="ml-1 text-lg font-medium text-tertiary">{unit}</span></>;
+}
+
+function seconds(ms: number): string {
+    return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1).replace(/\.0$/, '')} s`;
 }

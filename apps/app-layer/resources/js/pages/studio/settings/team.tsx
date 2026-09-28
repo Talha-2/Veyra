@@ -7,7 +7,8 @@ import { Field } from '../../../components/studio/form';
 import SettingsShell from '../../../components/studio/settings-shell';
 import { MenuItem, MenuSeparator } from '../../../components/shell/menu';
 import Dialog from '../../../components/ui/dialog';
-import { Callout, Card, CardHeader, CopyButton, IconTile, List, ListRow } from '../../../components/ui/kit';
+import { DialogActions, PanelHeader } from '../../../components/studio-ops/page-parts';
+import { Callout, Card, CopyButton, IconTile, List } from '../../../components/ui/kit';
 import { Avatar, Badge, EmptyState, RelativeTime } from '../../../components/ui/primitives';
 import { toast } from '../../../components/ui/toaster';
 import type { SharedProps } from '../../../types';
@@ -24,7 +25,7 @@ interface Props {
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase() || '?';
 /** "Veyra Desk" reads as "Desk" inside a row that is already about Veyra. */
 const short = (label: string) => label.replace(/^Veyra\s+/, '');
-const COLS = 'md:grid-cols-[minmax(0,1fr)_132px_156px_76px_36px]';
+const COLS = 'md:grid-cols-[minmax(0,1fr)_144px_168px_96px_36px]';
 
 /**
  * Who is on the team and what each person can open.
@@ -47,15 +48,15 @@ export default function TeamSettings({ members, invitations, roles, surface_opti
             actions={can_manage ? <button type="button" className="v-btn v-btn--primary" onClick={() => setInviting(true)}><UserPlus size={15} strokeWidth={2} />Invite</button> : undefined}
         >
             {!can_manage && (
-                <div className="mb-5"><Callout tone="info">Only owners and admins can change roles, access or extensions. Ask one of them if something here is wrong.</Callout></div>
+                <div className="mb-6"><Callout tone="info">Only owners and admins can change roles, access or extensions. Ask one of them if something here is wrong.</Callout></div>
             )}
             {(errors.role || errors.surfaces) && (
-                <div className="mb-5"><Callout tone="danger" title="That change was not saved">{errors.role ?? errors.surfaces}</Callout></div>
+                <div className="mb-6"><Callout tone="danger" title="That change was not saved">{errors.role ?? errors.surfaces}</Callout></div>
             )}
 
-            <Card className="mb-5">
-                <CardHeader title="Members" description="Desk and Studio are granted separately. A support agent can have Desk and never see Studio; an admin can have Studio without Desk." />
-                <div className={`hidden gap-4 px-5 pt-3 pb-2 text-xs font-medium text-tertiary md:grid ${COLS}`}>
+            <Card className="mb-6">
+                <PanelHeader title="Members" description="Desk and Studio are granted separately. A support agent can have Desk and never see Studio; an admin can have Studio without Desk." />
+                <div className={`hidden h-11 items-center gap-5 px-7 text-xs font-medium text-tertiary md:grid ${COLS}`} style={{ borderBottom: '1px solid var(--separator)' }}>
                     <span>Member</span><span>Role</span><span>Can open</span><span>Extension</span><span className="sr-only">Actions</span>
                 </div>
                 <div className="divide-y" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
@@ -66,7 +67,7 @@ export default function TeamSettings({ members, invitations, roles, surface_opti
             </Card>
 
             <Card>
-                <CardHeader
+                <PanelHeader
                     title="Pending invitations"
                     description="Each invitation is a link that expires seven days after it was created. Share it with the person it is for."
                 />
@@ -77,27 +78,24 @@ export default function TeamSettings({ members, invitations, roles, surface_opti
                 ) : (
                     <List>
                         {invitations.map((i) => (
-                            <ListRow
-                                key={i.id}
-                                leading={<IconTile tone="info"><Mail size={16} strokeWidth={1.9} /></IconTile>}
-                                title={i.email}
-                                subtitle={<>{i.role} · {i.surfaces.map(surfaceLabel).join(' + ')}{i.invited_by && <> · invited by {i.invited_by}</>}</>}
-                                trailing={
-                                    <>
-                                        <span className="hidden text-xs text-tertiary sm:inline">Expires <RelativeTime at={i.expires_at} /></span>
-                                        <CopyButton value={i.link} label="Copy link" />
-                                        {can_manage && (
-                                            <RowMenu label={`More for ${i.email}`}>
-                                                {(close) => (
-                                                    <MenuItem danger icon={<UserMinus size={14} strokeWidth={2} />} onSelect={() => { close(); if (confirm(`Revoke the invitation for ${i.email}? The link stops working.`)) router.delete(`/studio/settings/team/invitations/${i.id}`, { preserveScroll: true }); }}>
-                                                        Revoke invitation
-                                                    </MenuItem>
-                                                )}
-                                            </RowMenu>
+                            <div key={i.id} className="flex min-h-16 flex-wrap items-center gap-x-4 gap-y-2 px-7 py-3">
+                                <IconTile tone="info" size={36}><Mail size={16} strokeWidth={1.9} /></IconTile>
+                                <div className="min-w-0 flex-1">
+                                    <div className="truncate text-base font-medium text-primary">{i.email}</div>
+                                    <div className="truncate text-sm text-secondary">{i.role} · {i.surfaces.map(surfaceLabel).join(' + ')}{i.invited_by && <> · invited by {i.invited_by}</>}</div>
+                                </div>
+                                <span className="hidden text-sm text-tertiary sm:inline">Expires <RelativeTime at={i.expires_at} className="text-sm" /></span>
+                                <CopyButton value={i.link} label="Copy link" />
+                                {can_manage && (
+                                    <RowMenu label={`More for ${i.email}`}>
+                                        {(close) => (
+                                            <MenuItem danger icon={<UserMinus size={14} strokeWidth={2} />} onSelect={() => { close(); if (confirm(`Revoke the invitation for ${i.email}? The link stops working.`)) router.delete(`/studio/settings/team/invitations/${i.id}`, { preserveScroll: true }); }}>
+                                                Revoke invitation
+                                            </MenuItem>
                                         )}
-                                    </>
-                                }
-                            />
+                                    </RowMenu>
+                                )}
+                            </div>
                         ))}
                     </List>
                 )}
@@ -116,9 +114,9 @@ function MemberRow({ member: m, isMe, canManage, roles, surfaces, surfaceLabel, 
     const saveExtension = (value: string) => { if (value !== (m.extension ?? '')) update(m, { extension: value || null }); };
 
     return (
-        <div className={`grid items-center gap-x-4 gap-y-3 px-5 py-3.5 transition-colors hover:bg-surface-hover ${COLS}`}>
+        <div className={`grid min-h-16 items-center gap-x-5 gap-y-3 px-7 py-3 transition-colors hover:bg-surface-hover ${COLS}`}>
             <div className="flex min-w-0 items-center gap-3">
-                <Avatar initials={initials(m.name)} name={m.email} size={34} />
+                <Avatar initials={initials(m.name)} name={m.email} size={36} />
                 <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                         <span className="truncate text-base font-medium text-primary">{m.name}</span>
@@ -130,7 +128,7 @@ function MemberRow({ member: m, isMe, canManage, roles, surfaces, surfaceLabel, 
 
             <div>
                 {canManage ? (
-                    <select className="v-field h-8 text-sm" value={m.role} onChange={(e) => update(m, { role: e.target.value })} aria-label={`Role for ${m.name}`}>
+                    <select className="v-field h-9 text-sm" value={m.role} onChange={(e) => update(m, { role: e.target.value })} aria-label={`Role for ${m.name}`}>
                         {roles.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                     </select>
                 ) : <Badge>{m.role_label}</Badge>}
@@ -167,7 +165,7 @@ function MemberRow({ member: m, isMe, canManage, roles, surfaces, surfaceLabel, 
             <div>
                 {canManage ? (
                     <input
-                        className="v-field h-8 text-sm tabular-nums"
+                        className="v-field h-9 text-sm tabular-nums"
                         placeholder="None"
                         inputMode="numeric"
                         defaultValue={m.extension ?? ''}
@@ -206,7 +204,7 @@ function InviteDialog({ open, onClose, roles, surfaces }: { open: boolean; onClo
     const toggle = (v: string) => setData('surfaces', data.surfaces.includes(v) ? data.surfaces.filter((x) => x !== v) : [...data.surfaces, v]);
 
     return (
-        <Dialog open={open} onClose={close} title="Invite someone" description="They get a link to join this organization with the role and access you choose here.">
+        <Dialog open={open} onClose={close} title="Invite someone" description="They get a link to join this organization with the role and access you choose here." width={600}>
             <form onSubmit={submit}>
                 <Field label="Email" error={errors.email}>
                     <input className="v-field" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} placeholder="name@company.com" autoFocus />
@@ -217,7 +215,7 @@ function InviteDialog({ open, onClose, roles, surfaces }: { open: boolean; onClo
                     </select>
                 </Field>
                 <Field label="Can open" error={errors.surfaces}>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
                         {surfaces.map((s) => {
                             const on = data.surfaces.includes(s.value);
                             return (
@@ -227,25 +225,25 @@ function InviteDialog({ open, onClose, roles, surfaces }: { open: boolean; onClo
                                     role="checkbox"
                                     aria-checked={on}
                                     onClick={() => toggle(s.value)}
-                                    className="flex items-start gap-2.5 rounded-md p-3 text-left transition-colors"
+                                    className="flex items-start gap-3 rounded-lg p-4 text-left transition-colors"
                                     style={{ background: on ? 'var(--accent-subtle)' : 'var(--surface)', boxShadow: `inset 0 0 0 1px ${on ? 'var(--border-accent)' : 'var(--border-strong)'}` }}
                                 >
                                     <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[5px]" style={{ background: on ? 'var(--accent)' : 'transparent', boxShadow: on ? 'none' : 'inset 0 0 0 1.5px var(--border-strong)', color: 'var(--text-on-accent)' }}>
                                         {on && <Check size={11} strokeWidth={3} />}
                                     </span>
                                     <span className="min-w-0">
-                                        <span className="block text-sm font-medium text-primary">{s.label}</span>
-                                        <span className="block text-xs text-secondary">{s.tagline}</span>
+                                        <span className="block text-base font-medium text-primary">{s.label}</span>
+                                        <span className="mt-0.5 block text-sm text-secondary">{s.tagline}</span>
                                     </span>
                                 </button>
                             );
                         })}
                     </div>
                 </Field>
-                <div className="mt-6 flex justify-end gap-2">
+                <DialogActions>
                     <button type="button" className="v-btn v-btn--ghost" onClick={close}>Cancel</button>
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.email || data.surfaces.length === 0}>{processing ? 'Sending…' : 'Send invitation'}</button>
-                </div>
+                </DialogActions>
             </form>
         </Dialog>
     );

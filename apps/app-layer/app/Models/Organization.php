@@ -62,6 +62,24 @@ class Organization extends Model
      * Null is a real answer: unauthenticated requests, onboarding, and console
      * commands all run without a tenant.
      */
+    /**
+     * A URL-safe identifier for a name, unique across every organization
+     * (deleted ones too), ignoring `$except` so an organization keeps its own
+     * identifier when its name does not change it.
+     */
+    public static function uniqueSlug(string $name, ?int $except = null): string
+    {
+        $base = \Illuminate\Support\Str::slug($name) ?: 'org';
+        $slug = $base;
+        $suffix = 2;
+        while (static::withTrashed()->where('slug', $slug)->when($except, fn ($q) => $q->where('id', '!=', $except))->exists()) {
+            $slug = "{$base}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
+    }
+
     public static function current(): ?self
     {
         $id = static::currentId();

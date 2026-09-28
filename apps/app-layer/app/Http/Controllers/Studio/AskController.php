@@ -8,6 +8,7 @@ use App\Models\AgentThread;
 use App\Models\Organization;
 use App\Services\Agent\AgentGateway;
 use App\Services\Agent\AgentUnavailable;
+use App\Services\Agent\StreamedTurn;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -94,7 +95,7 @@ class AskController extends Controller
 
             $send(['type' => 'thread', 'id' => $thread->id, 'title' => $thread->title]);
 
-            $turn = new AskTurn;
+            $turn = new StreamedTurn;
             try {
                 $body = $gateway->streamThread($thread, $validated['message'], $history);
             } catch (AgentUnavailable $e) {
@@ -106,35 +107,7 @@ class AskController extends Controller
                 return;
             }
 
-            $buffer = '';
-            while (! $body->eof()) {
-                if (connection_aborted()) {
-                    $turn->stopped = true;
-                    break;
-                }
-                $buffer .= $body->read(2048);
-                while (($pos = strpos($buffer, "\n\n")) !== false) {
-                    $frame = substr($buffer, 0, $pos);
-                    $buffer = substr($buffer, $pos + 2);
-                    foreach (explode("\n", $frame) as $line) {
-                        if (! str_starts_with($line, 'data: ')) {
-                            continue;
-                        }
-                        $event = json_decode(substr($line, 6), true);
-                        if (! is_array($event)) {
-                            continue;
-                        }
-                        $turn->apply($event);
-                        $send($event);
-                    }
-                }
-            }
-            $body->close();
-
-            if (! $turn->finished && ! $turn->stopped && ! $turn->error) {
-                $turn->fail('The agent stopped before finishing its reply.');
-                $send(['type' => 'error', 'message' => $turn->error]);
-            }
+            $turn->relay($body, $send);
 
             $this->save($thread, $turn);
             Organization::setCurrent(null);
@@ -195,7 +168,7 @@ class AskController extends Controller
         return $open ? redirect()->route('studio.ask') : back();
     }
 
-    private function save(AgentThread $thread, AskTurn $turn): void
+    private function save(AgentThread $thread, StreamedTurn $turn): void
     {
         $thread->refresh();
         $messages = $thread->messages ?? [];
@@ -209,91 +182,5 @@ class AskController extends Controller
         $first = preg_split('/(?<=[.?!])\s/', trim($message))[0] ?? $message;
 
         return str($first)->squish()->limit(60)->value();
-    }
-}
-
-/**
- * One assistant turn, accumulated from the stream exactly as the page builds
- * it: text parts interleaved with tool steps, in the order they happened.
- */
-final class AskTurn
-{
-    /** @var list<array<string, mixed>> */
-    public array $parts = [];
-
-    public bool $finished = false;
-
-    public bool $stopped = false;
-
-    public ?string $error = null;
-
-    public int $tokens = 0;
-
-    public ?string $model = null;
-
-    public function apply(array $event): void
-    {
-        match ($event['type'] ?? null) {
-            'delta' => $this->text((string) ($event['text'] ?? '')),
-            'tool' => $this->tool($event),
-            'done' => $this->finish($event),
-            'error' => $this->fail((string) ($event['message'] ?? 'The agent failed.')),
-            default => null,
-        };
-    }
-
-    public function fail(string $message): void
-    {
-        $this->error = $message;
-    }
-
-    public function toMessage(): array
-    {
-        $text = trim(collect($this->parts)->where('type', 'text')->pluck('text')->implode(''));
-
-        return array_filter([
-            'role' => 'assistant',
-            'content' => $text,
-            'parts' => $this->parts,
-            'at' => now()->toIso8601String(),
-            'stopped' => $this->stopped ?: null,
-            'error' => $this->error,
-            'tokens' => $this->tokens ?: null,
-            'model' => $this->model,
-        ], fn ($v) => $v !== null && $v !== []);
-    }
-
-    private function text(string $delta): void
-    {
-        $last = array_key_last($this->parts);
-        if ($last !== null && $this->parts[$last]['type'] === 'text') {
-            $this->parts[$last]['text'] .= $delta;
-        } else {
-            $this->parts[] = ['type' => 'text', 'text' => $delta];
-        }
-    }
-
-    private function tool(array $event): void
-    {
-        $step = array_intersect_key($event, array_flip(['id', 'name', 'status', 'label', 'detail', 'summary', 'ms']));
-        foreach ($this->parts as $i => $part) {
-            if ($part['type'] === 'tool' && ($part['id'] ?? null) === ($event['id'] ?? null)) {
-                $this->parts[$i] = [...$part, ...$step];
-
-                return;
-            }
-        }
-        $this->parts[] = ['type' => 'tool', ...$step];
-    }
-
-    private function finish(array $event): void
-    {
-        $this->finished = true;
-        $this->tokens = (int) ($event['tokens'] ?? 0);
-        $this->model = $event['model'] ?? null;
-        // A model that did not stream still says everything in `done`.
-        if (! collect($this->parts)->contains('type', 'text') && filled($event['content'] ?? '')) {
-            $this->parts[] = ['type' => 'text', 'text' => $event['content']];
-        }
     }
 }

@@ -128,6 +128,69 @@ class TextRunner:
                 task.cancel()
                 self._threads.pop(key, None)
 
+    async def stream_chat(self, organization_id: int, conversation_id: int, message: str, history: list[dict[str, Any]], context: dict[str, Any]):
+        """One live-chat turn with the customer-facing agent, as a stream of events.
+
+        The same worker a phone call uses (the first worker expert, its skills,
+        tools, knowledge search and memory), with the chat prompt in place of
+        the talker: in text there is no latency budget that needs a separate
+        voice, so one agent speaks and acts. One worker per conversation, kept
+        between turns; a restarted gateway rebuilds it from `history`.
+        """
+        from app_sdk.models import CallerInfo
+        from veyra_harness.actions import tools_for_expert
+        from veyra_harness.prompt import chat_instructions
+
+        app = self._sdk.for_organization(organization_id)
+        key = (organization_id, -conversation_id)  # negative: never collides with an Ask thread id
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+
+        yield {"type": "status", "text": "Thinking"}
+        worker = self._threads.get(key)
+        if worker is None:
+            try:
+                tenant = TenantContext.model_validate({k: v for k, v in context.items() if k not in ("caller", "conversation")})
+                caller = CallerInfo.model_validate(context["caller"]) if context.get("caller") else None
+            except Exception as e:  # noqa: BLE001 — a malformed bundle is the app's bug; say so
+                yield {"type": "error", "message": f"The conversation context could not be read: {e}"[:300]}
+                return
+            expert = tenant.workers[0] if tenant.workers else next(iter(tenant.experts_for("text")), None)
+            tools = tools_for_expert(expert, tenant) if expert else list(BUILTINS.values())
+            model = self._model_factory(expert.reasoning_effort if expert else None, (expert.model if expert and expert.model else None) or tenant.agent.advanced.get("worker_model"))
+            state = RunState(sdk=app, context=tenant, contact=caller.contact if caller else None)
+            worker = Worker(model=model, instructions=chat_instructions(tenant, expert, caller), tools=tools, executor=ActionExecutor(app, scope=ExecutionScope(expert_slug=expert.slug if expert else None)), state=state)
+            worker.seed_history(history)
+            self._threads[key] = worker
+
+        async def emit(event: dict[str, Any]) -> None:
+            await queue.put(event)
+
+        async def run() -> None:
+            try:
+                worker.claim()
+                outcome = await worker.delegate(message, emit=emit)
+                if outcome.failed or not outcome.reply:
+                    await queue.put({"type": "error", "message": worker.last_error or "The agent produced no reply."})
+                else:
+                    await queue.put({"type": "done", "content": outcome.reply, "tokens": worker.tokens, "model": getattr(worker._model, "name", None)})
+            except Exception as e:  # noqa: BLE001
+                logger.exception("runner.chat_failed conversation=%s", conversation_id)
+                await queue.put({"type": "error", "message": f"{type(e).__name__}: {e}"[:300]})
+            finally:
+                await queue.put(None)
+
+        task = asyncio.create_task(run())
+        try:
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield event
+        finally:
+            if not task.done():
+                task.cancel()
+                self._threads.pop(key, None)
+
     async def run_thread(self, organization_id: int, thread_id: int, message: str, external_id: str | None) -> str:
         app = self._sdk.for_organization(organization_id)
         key = (organization_id, thread_id)

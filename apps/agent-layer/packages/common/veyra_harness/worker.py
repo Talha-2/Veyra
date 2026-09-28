@@ -148,6 +148,10 @@ class Worker:
         # automation run's error column). Never spoken.
         self.last_error: str | None = None
         self._emit: Emit | None = None
+        # A standing listener for tool steps only (never text deltas): a voice
+        # host publishes them to the browser so the person can see the agent
+        # look things up and act while it talks.
+        self.observer: Emit | None = None
 
     # ── talker-facing surface ─────────────────────────────────────────────
 
@@ -279,9 +283,12 @@ class Worker:
                 self._history.append({"role": role, "content": content})
 
     async def _say(self, event: dict[str, Any]) -> None:
-        if self._emit is not None:
+        listeners = [self._emit] + ([self.observer] if self.observer is not None and event.get("type") == "tool" else [])
+        for listener in listeners:
+            if listener is None:
+                continue
             try:
-                await self._emit(event)
+                await listener(event)
             except Exception:  # noqa: BLE001 — a dead listener must not kill the work
                 logger.debug("worker.emit_failed", exc_info=True)
 

@@ -24,8 +24,8 @@ export function MessageDialog({ open, onClose, name, phone, email }: { open: boo
     if (email) options.push({ value: 'email', label: 'Email' });
 
     return (
-        <Dialog open={open} onClose={onClose} title={`Message ${name}`} description="Starts a conversation in the inbox, or continues the one already open on this channel.">
-            <form onSubmit={submit} className="flex flex-col gap-4">
+        <Dialog open={open} onClose={onClose} title={`Message ${name}`} width={620} description="Starts a conversation in the inbox, or continues the one already open on this channel.">
+            <form onSubmit={submit} className="flex flex-col gap-5">
                 {options.length > 1 && (
                     <SegmentedControl<'sms' | 'email'> value={data.channel as 'sms' | 'email'} onChange={pick} options={options} />
                 )}
@@ -42,10 +42,10 @@ export function MessageDialog({ open, onClose, name, phone, email }: { open: boo
                 )}
                 <div>
                     <label className="v-label" htmlFor="msg-body">Message</label>
-                    <textarea id="msg-body" className="v-field h-auto" rows={5} value={data.body} onChange={(e) => setData('body', e.target.value)} dir="auto" autoFocus />
+                    <textarea id="msg-body" className="v-field text-md" rows={6} value={data.body} onChange={(e) => setData('body', e.target.value)} dir="auto" autoFocus />
                     {errors.body && <p className="mt-1.5 text-sm text-danger">{errors.body}</p>}
                 </div>
-                <div className="flex justify-end gap-2">
+                <div className="mt-1 flex justify-end gap-2 pt-5" style={{ borderTop: '1px solid var(--separator)' }}>
                     <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.body.trim() || !data.to.trim()}>{processing ? 'Sending…' : 'Send'}</button>
                 </div>
@@ -68,14 +68,14 @@ export function TicketDialog({ open, onClose, contactId, name, types, priorities
     };
 
     return (
-        <Dialog open={open} onClose={onClose} title="New ticket" description={`Raised against ${name}, so it shows on their profile and in the team's board.`}>
-            <form onSubmit={submit} className="flex flex-col gap-4">
+        <Dialog open={open} onClose={onClose} title="New ticket" width={620} description={`Raised against ${name}, so it shows on their profile and in the team's board.`}>
+            <form onSubmit={submit} className="flex flex-col gap-5">
                 <div>
                     <label className="v-label" htmlFor="t-subject">Subject</label>
                     <input id="t-subject" className="v-field" value={data.subject} onChange={(e) => setData('subject', e.target.value)} dir="auto" autoFocus />
                     {errors.subject && <p className="mt-1.5 text-sm text-danger">{errors.subject}</p>}
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-5 sm:grid-cols-2">
                     <div>
                         <label className="v-label" htmlFor="t-priority">Priority</label>
                         <select id="t-priority" className="v-field" value={data.priority} onChange={(e) => setData('priority', e.target.value)}>
@@ -94,9 +94,9 @@ export function TicketDialog({ open, onClose, contactId, name, types, priorities
                 </div>
                 <div>
                     <label className="v-label" htmlFor="t-body">Details</label>
-                    <textarea id="t-body" className="v-field h-auto" rows={4} value={data.body} onChange={(e) => setData('body', e.target.value)} dir="auto" placeholder="What happened, and what they need." />
+                    <textarea id="t-body" className="v-field text-md" rows={5} value={data.body} onChange={(e) => setData('body', e.target.value)} dir="auto" placeholder="What happened, and what they need." />
                 </div>
-                <div className="flex justify-end gap-2">
+                <div className="mt-1 flex justify-end gap-2 pt-5" style={{ borderTop: '1px solid var(--separator)' }}>
                     <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.subject.trim()}>{processing ? 'Creating…' : 'Create ticket'}</button>
                 </div>

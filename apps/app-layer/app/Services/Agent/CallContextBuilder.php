@@ -36,6 +36,13 @@ class CallContextBuilder
 
     public function forOrganization(Organization $organization): array
     {
+        // An organization that never went through onboarding (created by a
+        // seeder, an import, the API) still answers with a working agent:
+        // without experts the front desk has no worker to look anything up.
+        if (! Expert::query()->exists()) {
+            app(\App\Services\Organization\StarterAgent::class)->provision($organization);
+        }
+
         $config = AgentConfig::query()->firstOrCreate([]);
         $profile = BusinessProfile::query()->firstOrCreate([]);
 
@@ -67,12 +74,17 @@ class CallContextBuilder
         ];
     }
 
-    public function forCall(Call $call, PhoneNumber $line, Identifier $identifier): array
+    /**
+     * A call's bundle. `$line` is null for a browser session (Studio Talk):
+     * there is no dialled number, so the line block describes the browser and
+     * the language falls back to the agent's primary one.
+     */
+    public function forCall(Call $call, ?PhoneNumber $line, Identifier $identifier): array
     {
         $organization = Organization::current();
         $bundle = $this->forOrganization($organization);
 
-        $language = $call->language ?: $line->effectiveLanguage();
+        $language = $call->language ?: ($line?->effectiveLanguage() ?? $bundle['agent']['primary_language'] ?? 'en');
 
         return [
             ...$bundle,
@@ -90,15 +102,28 @@ class CallContextBuilder
                 'language' => $language,
                 'capabilities' => LanguageCapabilities::for($language),
             ],
-            'line' => [
+            'line' => $line ? [
                 'id' => $line->id,
                 'e164' => $line->e164,
                 'friendly_name' => $line->friendly_name,
                 'language' => $line->language,
                 'ivr' => $line->ivr,
                 'answered_by_agent' => $line->answeredByAgent(),
-            ],
+            ] : ['id' => 0, 'e164' => 'web', 'friendly_name' => 'Browser (Studio Talk)', 'language' => $language, 'ivr' => null, 'answered_by_agent' => true],
             'caller' => $this->caller($identifier),
+        ];
+    }
+
+    /**
+     * A text conversation's bundle for live chat: the tenant bundle plus who
+     * the agent is talking to, with no call or line.
+     */
+    public function forConversation(\App\Models\Conversation $conversation): array
+    {
+        return [
+            ...$this->forOrganization(Organization::current()),
+            'conversation' => ['id' => $conversation->id, 'channel' => $conversation->channel->value],
+            'caller' => $this->caller($conversation->identifier),
         ];
     }
 
@@ -113,7 +138,10 @@ class CallContextBuilder
             'primary_language' => $config->primary_language,
             'languages' => collect($languages)->map(fn ($code) => ['code' => $code, ...(LanguageCapabilities::for($code) ?? [])])->all(),
             'voice' => [
-                'provider' => $config->voice_provider ?: 'elevenlabs',
+                // Cartesia unless the tenant chose otherwise: it covers the
+                // most languages at realtime latency and its key is the one
+                // that is live (ElevenLabs is opt-in per tenant).
+                'provider' => $config->voice_provider ?: 'cartesia',
                 'id' => $config->voice_id,
                 'model' => $config->advanced['tts_model'] ?? 'flash',
             ],

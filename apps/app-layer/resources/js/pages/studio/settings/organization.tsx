@@ -1,9 +1,10 @@
 import { useForm } from '@inertiajs/react';
 import { useMemo, type FormEvent } from 'react';
 
-import { Field, SaveBar, Section } from '../../../components/studio/form';
+import { SaveBar } from '../../../components/studio/form';
 import SettingsShell from '../../../components/studio/settings-shell';
-import { Card, CopyButton } from '../../../components/ui/kit';
+import { SettingRow, SettingsGroup } from '../../../components/studio-ops/page-parts';
+import { CopyButton } from '../../../components/ui/kit';
 import { Avatar } from '../../../components/ui/primitives';
 
 function initials(name: string): string {
@@ -30,39 +31,34 @@ export default function OrganizationSettings({ organization }: { organization: {
 
     return (
         <SettingsShell title="Organization" description="How your organization is named and which clock it runs on.">
-            <Card className="mb-5 flex items-center gap-4 px-6 py-5">
-                <Avatar initials={initials(data.name || organization.name)} name={organization.slug} size={52} />
+            <div className="v-panel mb-6 flex flex-wrap items-center gap-5 px-7 py-6">
+                <Avatar initials={initials(data.name || organization.name)} name={organization.slug} size={56} />
                 <div className="min-w-0 flex-1">
-                    <div className="truncate text-lg font-semibold tracking-tight text-primary">{data.name || organization.name}</div>
+                    <div className="truncate text-xl font-semibold tracking-tight text-primary">{data.name || organization.name}</div>
                     <div className="mt-0.5 truncate text-sm text-secondary">
                         <span className="font-mono">{organization.slug}</span>
                         <span className="text-tertiary"> · {organization.timezone.replace(/_/g, ' ')}</span>
                     </div>
                 </div>
                 <CopyButton value={organization.slug} label="Copy identifier" />
-            </Card>
+            </div>
 
             <form onSubmit={submit}>
-                <Section title="Details" description="Shown to your team in Desk and Studio, and in emails the platform sends on your behalf.">
-                    <Field inline label="Name" hint="What your team and invitees see." error={errors.name}>
-                        <input className="v-field max-w-95" value={data.name} onChange={(e) => setData('name', e.target.value)} />
-                    </Field>
-                    <Field inline label="Identifier" hint="Used in URLs and by the agent layer. Fixed once the organization exists.">
-                        <input className="v-field max-w-95 font-mono" value={organization.slug} disabled />
-                    </Field>
-                    <Field
-                        inline
-                        label="Timezone"
-                        hint="Business hours, reports and scheduled automations run on this clock."
-                        error={errors.timezone}
-                    >
-                        <input className="v-field max-w-95" list="org-timezones" value={data.timezone} onChange={(e) => setData('timezone', e.target.value)} spellCheck={false} />
+                <SettingsGroup title="Details" description="Shown to your team in Desk and Studio, and in emails the platform sends on your behalf.">
+                    <SettingRow label="Name" hint="What your team and invitees see." error={errors.name} htmlFor="org-name">
+                        <input id="org-name" className="v-field max-w-105" value={data.name} onChange={(e) => setData('name', e.target.value)} />
+                    </SettingRow>
+                    <SettingRow label="Identifier" hint="Follows the name: renaming the organization updates it." htmlFor="org-slug">
+                        <input id="org-slug" className="v-field max-w-105 font-mono" value={organization.slug} disabled />
+                    </SettingRow>
+                    <SettingRow label="Timezone" hint="Business hours, reports and scheduled automations run on this clock." error={errors.timezone} htmlFor="org-timezone">
+                        <input id="org-timezone" className="v-field max-w-105" list="org-timezones" value={data.timezone} onChange={(e) => setData('timezone', e.target.value)} spellCheck={false} />
                         <datalist id="org-timezones">{zones.map((z) => <option key={z} value={z} />)}</datalist>
-                        <p className="mt-1.5 text-xs text-tertiary">
+                        <p className="mt-2 text-sm text-tertiary">
                             {now ? <>It is <span className="font-medium text-secondary">{now}</span> there now.</> : 'Not a recognised timezone. Try a region name such as Asia/Karachi.'}
                         </p>
-                    </Field>
-                </Section>
+                    </SettingRow>
+                </SettingsGroup>
                 <SaveBar processing={processing} dirty={isDirty} onDiscard={() => reset()} />
             </form>
         </SettingsShell>

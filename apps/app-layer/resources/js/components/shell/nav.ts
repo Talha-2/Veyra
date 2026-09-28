@@ -51,6 +51,7 @@ export const NAV: Record<SurfaceKey, ShellNavGroup[]> = {
             items: [
                 { label: 'Overview', href: '/studio', icon: LayoutDashboard, match: '/studio$', keywords: 'home health dashboard' },
                 { label: 'Ask', href: '/studio/ask', icon: Sparkles, keywords: 'chat assistant claude agent' },
+                { label: 'Talk', href: '/studio/talk', icon: AudioLines, keywords: 'voice mode call live chat test customer' },
                 { label: 'Identity', href: '/studio/agent', icon: UserRound, keywords: 'persona greeting language models' },
                 { label: 'Voice', href: '/studio/voice', icon: AudioLines, keywords: 'tts speech cartesia elevenlabs' },
                 { label: 'Experts', href: '/studio/experts', icon: Bot, keywords: 'talker worker specialists' },

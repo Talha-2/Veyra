@@ -87,6 +87,39 @@ fragments. Laravel relays the stream (it must read it with Guzzle's
 `StreamHandler` over HTTP/1.0: the default curl handler buffers the whole
 body, and PHP's dechunk filter holds 8 KB) and saves the finished turn.
 
+## Voice mode and live chat (Studio Talk)
+
+Talk is the customer-facing agent, tried from Studio: one chat, with a voice
+button in the message box that opens voice mode, as in Claude.
+
+- **Voice** runs on the LiveKit voice worker, the same one that answers the
+  phone. Studio creates a waiting call and a room named `web-…`, signs a
+  LiveKit token for the browser, and LiveKit dispatches the worker into the
+  room. The worker claims the call with `POST /calls/web` (patiently: 25 s,
+  one retry), then runs the identical pipeline: talker + worker, skills,
+  knowledge, memory, experts and actions. The worker publishes its tool
+  steps (and the front desk's knowledge lookups) on the `agent_activity`
+  data topic; the browser reads state from `lk.agent.state` and captions from
+  the `lk.transcription` text streams. The call lands in Desk with its
+  transcript and summary.
+- **Chat** runs through the gateway's `POST /v1/chat/stream`: the first worker
+  expert with the customer-facing `chat.txt` prompt, streamed like Ask, saved
+  in Desk as a web-chat conversation.
+
+Run the voice worker locally (it needs LIVEKIT_*, DEEPGRAM_API_KEY, a TTS key
+such as CARTESIA_API_KEY, an LLM key, APP_LAYER_URL and AGENT_SHARED_SECRET):
+
+```bash
+python -m veyra_voice download-files   # once: VAD + turn-detector weights
+python -m veyra_voice dev
+```
+
+LiveKit plugins must be imported at worker start (`entrypoint.py` does it):
+importing one inside a job fails with "Plugins must be registered on the main
+thread". The worker is too heavy for Render's free plan; host it on LiveKit
+Cloud agents or any machine with ~2 GB RAM. Laravel needs LIVEKIT_URL,
+LIVEKIT_API_KEY and LIVEKIT_API_SECRET to sign browser tokens.
+
 ## Proven live (2026-09-27)
 
 With the gateway on the host (`AGENT_GATEWAY_URL=http://host.docker.internal:8100`

@@ -22,6 +22,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+// The public API reference, readable without an account (partners evaluating
+// an integration). Same spec as Studio › Developer: App\Support\PublicApi\OpenApiSpec.
+Route::get('/docs/api', [\App\Http\Controllers\DocsController::class, 'api'])->name('docs.api');
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthenticatedSessionController::class, 'store']);

@@ -1,10 +1,10 @@
 import { useForm } from '@inertiajs/react';
 import { LogOut, Monitor, Smartphone, Tablet } from 'lucide-react';
-import type { FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 
-import { Field, Section } from '../../../components/studio/form';
 import SettingsShell from '../../../components/studio/settings-shell';
-import { Card, CardFooter, CardHeader, IconTile, List, ListRow } from '../../../components/ui/kit';
+import { PanelHeader, SettingRow, SettingsGroup } from '../../../components/studio-ops/page-parts';
+import { Card, IconTile, List } from '../../../components/ui/kit';
 import { Badge, RelativeTime } from '../../../components/ui/primitives';
 
 interface Session { id: string; ip: string | null; agent: string; last_active: string; current: boolean }
@@ -28,45 +28,57 @@ export default function SessionSettings({ sessions }: { sessions: Session[] }) {
 
     const ordered = [...sessions].sort((a, b) => Number(b.current) - Number(a.current));
     const others = sessions.length - 1;
+    // A long list of old sessions buries the one decision on this page.
+    const [showAll, setShowAll] = useState(false);
+    const LIMIT = 8;
+    const shown = showAll ? ordered : ordered.slice(0, LIMIT);
 
     return (
         <SettingsShell title="Sessions" description="Every browser where you are signed in to Veyra. If you do not recognise one, sign it out and change your password.">
-            <Card className="mb-5">
-                <CardHeader title="Where you are signed in" description={`${sessions.length} ${sessions.length === 1 ? 'device' : 'devices'}, most recently active first.`} />
+            <Card className="mb-6">
+                <PanelHeader title="Where you are signed in" description={`${sessions.length} ${sessions.length === 1 ? 'device' : 'devices'}, most recently active first.`} />
                 <List>
-                    {ordered.map((s) => {
+                    {shown.map((s) => {
                         const d = describe(s.agent);
                         const Icon = ICON[d.kind];
                         return (
-                            <ListRow
-                                key={s.id}
-                                leading={<IconTile tone={s.current ? 'success' : 'muted'}><Icon size={16} strokeWidth={1.9} /></IconTile>}
-                                title={d.label}
-                                subtitle={<span className="tabular-nums">{s.ip ?? 'Unknown IP address'}</span>}
-                                trailing={s.current
+                            <div key={s.id} className="flex min-h-16 items-center gap-4 px-7 py-3">
+                                <IconTile tone={s.current ? 'success' : 'muted'} size={36}><Icon size={16} strokeWidth={1.9} /></IconTile>
+                                <div className="min-w-0 flex-1">
+                                    <div className="truncate text-base font-medium text-primary">{d.label}</div>
+                                    <div className="truncate text-sm text-secondary tabular-nums">{s.ip ?? 'Unknown IP address'}</div>
+                                </div>
+                                {s.current
                                     ? <Badge tone="success" dot>This device</Badge>
-                                    : <span className="text-xs text-tertiary">Active <RelativeTime at={s.last_active} /></span>}
-                            />
+                                    : <span className="text-sm text-tertiary">Active <RelativeTime at={s.last_active} className="text-sm" /></span>}
+                            </div>
                         );
                     })}
                 </List>
+                {ordered.length > LIMIT && (
+                    <div className="px-7 py-4" style={{ borderTop: '1px solid var(--separator)' }}>
+                        <button type="button" className="v-btn v-btn--ghost v-btn--sm -ml-3" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>
+                            {showAll ? 'Show fewer' : `Show all ${ordered.length} sessions`}
+                        </button>
+                    </div>
+                )}
                 {others === 0 && (
-                    <CardFooter><span className="mr-auto text-sm text-secondary">You are only signed in here.</span></CardFooter>
+                    <p className="rounded-b-lg px-7 py-4 text-sm text-secondary" style={{ borderTop: '1px solid var(--separator)', background: 'var(--bg-subtle)' }}>You are only signed in here.</p>
                 )}
             </Card>
 
             {others > 0 && (
                 <form onSubmit={submit}>
-                    <Section title="Sign out everywhere else" description={`Ends the ${others} other ${others === 1 ? 'session' : 'sessions'} listed above. This device stays signed in.`}>
-                        <Field inline label="Your password" hint="Confirms it is you before anyone is signed out." error={errors.password}>
-                            <div className="flex max-w-110 flex-wrap gap-2">
-                                <input className="v-field min-w-50 flex-1" type="password" autoComplete="current-password" value={data.password} onChange={(e) => setData('password', e.target.value)} />
-                                <button type="submit" className="v-btn v-btn--danger" disabled={processing || !data.password}>
+                    <SettingsGroup title="Sign out everywhere else" description={`Ends the ${others} other ${others === 1 ? 'session' : 'sessions'} listed above. This device stays signed in.`}>
+                        <SettingRow label="Your password" hint="Confirms it is you before anyone is signed out." error={errors.password} htmlFor="sessions-password">
+                            <div className="flex max-w-120 flex-wrap gap-3">
+                                <input id="sessions-password" className="v-field min-w-50 flex-1" type="password" autoComplete="current-password" value={data.password} onChange={(e) => setData('password', e.target.value)} />
+                                <button type="submit" className="v-btn v-btn--danger h-10" disabled={processing || !data.password}>
                                     <LogOut size={14} strokeWidth={2} />{processing ? 'Signing out…' : `Sign out ${others} ${others === 1 ? 'other' : 'others'}`}
                                 </button>
                             </div>
-                        </Field>
-                    </Section>
+                        </SettingRow>
+                    </SettingsGroup>
                 </form>
             )}
         </SettingsShell>

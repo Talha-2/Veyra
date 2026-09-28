@@ -48,6 +48,63 @@ npx tsc --noEmit        # type-check the frontend
 
 Tests run on in-memory SQLite and do not need Postgres.
 
+## Public API
+
+For customers who integrate Veyra into their own platform instead of (or as
+well as) using Desk. **Not** the agent contract (`/api/agent/v1`,
+`docs/agent-contract.md`), which is untouched by it.
+
+- **Routes:** `routes/api_v1.php`, mounted at `/api/v1`. Controllers in
+  `app/Http/Controllers/Api/V1/`, objects in `app/Http/Resources/V1/`.
+  Contacts (CRUD + lookup by phone/email), conversations (+ messages, notes),
+  messages (record outbound / add notes), tickets (+ notes), leads (+ move
+  stage), pipelines, calls (+ transcript, summary, handoffs), knowledge
+  documents (+ search) and webhook endpoints, plus `GET /me`.
+- **Auth:** `Authorization: Bearer vy_sk_…`, minted in Studio › Developer.
+  `AuthenticateApiKey` finds the key by its SHA-256 hash, sets its
+  organization as the tenant (so TenantScope confines everything, route
+  binding included), rate-limits 120/min per key with `X-RateLimit-*`
+  headers, and checks the route's scope. Every route declares
+  `->apiScope('tickets:read')` (or `null` = any key); a route without one is
+  refused at runtime. Scopes are `ApiKey::SCOPES`.
+- **Publishable keys** (`vy_pk_…`) only reach routes marked `->publishable()`:
+  `GET /me`, `POST /knowledge/search` and the agent chat routes, and may only
+  hold `knowledge:read` and `chat:write`.
+- **Agent chat** (`/api/v1/chat/sessions`, scope `chat:write`): a site or
+  backend talks to the customer-facing agent through `App\Services\Agent\LiveChat`,
+  the same service as Studio Talk's chat. A session is one visitor's web-chat
+  conversation in Desk (`visitor.id` → identifier `api:{id}`; email/phone link
+  an existing contact). `POST …/{id}/messages` waits for the reply (JSON with
+  `reply` and the agent's `steps`) or streams it (`"stream": true` / `Accept:
+  text/event-stream`, ending with a `message` event). Publishable keys must
+  send the session's `session_token` (an HMAC of the conversation id, returned
+  once at creation) as `X-Chat-Session-Token`.
+- **Shape:** single objects unwrapped, with `object`, numeric `id`,
+  `created_at`/`updated_at` in ISO 8601 UTC; lists are
+  `{object: "list", data, has_more, next_cursor}` (`?limit`, `?cursor`,
+  `?updated_since`); errors are `{error: {type, message, fields?}}`
+  (`App\Support\PublicApi\ApiError`, wired in `bootstrap/app.php`).
+- **Outbound messages are recorded, not sent:** no SMS/email provider is
+  connected, so they are created `status: "queued"` and stay queued.
+- **Spec:** `App\Support\PublicApi\OpenApiSpec` (hand-maintained, OpenAPI
+  3.1), served at `GET /api/v1/openapi.json`, rendered in Studio › Developer
+  and publicly at `/docs/api`. `PublicApiTest` fails if a route and the spec
+  disagree, so add both together.
+- **Webhooks:** `App\Observers\WebhookObserver` (registered in
+  `AppServiceProvider`) turns model changes into events — whichever surface
+  made them — and `App\Services\Webhooks\WebhookDispatcher` delivers them
+  **after the response** with `defer()` (there is no queue worker in
+  production), 5 s timeout, one retry on 5xx/429/fast refusal, every attempt
+  a `WebhookDelivery` row. Signed `X-Veyra-Signature: sha256=<hmac of the raw
+  body>`, plus `X-Veyra-Event` and `X-Veyra-Delivery`. An endpoint is turned
+  off after 10 consecutive failed events (`WEBHOOK_DISABLE_AFTER`); switching
+  it back on in Studio resets it. Private/loopback URLs are refused unless
+  `APP_ENV=local` (`WEBHOOK_ALLOW_PRIVATE_URLS`). Settings: `config/public_api.php`.
+
+```bash
+curl http://localhost:8080/api/v1/me -H "Authorization: Bearer $VEYRA_API_KEY"
+```
+
 ## Deploying (Render + Neon)
 
 The app layer and the agent gateway run on Render's free plan from the

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from app_sdk.models import CallContext, ExpertRecord, TenantContext
+from app_sdk.models import CallContext, CallerInfo, ExpertRecord, TenantContext
 
 _PROMPTS = Path(__file__).parent / "prompts"
 
@@ -221,3 +221,47 @@ def text_instructions(context: TenantContext, expert: ExpertRecord | None) -> st
         ticket_types=ticket_types_block(context),
         now=now_block(context),
     )
+
+
+def chat_caller_block(caller: CallerInfo | None) -> str:
+    """Who the live-chat customer is, as far as the business knows. No internal ids."""
+    if caller is None:
+        return "- Status: an anonymous visitor"
+    lines: list[str] = []
+    if caller.contact:
+        lines.append("- Status: known customer")
+        for label, value in (("Name", caller.contact.name), ("Email", caller.contact.email), ("Phone", caller.contact.phone), ("Company", caller.contact.company)):
+            if value:
+                lines.append(f"- {label}: {value}")
+    else:
+        lines.append("- Status: not on file yet")
+    if caller.open_tickets:
+        lines.append("- Open with the team: " + "; ".join(f"{t.reference} {t.subject} ({t.status})" for t in caller.open_tickets))
+    if caller.recent_calls:
+        lines.append("- Recent calls: " + "; ".join(f"{r.at or '?'}: {r.summary or 'no summary'}" for r in caller.recent_calls))
+    return "\n".join(lines)
+
+
+def chat_instructions(context: TenantContext, expert: ExpertRecord | None, caller: CallerInfo | None) -> str:
+    """The live-chat agent: the phone agent's front-desk voice and the worker's
+    tools and rules, in one text agent, talking to a customer."""
+    talker = context.talker
+    agent = context.agent
+    persona = "\n\n".join(p for p in (
+        (talker.system_prompt or "").strip() if talker else "",
+        (agent.persona or "").strip(),
+        (expert.system_prompt or "").strip() if expert else "",
+    ) if p)
+    return fill(
+        load("chat"),
+        agent_name=agent.display_name or "the assistant",
+        business_name=context.business.name or context.organization.name,
+        persona=persona or "Warm, direct, brief. You sound like the best receptionist this business ever had.",
+        language=language_block(context, None).replace("Speak ", "Write in ", 1),
+        business=business_block(context),
+        caller=chat_caller_block(caller),
+        ticket_types=ticket_types_block(context),
+        skills=skill_catalog(expert) if expert else "(none)",
+        now=now_block(context),
+    )
+

@@ -4,7 +4,8 @@ import { useState, type CSSProperties, type FormEvent } from 'react';
 
 import { SaveBar } from '../../components/studio/form';
 import { formatBytes, plural } from '../../components/studio-knowledge/format';
-import { Callout, Card, CardBody, CardHeader, KeyValues } from '../../components/ui/kit';
+import { PanelHeader } from '../../components/studio-ops/page-parts';
+import { Callout, Card, KeyValues } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, EmptyState, RelativeTime, type Tone } from '../../components/ui/primitives';
 
@@ -16,7 +17,7 @@ interface Props {
     };
 }
 
-const SOURCE_LABEL: Record<string, string> = { created: 'Written here', upload: 'Uploaded file', scrape: 'Imported web page' };
+const SOURCE_LABEL: Record<string, string> = { created: 'Written here', upload: 'Uploaded file', scrape: 'Imported web page', agent: 'Agent memory' };
 const TYPE_LABEL: Record<string, string> = {
     'text/markdown': 'Markdown', 'text/plain': 'Plain text', 'text/csv': 'CSV', 'text/html': 'HTML', 'application/pdf': 'PDF',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word document',
@@ -85,8 +86,8 @@ export default function DocumentPage({ document: d }: Props) {
                 </div>
             )}
 
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-                {/* The writing well. */}
+            <div className="mt-3 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+                {/* The writing well: the full main column, never a side panel. */}
                 <div className="min-w-0">
                     {d.content === null ? (
                         <Card>
@@ -95,19 +96,18 @@ export default function DocumentPage({ document: d }: Props) {
                             </EmptyState>
                         </Card>
                     ) : (
-                        <Card className="overflow-hidden transition-colors focus-within:border-(--border-accent)">
+                        <Card className="transition-colors focus-within:border-(--border-accent)">
                             <textarea
-                                className="block min-h-[60vh] w-full resize-none bg-transparent px-6 py-6 text-md leading-relaxed text-primary outline-none placeholder:text-tertiary sm:px-10 sm:py-8"
-                                style={{ fieldSizing: 'content', boxShadow: 'none' } as CSSProperties}
+                                className="block min-h-[64vh] w-full resize-none rounded-t-lg bg-transparent px-7 py-7 text-md text-primary outline-none placeholder:text-tertiary sm:px-12 sm:py-10"
+                                style={{ fieldSizing: 'content', boxShadow: 'none', lineHeight: 1.6 } as CSSProperties}
                                 value={data.content}
                                 onChange={(e) => setData('content', e.target.value)}
                                 placeholder="Write it the way you would explain it to a new hire."
                                 aria-label="Document content"
                                 dir="auto"
                             />
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-2.5 text-xs text-tertiary tabular-nums sm:px-10" style={{ borderTop: '1px solid var(--separator)', background: 'var(--bg-subtle)' }}>
+                            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-b-lg px-7 py-3 text-xs text-tertiary tabular-nums sm:px-12" style={{ borderTop: '1px solid var(--separator)', background: 'var(--bg-subtle)' }}>
                                 <span>{plural(words, 'word')}</span>
-                                <span>{plural(data.content.length, 'character')}</span>
                                 <span>{plural(paragraphs, 'paragraph')}</span>
                                 <span>≈ {plural(Math.max(text ? 1 : 0, Math.ceil(data.content.length / CHUNK_TARGET)), 'chunk')} after saving</span>
                                 <span className="flex-1" />
@@ -118,21 +118,21 @@ export default function DocumentPage({ document: d }: Props) {
                     {errors.content && <p className="mt-2 text-sm text-danger">{errors.content}</p>}
                 </div>
 
-                {/* The inspector. */}
-                <aside className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
+                {/* The inspector: beside the editor from 1280px, under it below that. */}
+                <aside className="flex min-w-0 flex-col gap-6">
                     <Card>
-                        <CardHeader
+                        <PanelHeader
                             title="What the agent retrieves"
                             description={`Paragraphs packed into chunks of about ${CHUNK_TARGET.toLocaleString()} characters, never split mid-paragraph. Each is matched and quoted on its own.`}
                         />
                         {contentChanged && (
-                            <p className="px-5 pt-3 text-xs text-warning">These are the saved chunks. Save to re-chunk your edits.</p>
+                            <p className="px-7 pt-4 text-sm text-warning">These are the saved chunks. Save to re-chunk your edits.</p>
                         )}
-                        <div className="max-h-110 overflow-y-auto px-4 py-4">
+                        <div className="px-5 py-5">
                             {d.chunks.length === 0 ? (
                                 <p className="px-1 py-4 text-center text-sm text-tertiary">No chunks yet. {d.content === null ? 'They appear once the text is extracted.' : 'Save or re-index to build them.'}</p>
                             ) : (
-                                <ol className="flex flex-col gap-2.5">
+                                <ol className="flex flex-col gap-3">
                                     {d.chunks.map((c) => <ChunkCard key={c.id} position={c.position} content={c.content} />)}
                                 </ol>
                             )}
@@ -140,8 +140,8 @@ export default function DocumentPage({ document: d }: Props) {
                     </Card>
 
                     <Card>
-                        <CardHeader title="Details" />
-                        <CardBody>
+                        <PanelHeader title="Details" />
+                        <div className="px-7 py-5">
                             <KeyValues items={[
                                 { label: 'Source', value: d.source_url
                                     ? <a href={d.source_url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-accent-text hover:underline"><span className="truncate">{SOURCE_LABEL[d.source_type] ?? d.source_type}</span><ExternalLink size={12} strokeWidth={2} className="shrink-0" /></a>
@@ -154,21 +154,17 @@ export default function DocumentPage({ document: d }: Props) {
                                     ? <Link href={`/studio/knowledge?folder=${d.folder.id}`} className="inline-flex items-center gap-1.5 text-accent-text hover:underline"><FolderIcon size={13} strokeWidth={1.8} />{d.folder.name}</Link>
                                     : <span className="text-secondary">Top level</span> },
                             ]} />
-                        </CardBody>
-                        <div className="px-5 pb-5">
+                        </div>
+                        <div className="px-7 pb-6">
                             <button type="button" className="v-btn v-btn--quiet w-full" onClick={reindex} disabled={reindexing || d.content === null}>
                                 <RefreshCw size={14} strokeWidth={1.9} className={reindexing ? 'animate-spin' : ''} />{reindexing ? 'Re-indexing…' : 'Re-index'}
                             </button>
-                            <p className="mt-2 text-xs text-tertiary">Rebuilds the chunks from the saved text. Saving already does this; use it after a failed or stale index.</p>
+                            <p className="mt-2.5 text-xs text-tertiary">Rebuilds the chunks from the saved text. Saving already does this; use it after a failed or stale index.</p>
                         </div>
-                    </Card>
-
-                    <Card>
-                        <CardHeader title="Danger zone" />
-                        <CardBody className="flex items-center gap-4">
-                            <p className="min-w-0 flex-1 text-sm text-secondary">Deleting removes the document and its chunks. The agent stops finding it on the next call.</p>
-                            <button type="button" className="v-btn v-btn--danger v-btn--sm shrink-0" onClick={destroy}><Trash2 size={14} strokeWidth={1.8} />Delete</button>
-                        </CardBody>
+                        <div className="px-7 py-5" style={{ borderTop: '1px solid var(--separator)' }}>
+                            <button type="button" className="v-btn v-btn--danger w-full" onClick={destroy}><Trash2 size={14} strokeWidth={1.8} />Delete document</button>
+                            <p className="mt-2.5 text-xs text-tertiary">Removes the document and its chunks. The agent stops finding it on the next call.</p>
+                        </div>
                     </Card>
                 </aside>
             </div>
@@ -183,7 +179,7 @@ function ChunkCard({ position, content }: { position: number; content: string })
     const long = content.length > 260;
 
     return (
-        <li className="rounded-md px-3.5 py-3" style={{ background: 'var(--surface-sunken)', border: '1px solid var(--border)' }}>
+        <li className="rounded-md px-4 py-3.5" style={{ background: 'var(--surface-sunken)', border: '1px solid var(--border)' }}>
             <div className="mb-1.5 flex items-center gap-2">
                 <span className="flex size-5 items-center justify-center rounded-full text-2xs font-semibold tabular-nums" style={{ background: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>{position + 1}</span>
                 <span className="flex items-center gap-1 text-xs text-tertiary tabular-nums"><Layers size={12} strokeWidth={1.8} />{plural(content.length, 'character')}</span>

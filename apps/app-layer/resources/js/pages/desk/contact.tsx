@@ -6,7 +6,8 @@ import { ChannelIcon, channelLabel } from '../../components/desk-pages/bits';
 import { MessageDialog, TicketDialog } from '../../components/desk-pages/contact-actions';
 import { clockTime, humanize, initialsOf, isToday, longDate, money, relative } from '../../components/desk-pages/format';
 import { Menu, MenuItem, MenuLabel } from '../../components/shell/menu';
-import { Card, CardBody, CardHeader, CopyButton, IconTile, KeyValues, List, ListRow, Tabs } from '../../components/ui/kit';
+import { DeskPage, Panel, PanelBody, PanelHeader, PanelRow, PanelRows, PanelTabs, WithSidePanel } from '../../components/desk-pages/layout';
+import { CopyButton, IconTile, KeyValues } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Avatar, Badge, EmptyState, Mono, RelativeTime, UserText, type Tone } from '../../components/ui/primitives';
 import TagInput from '../../components/ui/tag-input';
@@ -55,14 +56,14 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
         <>
             <Head title={contact.name} />
 
-            <div className="mx-auto max-w-[1320px] px-6 py-7 md:px-8">
-                <Link href="/desk/contacts" className="mb-3 -ml-1 inline-flex items-center gap-0.5 rounded-md px-1 text-sm text-secondary transition-colors hover:text-primary">
+            <DeskPage header={
+                <Link href="/desk/contacts" className="-ml-1 inline-flex items-center gap-0.5 rounded-md px-1 text-sm text-secondary transition-colors hover:text-primary">
                     <ChevronLeft size={15} strokeWidth={2} />Contacts
                 </Link>
-
+            }>
                 {/* Profile */}
-                <Card className="mb-6">
-                    <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start">
+                <Panel className="-mt-5">
+                    <div className="flex flex-col gap-6 px-7 pt-7 pb-6 sm:flex-row sm:items-start">
                         <Avatar name={contact.name} initials={contact.initials} size={72} />
                         <div className="min-w-0 flex-1 [&>header]:mb-0">
                             <PageHeader
@@ -100,18 +101,17 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                         </div>
                     </div>
 
-                    <dl className="grid grid-cols-2 md:grid-cols-4" style={{ borderTop: '1px solid var(--separator)' }}>
+                    <dl className="grid grid-cols-2 lg:grid-cols-4" style={{ borderTop: '1px solid var(--separator)' }}>
                         <Fact label="Phone" value={contact.phone ? <span className="tabular-nums">{contact.phone}</span> : null} copy={contact.phone} />
                         <Fact label="Email" value={contact.email} copy={contact.email} />
                         <Fact label="Last contact" value={contact.last_contact_at ? <time dateTime={contact.last_contact_at} title={new Date(contact.last_contact_at).toLocaleString()}>{relative(contact.last_contact_at)}</time> : null} />
                         <Fact label="Open pipeline value" value={leads.length ? <span className="tabular-nums">{money(pipelineValue)}</span> : null} />
                     </dl>
-                </Card>
+                </Panel>
 
-                <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-                    {/* History */}
-                    <Card>
-                        <Tabs<Tab> value={tab} onChange={setTab} options={[
+                <WithSidePanel main={
+                    <Panel>
+                        <PanelTabs<Tab> value={tab} onChange={setTab} options={[
                             { value: 'activity', label: 'Activity', count: activities.length },
                             { value: 'conversations', label: 'Conversations', count: conversations.length },
                             { value: 'tickets', label: 'Tickets', count: tickets.length },
@@ -126,9 +126,9 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                                 Calls, texts and emails with {contact.name} collect here as threads.
                             </EmptyState>
                         ) : (
-                            <List>
+                            <PanelRows>
                                 {conversations.map((c) => (
-                                    <ListRow key={c.id} href={`/desk/inbox/${c.id}`} onClick={() => router.visit(`/desk/inbox/${c.id}`)}
+                                    <PanelRow key={c.id} href={`/desk/inbox/${c.id}`}
                                         leading={<IconTile><ChannelIcon channel={c.channel} size={15} /></IconTile>}
                                         title={<span className="flex items-center gap-2">{channelLabel(c.channel)}<Badge tone={c.status === 'open' ? 'accent' : 'muted'}>{c.status}</Badge></span>}
                                         subtitle={c.preview ? <span>{c.last_from_agent && <span className="text-tertiary">Agent: </span>}<UserText>{c.preview}</UserText></span> : <span className="text-tertiary">No messages</span>}
@@ -140,7 +140,7 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                                         }
                                     />
                                 ))}
-                            </List>
+                            </PanelRows>
                         ))}
 
                         {tab === 'tickets' && (tickets.length === 0 ? (
@@ -149,9 +149,9 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                                 Tickets the team or the agent raise about {contact.name} are listed here.
                             </EmptyState>
                         ) : (
-                            <List>
+                            <PanelRows>
                                 {tickets.map((t) => (
-                                    <ListRow key={t.id} href={`/desk/tickets/${t.id}`} onClick={() => router.visit(`/desk/tickets/${t.id}`)}
+                                    <PanelRow key={t.id} href={`/desk/tickets/${t.id}`}
                                         leading={<IconTile tone={t.priority_tone ?? 'muted'}><TicketIcon size={15} strokeWidth={1.8} /></IconTile>}
                                         title={<UserText>{t.subject}</UserText>}
                                         subtitle={
@@ -169,17 +169,16 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                                         }
                                     />
                                 ))}
-                            </List>
+                            </PanelRows>
                         ))}
 
                         {tab === 'notes' && <NotesPanel contactId={contact.id} notes={notes} />}
-                    </Card>
-
-                    {/* Inspector */}
-                    <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
-                        <Card>
-                            <CardHeader title="Details" />
-                            <CardBody>
+                    </Panel>
+                } side={
+                    <>
+                        <Panel>
+                            <PanelHeader title="Details" />
+                            <PanelBody>
                                 <KeyValues items={[
                                     { label: 'Name', value: <UserText>{contact.name}</UserText> },
                                     { label: 'Company', value: contact.company ?? <span className="text-tertiary">—</span> },
@@ -188,12 +187,8 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                                     { label: 'Value', value: <span className="tabular-nums">{money(contact.value)}</span> },
                                     ...(contact.created_at ? [{ label: 'Added', value: <span title={new Date(contact.created_at).toLocaleString()}>{longDate(contact.created_at)}</span> }] : []),
                                 ]} />
-                            </CardBody>
-                        </Card>
-
-                        <Card>
-                            <CardHeader title="Owner" />
-                            <CardBody>
+                                <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--separator)' }}>
+                                <div className="v-label">Owner</div>
                                 <div className="mb-3 flex items-center gap-3">
                                     {contact.owner
                                         ? <><Avatar name={contact.owner} initials={initialsOf(contact.owner)} size={32} /><span className="text-base font-medium text-primary">{contact.owner}</span></>
@@ -208,17 +203,18 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                                     <option value="">{contact.owner ? 'Change owner…' : 'Assign an owner…'}</option>
                                     {team.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                                 </select>
-                            </CardBody>
-                        </Card>
+                                </div>
+                            </PanelBody>
+                        </Panel>
 
-                        <Card>
-                            <CardHeader title="Ways to reach" description="Every number and address on file." />
+                        <Panel>
+                            <PanelHeader title="Ways to reach" description="Every number and address on file." />
                             {contact.identifiers.length === 0 ? (
-                                <p className="px-5 py-4 text-sm text-tertiary">None recorded.</p>
+                                <p className="px-7 py-5 text-sm text-tertiary">None recorded.</p>
                             ) : (
-                                <ul className="py-1">
+                                <ul className="divide-y py-1" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
                                     {contact.identifiers.map((i) => (
-                                        <li key={i.id} className="flex items-center gap-3 px-5 py-2.5" style={{ opacity: i.blocked ? 0.7 : 1 }}>
+                                        <li key={i.id} className="flex min-h-15 items-center gap-3.5 py-2.5 pr-5 pl-7" style={{ opacity: i.blocked ? 0.7 : 1 }}>
                                             <span className="text-tertiary">{identifierIcon(i.type)}</span>
                                             <div className="min-w-0 flex-1">
                                                 <div className="truncate text-sm text-primary tabular-nums" style={{ textDecoration: i.blocked ? 'line-through' : undefined }}>{i.value}</div>
@@ -242,23 +238,23 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                                     ))}
                                 </ul>
                             )}
-                        </Card>
+                        </Panel>
 
-                        <Card>
-                            <CardHeader title="Tags" />
-                            <CardBody>
+                        <Panel>
+                            <PanelHeader title="Tags" />
+                            <PanelBody>
                                 <TagInput value={contact.tags} onChange={(tags) => patch({ tags })} placeholder="Add a tag…" />
-                            </CardBody>
-                        </Card>
+                            </PanelBody>
+                        </Panel>
 
-                        <Card>
-                            <CardHeader title="Pipelines" actions={<Link href="/desk/leads" className="v-btn v-btn--ghost v-btn--sm">Leads</Link>} />
+                        <Panel>
+                            <PanelHeader title="Pipelines" actions={<Link href="/desk/leads" className="v-btn v-btn--ghost v-btn--sm">Leads</Link>} />
                             {leads.length === 0 ? (
-                                <p className="px-5 py-4 text-sm text-tertiary">Not in any pipeline. <Link href="/desk/leads" className="text-accent-text">Add as a lead</Link>.</p>
+                                <p className="px-7 py-5 text-sm text-tertiary">Not in any pipeline. <Link href="/desk/leads" className="text-accent-text">Add as a lead</Link>.</p>
                             ) : (
-                                <ul className="py-1">
+                                <ul className="divide-y py-1" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
                                     {leads.map((l) => (
-                                        <li key={l.id} className="flex items-center gap-3 px-5 py-2.5">
+                                        <li key={l.id} className="flex min-h-15 items-center gap-3.5 px-7 py-2.5">
                                             <Workflow size={15} strokeWidth={1.8} className="shrink-0 text-tertiary" />
                                             <div className="min-w-0 flex-1">
                                                 <div className="truncate text-sm font-medium text-primary">{l.pipeline ?? 'Pipeline'}</div>
@@ -272,10 +268,10 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                                     ))}
                                 </ul>
                             )}
-                        </Card>
-                    </aside>
-                </div>
-            </div>
+                        </Panel>
+                    </>
+                } />
+            </DeskPage>
 
             <MessageDialog open={messaging} onClose={() => setMessaging(false)} name={contact.name} phone={contact.phone} email={contact.email} />
             <TicketDialog open={ticketing} onClose={() => setTicketing(false)} contactId={contact.id} name={contact.name} types={ticket_types} priorities={priorities} />
@@ -285,7 +281,7 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
 
 function Fact({ label, value, copy }: { label: string; value: ReactNode; copy?: string | null }) {
     return (
-        <div className="group flex min-w-0 flex-col gap-0.5 px-6 py-3.5 even:border-l md:not-first:border-l nth-[n+3]:border-t md:nth-[n+3]:border-t-0" style={{ borderColor: 'var(--separator)' }}>
+        <div className="group flex min-w-0 flex-col gap-1 px-7 py-4 even:border-l lg:not-first:border-l nth-[n+3]:border-t lg:nth-[n+3]:border-t-0" style={{ borderColor: 'var(--separator)' }}>
             <dt className="text-xs text-tertiary">{label}</dt>
             <dd className="flex h-7 min-w-0 items-center gap-2 text-sm text-primary">
                 {value ? <span className="truncate">{value}</span> : <span className="text-tertiary">—</span>}
@@ -344,19 +340,19 @@ function ActivityTimeline({ activities }: { activities: Props['activities'] }) {
     }
 
     return (
-        <div className="px-5 py-4">
+        <div className="px-7 py-6">
             {groups.map((g) => (
-                <section key={g.label} className="mb-2 last:mb-0">
-                    <h3 className="mb-1 text-xs font-medium text-tertiary">{g.label}</h3>
+                <section key={g.label} className="mb-5 last:mb-0">
+                    <h3 className="mb-2 text-xs font-medium text-tertiary">{g.label}</h3>
                     <ol>
                         {g.items.map((a, i) => (
-                            <li key={a.id} className="relative flex gap-3.5 py-2">
-                                {i < g.items.length - 1 && <span className="absolute top-9 bottom-[-6px] left-[13px] w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />}
+                            <li key={a.id} className="relative flex gap-3.5 py-2.5">
+                                {i < g.items.length - 1 && <span className="absolute top-10 bottom-[-8px] left-[13px] w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />}
                                 {a.is_agent
                                     ? <IconTile tone="accent" size={28}><Bot size={14} strokeWidth={1.8} /></IconTile>
                                     : <Avatar name={a.actor} initials={initialsOf(a.actor)} size={28} />}
                                 <div className="min-w-0 flex-1 pt-0.5">
-                                    <p className="text-sm text-primary"><UserText>{a.description}</UserText></p>
+                                    <p className="text-base text-primary"><UserText>{a.description}</UserText></p>
                                     <p className="text-xs text-tertiary">{a.actor} · <time dateTime={a.at} title={new Date(a.at).toLocaleString()}>{clockTime(a.at)}</time></p>
                                 </div>
                             </li>
@@ -381,20 +377,20 @@ function NotesPanel({ contactId, notes }: { contactId: number; notes: Props['not
 
     return (
         <div>
-            <form onSubmit={submit} className="px-5 pt-4 pb-4" style={{ borderBottom: notes.length ? '1px solid var(--separator)' : undefined }}>
+            <form onSubmit={submit} className="px-7 pt-6 pb-6" style={{ borderBottom: notes.length ? '1px solid var(--separator)' : undefined }}>
                 <textarea
                     value={data.body}
                     onChange={(e) => setData('body', e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(e); }}
                     dir="auto"
-                    rows={3}
+                    rows={4}
                     placeholder="Add a note for the team. Only people on the team can see it."
                     aria-label="New note"
-                    className="v-field h-auto resize-none"
+                    className="v-field text-md"
                 />
-                <div className="mt-2 flex items-center justify-between">
+                <div className="mt-3 flex items-center justify-between">
                     <span className="text-xs text-tertiary">Ctrl + Enter to add</span>
-                    <button type="submit" className="v-btn v-btn--quiet v-btn--sm" disabled={processing || !data.body.trim()}>
+                    <button type="submit" className="v-btn v-btn--quiet" disabled={processing || !data.body.trim()}>
                         <Plus size={14} strokeWidth={2} />Add note
                     </button>
                 </div>
@@ -403,20 +399,20 @@ function NotesPanel({ contactId, notes }: { contactId: number; notes: Props['not
             {notes.length === 0 ? (
                 <EmptyState icon={<StickyNote size={20} strokeWidth={1.8} />} title="No notes yet">Context the next person will need: what was promised, what to avoid, who to ask.</EmptyState>
             ) : (
-                <List>
+                <PanelRows>
                     {notes.map((note) => (
-                        <div key={note.id} className="flex gap-3.5 px-5 py-4">
-                            <Avatar name={note.author} initials={initialsOf(note.author)} size={28} />
+                        <div key={note.id} className="flex gap-4 px-7 py-5">
+                            <Avatar name={note.author} initials={initialsOf(note.author)} size={32} />
                             <div className="min-w-0 flex-1">
                                 <div className="mb-1 flex items-center gap-2">
                                     <span className="text-sm font-medium text-primary">{note.author}</span>
                                     <RelativeTime at={note.at} />
                                 </div>
-                                <p className="text-sm whitespace-pre-wrap text-secondary"><UserText>{note.body}</UserText></p>
+                                <p className="max-w-[72ch] text-md whitespace-pre-wrap text-primary"><UserText>{note.body}</UserText></p>
                             </div>
                         </div>
                     ))}
-                </List>
+                </PanelRows>
             )}
         </div>
     );

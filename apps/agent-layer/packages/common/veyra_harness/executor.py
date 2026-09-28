@@ -32,10 +32,13 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from app_sdk.errors import AppSdkError
+from app_sdk.errors import AppSdkError, Unavailable
 
 from .tools import Tool, ToolResult
 from .tracing import span
+
+# Deferred closes, held so the event loop does not drop them mid-retry.
+_PENDING_CLOSES: set[asyncio.Task[None]] = set()
 
 logger = logging.getLogger("veyra.harness.executor")
 
@@ -136,8 +139,31 @@ class ActionExecutor:
     async def _finish(self, tool_call_id: int, **fields: Any) -> None:
         try:
             await self._sdk.finish_tool_call(tool_call_id, **fields)
+        except Unavailable as e:
+            # The app was briefly unreachable (a restart, a cold instance). A
+            # record left open reads as "timed out mid-write" and puts a
+            # finished action in front of a person, so keep trying in the
+            # background; the caller does not wait for the audit trail.
+            logger.warning("executor.close_deferred id=%s error=%s", tool_call_id, e)
+            task = asyncio.create_task(self._finish_later(tool_call_id, fields))
+            _PENDING_CLOSES.add(task)
+            task.add_done_callback(_PENDING_CLOSES.discard)
         except AppSdkError as e:
             logger.warning("executor.close_failed id=%s error=%s", tool_call_id, e)
+
+    async def _finish_later(self, tool_call_id: int, fields: dict[str, Any]) -> None:
+        for delay in (1.0, 3.0, 8.0, 20.0):
+            await asyncio.sleep(delay)
+            try:
+                await self._sdk.finish_tool_call(tool_call_id, **fields)
+                logger.info("executor.close_recovered id=%s", tool_call_id)
+                return
+            except Unavailable:
+                continue
+            except AppSdkError as e:
+                logger.warning("executor.close_failed id=%s error=%s", tool_call_id, e)
+                return
+        logger.error("executor.close_abandoned id=%s — the record stays open and will read as unconfirmed", tool_call_id)
 
     def _reconcile(self, tool: Tool, earlier: dict[str, Any]) -> ToolResult:
         status = earlier.get("status")

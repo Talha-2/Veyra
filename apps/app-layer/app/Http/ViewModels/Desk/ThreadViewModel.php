@@ -2,6 +2,7 @@
 
 namespace App\Http\ViewModels\Desk;
 
+use App\Enums\TicketStatus;
 use App\Models\Activity;
 use App\Models\Call;
 use App\Models\Conversation;
@@ -39,6 +40,7 @@ class ThreadViewModel
             'notes.author:id,name',
             'reminders' => fn ($q) => $q->outstanding()->orderBy('due_at'),
             'tickets' => fn ($q) => $q->latest()->limit(10),
+            'tickets.assignees:id,name',
             'activities.user:id,name',
         ]);
 
@@ -75,6 +77,7 @@ class ThreadViewModel
             'details' => [
                 'notes' => $conversation->notes->map(fn ($n) => [
                     'id' => $n->id, 'body' => $n->body, 'author' => $n->author?->name ?? 'Agent', 'at' => $n->created_at?->toIso8601String(),
+                    'by_agent' => $n->author_id === null,
                 ])->all(),
                 'reminders' => $conversation->reminders->map(fn ($r) => [
                     'id' => $r->id, 'text' => $r->text, 'due_at' => $r->due_at?->toIso8601String(), 'overdue' => $r->due_at?->isPast() ?? false,
@@ -86,6 +89,7 @@ class ThreadViewModel
                     'at' => $t->created_at?->toIso8601String(),
                     'status' => $t->status->value, 'status_label' => $t->status->label(), 'status_tone' => $t->status->tone(),
                     'priority' => $t->priority->value, 'priority_tone' => $t->priority->tone(), 'created_by_agent' => $t->created_by_agent,
+                    'assignees' => $t->assignees->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->all(),
                 ])->all(),
                 'activities' => $conversation->activities->take(30)->map(fn (Activity $a) => [
                     'id' => $a->id, 'actor' => $a->actorLabel(), 'is_agent' => $a->actor === 'agent',
@@ -95,6 +99,10 @@ class ThreadViewModel
                     'id' => $a->id, 'filename' => $a->filename, 'size_bytes' => $a->size_bytes, 'mime' => $a->mime,
                 ])->values()->all(),
             ],
+            // So a ticket card in the timeline can change status in place.
+            'ticket_statuses' => collect(TicketStatus::cases())->map(fn (TicketStatus $s) => [
+                'value' => $s->value, 'label' => $s->label(), 'tone' => $s->tone(),
+            ])->all(),
         ];
     }
 
@@ -147,6 +155,7 @@ class ThreadViewModel
             'attachments' => $m->attachments->map(fn ($a) => [
                 'id' => $a->id, 'filename' => $a->filename, 'size_bytes' => $a->size_bytes,
             ])->all(),
+            'steps' => $this->steps($m),
         ]);
 
         $calls = $this->conversation->calls->map(fn (Call $c) => [
@@ -159,11 +168,40 @@ class ThreadViewModel
             'language' => $c->language,
             'recording_url' => $c->recording_url,
             'transcript' => $c->transcript?->items,
+            'summary' => $c->transcript?->summary,
             'p95_ms' => $c->transcript?->metrics['voice_to_voice']['p95'] ?? null,
             'work' => $this->work($c),
         ]);
 
         return $messages->concat($calls)->sortBy('at')->values()->all();
+    }
+
+    /**
+     * The tool steps an agent reply took (web chat and Studio talk keep them
+     * in `meta.steps`), trimmed to what the thread shows.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function steps(Message $message): array
+    {
+        $steps = $message->meta['steps'] ?? [];
+
+        if (! is_array($steps)) {
+            return [];
+        }
+
+        return collect($steps)
+            ->filter(fn ($s) => is_array($s))
+            ->map(fn (array $s) => [
+                'id' => (string) ($s['id'] ?? ''),
+                'name' => (string) ($s['name'] ?? 'tool'),
+                'label' => $s['label'] ?? null,
+                'detail' => $s['detail'] ?? null,
+                'status' => (string) ($s['status'] ?? 'done'),
+                'summary' => isset($s['summary']) ? str((string) $s['summary'])->limit(1200)->value() : null,
+                'ms' => isset($s['ms']) ? (int) $s['ms'] : null,
+            ])
+            ->values()->all();
     }
 
     private function work(Call $call): array

@@ -3,7 +3,7 @@ import { Activity, ChevronRight, CircleAlert, Clock, Play, Plus, Power, Webhook,
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 
 import { useCreateParam } from '../../components/studio-capability/use-create-param';
-import { Field } from '../../components/studio/form';
+import { Stacked } from '../../components/studio/space';
 import Dialog from '../../components/ui/dialog';
 import { Card, IconTile, List, SearchField, SegmentedControl, StatTile, Switch, Toolbar } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
@@ -88,8 +88,8 @@ export default function Automations({ automations }: { automations: Row[] }) {
                     </EmptyState>
                 </Card>
             ) : (
-                <>
-                    <div className="mb-6 grid gap-4 sm:grid-cols-3">
+                <div className="pt-3">
+                    <div className="mb-12 grid gap-6 sm:grid-cols-3">
                         <StatTile label="Active" icon={<Power size={15} strokeWidth={1.9} />} value={totals.active}
                             hint={`of ${automations.length} ${automations.length === 1 ? 'automation' : 'automations'}; paused ones never fire`} />
                         <StatTile label="Runs, last 7 days" icon={<Activity size={15} strokeWidth={1.9} />} value={totals.recentRuns.toLocaleString()}
@@ -99,6 +99,7 @@ export default function Automations({ automations }: { automations: Row[] }) {
                             hint={totals.recentFailed > 0 ? `across ${totals.failing} ${totals.failing === 1 ? 'automation' : 'automations'}; open one to read the error` : 'Nothing failed this week'} />
                     </div>
 
+                    <div className="mb-2">
                     <Toolbar trailing={<SearchField value={query} onChange={setQuery} placeholder="Search automations" className="w-full sm:w-70" />}>
                         <SegmentedControl<Filter> value={filter} onChange={setFilter} options={[
                             { value: 'all', label: <Count text="All" n={automations.length} /> },
@@ -107,6 +108,7 @@ export default function Automations({ automations }: { automations: Row[] }) {
                             ...(totals.failing > 0 ? [{ value: 'failing' as Filter, label: <Count text="Failing" n={totals.failing} /> }] : []),
                         ]} />
                     </Toolbar>
+                    </div>
 
                     <Card>
                         {visible.length === 0 ? (
@@ -121,10 +123,10 @@ export default function Automations({ automations }: { automations: Row[] }) {
                             </List>
                         )}
                     </Card>
-                </>
+                </div>
             )}
 
-            <Dialog open={creating} onClose={() => setCreating(false)} title="New automation"
+            <Dialog open={creating} onClose={() => setCreating(false)} title="New automation" width={600}
                 description="It starts with a manual trigger and balanced reasoning. You set the goal, when it runs and what it may use on the next screen.">
                 <CreateForm onDone={() => setCreating(false)} />
             </Dialog>
@@ -151,7 +153,7 @@ function AutomationRow({ a, on, onToggle }: { a: Row; on: boolean; onToggle: (v:
 
     return (
         <div
-            className="flex cursor-pointer items-center gap-3.5 px-5 py-3.5 transition-colors hover:bg-surface-hover"
+            className="flex min-h-15 cursor-pointer items-center gap-4 px-5 py-3 transition-colors hover:bg-surface-hover"
             onClick={(e) => { if ((e.target as HTMLElement).closest('a,button')) return; router.visit(href); }}
         >
             <IconTile tone={on ? 'success' : 'muted'}><Workflow size={16} strokeWidth={1.9} /></IconTile>
@@ -167,13 +169,15 @@ function AutomationRow({ a, on, onToggle }: { a: Row; on: boolean; onToggle: (v:
                         </span>
                     )}
                 </div>
-                {a.description && <div className="mt-0.5 truncate text-sm text-secondary">{a.description}</div>}
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-tertiary">
-                    {a.schedule_label && <TriggerChip icon={<Clock size={14} strokeWidth={1.8} />}>{a.schedule_label}</TriggerChip>}
-                    {a.triggers.includes('webhook') && <TriggerChip icon={<Webhook size={14} strokeWidth={1.8} />}>Webhook</TriggerChip>}
-                    {a.app_event && <TriggerChip icon={<Zap size={14} strokeWidth={1.8} />}>On {a.app_event}</TriggerChip>}
-                    {a.triggers.includes('manual') && <TriggerChip icon={<Play size={14} strokeWidth={1.8} />}>By hand</TriggerChip>}
-                    <span className="capitalize">{a.reasoning} reasoning</span>
+                {/* Two lines at most: what starts it, then what it does. */}
+                <div className="mt-0.5 flex min-w-0 items-center gap-3 text-sm text-secondary">
+                    <span className="flex shrink-0 items-center gap-3 text-tertiary">
+                        {a.schedule_label && <TriggerChip icon={<Clock size={13} strokeWidth={1.8} />}>{a.schedule_label}</TriggerChip>}
+                        {a.triggers.includes('webhook') && <TriggerChip icon={<Webhook size={13} strokeWidth={1.8} />}>Webhook</TriggerChip>}
+                        {a.app_event && <TriggerChip icon={<Zap size={13} strokeWidth={1.8} />}>On {a.app_event}</TriggerChip>}
+                        {a.triggers.includes('manual') && <TriggerChip icon={<Play size={13} strokeWidth={1.8} />}>By hand</TriggerChip>}
+                    </span>
+                    {a.description && <span className="min-w-0 truncate" title={a.description}>{a.description}</span>}
                 </div>
             </div>
 
@@ -207,14 +211,14 @@ function CreateForm({ onDone }: { onDone: () => void }) {
     const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/automations'); };
 
     return (
-        <form onSubmit={submit}>
-            <Field label="Name" error={errors.name}>
-                <input className="v-field" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} placeholder="Morning digest" autoFocus />
-            </Field>
-            <Field label="What it does" error={errors.description} hint="One line, for the list. The goal you brief it with comes next.">
-                <input className="v-field" value={data.description} maxLength={300} onChange={(e) => setData('description', e.target.value)} placeholder="Summarise overnight calls for the team at 8am." />
-            </Field>
-            <div className="mt-6 flex justify-end gap-2">
+        <form onSubmit={submit} className="flex flex-col gap-5 pt-1">
+            <Stacked label="Name" htmlFor="automation-name" error={errors.name}>
+                <input id="automation-name" className="v-field" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} placeholder="Morning digest" autoFocus />
+            </Stacked>
+            <Stacked label="What it does" htmlFor="automation-description" error={errors.description} hint="One line, for the list. The goal you brief it with comes next.">
+                <input id="automation-description" className="v-field" value={data.description} maxLength={300} onChange={(e) => setData('description', e.target.value)} placeholder="Summarise overnight calls for the team at 8am." />
+            </Stacked>
+            <div className="mt-2 flex justify-end gap-2 border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
                 <button type="button" className="v-btn v-btn--ghost" onClick={onDone}>Cancel</button>
                 <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.name.trim()}>{processing ? 'Creating…' : 'Create automation'}</button>
             </div>

@@ -7,7 +7,8 @@ import { Field } from '../../../components/studio/form';
 import SettingsShell from '../../../components/studio/settings-shell';
 import AssigneePicker from '../../../components/ui/assignee-picker';
 import Dialog from '../../../components/ui/dialog';
-import { Card, CardHeader, Switch } from '../../../components/ui/kit';
+import { DialogActions, PanelHeader } from '../../../components/studio-ops/page-parts';
+import { Card, Switch } from '../../../components/ui/kit';
 import { Avatar, Badge, EmptyState } from '../../../components/ui/primitives';
 
 interface Type { id: number; name: string; color: string; description: string | null; default_assignee_ids: number[]; enabled: boolean; tickets_count: number }
@@ -42,13 +43,13 @@ export default function TicketTypeSettings({ types, team }: { types: Type[]; tea
                     </EmptyState>
                 ) : (
                     <>
-                        <CardHeader title="Types" description="Turning a type off hides it when creating tickets. Existing tickets keep it." />
+                        <PanelHeader title="Types" description="Turning a type off hides it when creating tickets. Existing tickets keep it." />
                         <div className="divide-y" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
                             {types.map((t) => {
                                 const assignees = t.default_assignee_ids.map((id) => team.find((u) => u.id === id)).filter((u): u is Member => !!u);
                                 return (
-                                    <div key={t.id} className="flex items-center gap-3.5 px-5 py-3.5">
-                                        <div className={`flex min-w-0 flex-1 items-center gap-3.5 transition-opacity ${t.enabled ? '' : 'opacity-55'}`}>
+                                    <div key={t.id} className="flex min-h-16 items-center gap-4 px-7 py-3">
+                                        <div className={`flex min-w-0 flex-1 items-center gap-4 transition-opacity ${t.enabled ? '' : 'opacity-55'}`}>
                                             <TypeTile color={t.color} />
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
@@ -57,17 +58,17 @@ export default function TicketTypeSettings({ types, team }: { types: Type[]; tea
                                                 </div>
                                                 <div className="truncate text-sm text-secondary">{t.description || 'No description'}</div>
                                             </div>
-                                            <div className="hidden w-36 shrink-0 items-center gap-2 sm:flex" title={assignees.map((a) => a.name).join(', ')}>
+                                            <div className="hidden w-40 shrink-0 items-center gap-2 sm:flex" title={assignees.map((a) => a.name).join(', ')}>
                                                 {assignees.length > 0 ? (
                                                     <>
                                                         <span className="flex -space-x-1.5">
                                                             {assignees.slice(0, 3).map((a) => <span key={a.id} className="rounded-full" style={{ boxShadow: '0 0 0 2px var(--surface)' }}><Avatar initials={initials(a.name)} name={a.name} size={22} /></span>)}
                                                         </span>
-                                                        <span className="truncate text-xs text-secondary">{assignees.length === 1 ? assignees[0].name.split(' ')[0] : `${assignees.length} people`}</span>
+                                                        <span className="truncate text-sm text-secondary">{assignees.length === 1 ? assignees[0].name.split(' ')[0] : `${assignees.length} people`}</span>
                                                     </>
-                                                ) : <span className="text-xs text-tertiary">No default assignee</span>}
+                                                ) : <span className="text-sm text-tertiary">No default assignee</span>}
                                             </div>
-                                            <span className="hidden w-20 shrink-0 text-right text-sm text-secondary tabular-nums md:inline">{t.tickets_count} {t.tickets_count === 1 ? 'ticket' : 'tickets'}</span>
+                                            <span className="hidden w-22 shrink-0 text-right text-sm text-secondary tabular-nums md:inline">{t.tickets_count} {t.tickets_count === 1 ? 'ticket' : 'tickets'}</span>
                                         </div>
                                         <Switch size="sm" checked={t.enabled} label={`${t.name} in use`} onChange={(v) => router.patch(`/studio/settings/ticket-types/${t.id}`, { enabled: v }, { preserveScroll: true })} />
                                         <button type="button" className="v-btn v-btn--ghost v-btn--icon" aria-label={`Edit ${t.name}`} onClick={() => setEditing(t)}><Pencil size={14} strokeWidth={2} /></button>
@@ -89,13 +90,13 @@ function TypeDialog({ type, team, onClose }: { type: Type | null; team: Member[]
     const deletable = type && type.tickets_count === 0;
 
     return (
-        <Dialog open onClose={onClose} title={type ? `Edit ${type.name}` : 'New ticket type'} description="The colour marks the type everywhere a ticket appears in Desk.">
+        <Dialog open onClose={onClose} title={type ? `Edit ${type.name}` : 'New ticket type'} description="The colour marks the type everywhere a ticket appears in Desk." width={600}>
             <form onSubmit={submit}>
-                <div className="mb-5 flex items-center gap-3 rounded-md px-3.5 py-3" style={{ background: 'var(--surface-sunken)' }}>
-                    <TypeTile color={data.color} size={32} />
+                <div className="mb-6 flex items-center gap-3.5 rounded-lg px-4 py-4" style={{ background: 'var(--surface-sunken)' }}>
+                    <TypeTile color={data.color} size={36} />
                     <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-primary">{data.name.trim() || 'Untitled type'}</div>
-                        <div className="truncate text-xs text-secondary">{data.description.trim() || 'Preview of how it appears in lists'}</div>
+                        <div className="truncate text-base font-medium text-primary">{data.name.trim() || 'Untitled type'}</div>
+                        <div className="truncate text-sm text-secondary">{data.description.trim() || 'Preview of how it appears in lists'}</div>
                     </div>
                 </div>
                 <Field label="Name" error={errors.name}>
@@ -110,17 +111,21 @@ function TypeDialog({ type, team, onClose }: { type: Type | null; team: Member[]
                 <Field label="Default assignees" hint="New tickets of this type, including ones the agent raises, go to these people.">
                     <AssigneePicker team={team} value={data.default_assignee_ids} onChange={(ids) => setData('default_assignee_ids', ids)} />
                 </Field>
-                <div className="mt-6 flex items-center gap-2">
-                    {deletable && (
-                        <button type="button" className="v-btn v-btn--danger" onClick={() => confirm(`Delete "${type.name}"? This cannot be undone.`) && router.delete(`/studio/settings/ticket-types/${type.id}`, { onSuccess: onClose })}>
-                            <Trash2 size={14} strokeWidth={2} />Delete
-                        </button>
-                    )}
-                    {type && !deletable && <span className="text-xs text-tertiary">In use by {type.tickets_count} tickets, so it can be turned off but not deleted.</span>}
-                    <div className="flex-1" />
+                <DialogActions
+                    start={
+                        <>
+                            {deletable && (
+                                <button type="button" className="v-btn v-btn--danger" onClick={() => confirm(`Delete "${type.name}"? This cannot be undone.`) && router.delete(`/studio/settings/ticket-types/${type.id}`, { onSuccess: onClose })}>
+                                    <Trash2 size={14} strokeWidth={2} />Delete
+                                </button>
+                            )}
+                            {type && !deletable && <span className="max-w-60 text-xs text-tertiary">In use by {type.tickets_count} tickets, so it can be turned off but not deleted.</span>}
+                        </>
+                    }
+                >
                     <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.name.trim()}>{processing ? 'Saving…' : type ? 'Save' : 'Create type'}</button>
-                </div>
+                </DialogActions>
             </form>
         </Dialog>
     );

@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Popover from '../ui/popover';
 import { KeyValues, Switch } from '../ui/kit';
 import { Avatar, Badge, Mono, RelativeTime, UserText } from '../ui/primitives';
+import { AvatarStack } from '../desk-inbox/controls';
 import { InspectorSection } from '../desk-inbox/inspector';
 import { dateTimeLabel, fileSize, initialsOf } from '../desk-inbox/helpers';
 import TagEditor from '../desk-inbox/tag-editor';
@@ -95,7 +96,10 @@ export default function ContactPanel({ thread, existingTags }: { thread: ThreadV
                                     {t.status_label && <Badge tone={t.status_tone ?? 'muted'} dot>{t.status_label}</Badge>}
                                     <Badge tone={t.priority_tone}>{t.priority}</Badge>
                                 </span>
-                                <span className="mt-0.5 block truncate text-sm font-medium text-primary"><UserText>{t.subject}</UserText></span>
+                                <span className="mt-0.5 flex items-center gap-2">
+                                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-primary"><UserText>{t.subject}</UserText></span>
+                                    {t.assignees && t.assignees.length > 0 && <AvatarStack people={t.assignees} size={18} />}
+                                </span>
                             </span>
                             <ChevronRight size={14} strokeWidth={2} className="shrink-0 text-tertiary" />
                         </Link>

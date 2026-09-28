@@ -38,13 +38,22 @@ export interface TimelineMessage {
     body: string | null; status: string; pinned: boolean;
     my_feedback: 'up' | 'down' | null; feedback_counts: { up: number; down: number };
     attachments: { id: number; filename: string; size_bytes: number }[];
+    /** Tool steps an agent reply took (web chat, Studio talk). */
+    steps?: AgentStep[];
 }
+
+export interface AgentStep {
+    id: string; name: string; label: string | null; detail: string | null; status: string; summary: string | null; ms: number | null;
+}
+
+export interface TranscriptTurn { role: string; text: string; at?: string; lang?: string }
 
 export interface TimelineCall {
     kind: 'call';
     id: number; at: string; direction: string; status: string; duration: string;
     language: string | null; recording_url: string | null;
-    transcript: { role: string; text: string }[] | null; p95_ms: number | null; work: DelegationView[];
+    transcript: TranscriptTurn[] | null; p95_ms: number | null; work: DelegationView[];
+    summary?: string | null;
 }
 
 export type TimelineEntry = TimelineMessage | TimelineCall;
@@ -52,6 +61,7 @@ export type TimelineEntry = TimelineMessage | TimelineCall;
 export interface TicketSummary {
     id: number; reference: string; subject: string; status: string; status_label?: string; status_tone?: Tone;
     priority: string; priority_tone: Tone; created_by_agent: boolean;
+    assignees?: TeamMember[];
 }
 
 export interface ThreadView {
@@ -74,12 +84,13 @@ export interface ThreadView {
     timeline: TimelineEntry[];
     pinned: { id: number; body: string; at: string }[];
     details: {
-        notes: { id: number; body: string; author: string; at: string }[];
+        notes: { id: number; body: string; author: string; at: string; by_agent?: boolean }[];
         reminders: { id: number; text: string; due_at: string | null; overdue: boolean }[];
         tickets: TicketSummary[];
         activities: { id: number; actor: string; is_agent: boolean; type: string; description: string; at: string }[];
         attachments: { id: number; filename: string; size_bytes: number; mime: string | null }[];
     };
+    ticket_statuses?: { value: string; label: string; tone: Tone }[];
 }
 
 export interface SavedViewRow { id: number; name: string; filters: Record<string, string | null>; is_shared: boolean; mine: boolean }

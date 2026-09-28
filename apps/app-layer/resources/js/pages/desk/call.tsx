@@ -1,10 +1,13 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Bot, Check, ChevronDown, ChevronRight, CircleDot, Flag, Gauge, MessagesSquare, Ticket, Timer, Wrench, X } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Bot, Check, ChevronDown, ChevronRight, CircleDot, Flag, Gauge, MessagesSquare, Play, Ticket, Timer, Wrench, X } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
 
 import { clockTime, longDate, ms, relative } from '../../components/desk-pages/format';
-import { Callout, Card, CardBody, CardHeader, CopyButton, IconTile, KeyValues, List, ListRow, StatTile } from '../../components/ui/kit';
+import { DeskPage, MetricTile, Panel, PanelBody, PanelHeader, PanelRow, PanelRows, WithSidePanel } from '../../components/desk-pages/layout';
+import { Callout, CopyButton, IconTile, KeyValues } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
+import RecordingPlayer, { type RecordingPlayerHandle } from '../../components/desk-inbox/recording-player';
+import { clock, offsetSeconds } from '../../components/desk-inbox/helpers';
 import { Avatar, Badge, EmptyState, Eyebrow, Mono, toneColor, UserText, type Tone } from '../../components/ui/primitives';
 
 interface ToolCall {
@@ -45,11 +48,12 @@ export default function CallDetail({ call }: Props) {
     const title = call.contact ? call.contact.name : call.from ?? 'Unknown caller';
     const statusTone: Tone = call.live ? 'accent' : call.status === 'completed' ? 'success' : call.status === 'failed' ? 'danger' : 'muted';
     const toolCount = call.loose_tool_calls.length + call.delegations.reduce((a, d) => a + d.tool_calls.length, 0);
+    const player = useRef<RecordingPlayerHandle>(null);
 
     return (
         <>
             <Head title={`Call · ${title}`} />
-            <div className="mx-auto max-w-[1320px] px-6 py-7 md:px-8">
+            <DeskPage header={
                 <PageHeader
                     back={{ href: '/desk/calls', label: 'Calls' }}
                     eyebrow={`${call.direction === 'inbound' ? 'Inbound' : 'Outbound'} call${call.line ? ` · ${call.line}` : ''} · ${call.language_label}`}
@@ -70,58 +74,56 @@ export default function CallDetail({ call }: Props) {
                         </>
                     }
                 />
-
+            }>
                 {review.length > 0 && (
-                    <div className="mb-6">
-                        <Callout tone="danger" icon={<AlertTriangle size={16} strokeWidth={2} />} title="Needs review before anyone calls back">
-                            <span className="font-medium text-primary">{review.map((t) => humanAction(t.action)).join(', ')}</span> timed out on this call. The action is not safe to repeat blindly and may or may not have happened; check the other system before telling the customer either way.
-                        </Callout>
-                    </div>
+                    <Callout tone="danger" icon={<AlertTriangle size={16} strokeWidth={2} />} title="Needs review before anyone calls back">
+                        <span className="font-medium text-primary">{review.map((t) => humanAction(t.action)).join(', ')}</span> timed out on this call. The action is not safe to repeat blindly and may or may not have happened; check the other system before telling the customer either way.
+                    </Callout>
                 )}
 
-                <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-                    <div className="flex min-w-0 flex-col gap-6">
+                <WithSidePanel main={
+                    <>
                         {call.summary && (
-                            <Card>
-                                <CardBody>
-                                    <Eyebrow className="mb-2 block">What happened</Eyebrow>
-                                    <p className="text-md text-primary" dir="auto"><UserText>{call.summary}</UserText></p>
-                                </CardBody>
-                            </Card>
+                            <Panel>
+                                <PanelBody>
+                                    <Eyebrow className="mb-3 block">What happened</Eyebrow>
+                                    <p className="max-w-[72ch] text-lg leading-relaxed text-primary" dir="auto"><UserText>{call.summary}</UserText></p>
+                                </PanelBody>
+                            </Panel>
                         )}
 
-                        <Card>
-                            <CardHeader title="Handoffs" description="What the front desk sent the worker, what came back, and the tools that ran in between."
+                        <Panel>
+                            <PanelHeader title="Handoffs" description="What the front desk sent the worker, what came back, and the tools that ran in between."
                                 actions={<Badge tone="muted">{call.delegations.length}</Badge>} />
                             {call.delegations.length === 0 ? (
-                                <p className="px-5 py-6 text-sm text-tertiary">{call.live ? 'Nothing handed off yet.' : 'The agent handled this call without handing anything off: informational only.'}</p>
+                                <p className="px-7 py-6 text-sm text-tertiary">{call.live ? 'Nothing handed off yet.' : 'The agent handled this call without handing anything off: informational only.'}</p>
                             ) : (
-                                <ol className="px-5 pt-5 pb-3">
+                                <ol className="px-7 pt-6 pb-4">
                                     {call.delegations.map((d, i) => <DelegationNode key={d.id} d={d} last={i === call.delegations.length - 1} />)}
                                 </ol>
                             )}
                             {call.loose_tool_calls.length > 0 && (
-                                <div className="px-5 py-4" style={{ borderTop: '1px solid var(--separator)' }}>
-                                    <Eyebrow className="mb-2.5 block">Outside any handoff</Eyebrow>
+                                <div className="px-7 py-6" style={{ borderTop: '1px solid var(--separator)' }}>
+                                    <Eyebrow className="mb-3 block">Outside any handoff</Eyebrow>
                                     <ToolCallList calls={call.loose_tool_calls} />
                                 </div>
                             )}
-                        </Card>
+                        </Panel>
 
-                        <Card>
-                            <CardHeader title="Transcript" description={call.transcript.length ? `${call.transcript.length} turns, in the language they were spoken.` : undefined}
+                        <Panel>
+                            <PanelHeader title="Transcript" description={call.transcript.length ? `${call.transcript.length} turns, in the language they were spoken.` : undefined}
                                 actions={call.live ? <Badge tone="accent" dot>Live</Badge> : undefined} />
                             {call.transcript.length === 0
                                 ? <EmptyState icon={<MessagesSquare size={20} strokeWidth={1.8} />} title="No transcript yet">{call.live ? 'Turns appear once the call ends.' : 'This call was not transcribed.'}</EmptyState>
-                                : <Transcript turns={call.transcript} callerName={title} contact={call.contact} />}
-                        </Card>
-                    </div>
-
-                    {/* Inspector */}
-                    <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
-                        <Card>
-                            <CardHeader title="Call" icon={call.direction === 'inbound' ? <ArrowDownLeft size={16} strokeWidth={1.8} /> : <ArrowUpRight size={16} strokeWidth={1.8} />} />
-                            <CardBody>
+                                : <Transcript turns={call.transcript} callerName={title} contact={call.contact} start={call.at}
+                                    onSeek={call.recording_url ? (s) => player.current?.seek(s) : undefined} />}
+                        </Panel>
+                    </>
+                } side={
+                    <>
+                        <Panel>
+                            <PanelHeader title="Call" icon={call.direction === 'inbound' ? <ArrowDownLeft size={17} strokeWidth={1.8} /> : <ArrowUpRight size={17} strokeWidth={1.8} />} />
+                            <PanelBody>
                                 <KeyValues items={[
                                     { label: 'When', value: <time dateTime={call.at} title={new Date(call.at).toLocaleString()}>{relative(call.at)}</time> },
                                     { label: 'Length', value: <span className="tabular-nums">{call.duration}</span> },
@@ -132,64 +134,64 @@ export default function CallDetail({ call }: Props) {
                                     ...(call.transferred_to ? [{ label: 'Transferred', value: call.transferred_to }] : []),
                                     ...(call.error ? [{ label: 'Error', value: <span className="text-danger">{call.error}</span> }] : []),
                                 ]} />
-                                {call.recording_url && (
-                                    <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--separator)' }}>
-                                        <Eyebrow className="mb-2 block">Recording</Eyebrow>
-                                        <audio controls preload="none" src={call.recording_url} className="w-full" />
+                                {call.recording_url ? (
+                                    <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--separator)' }}>
+                                        <Eyebrow className="mb-2.5 block">Recording</Eyebrow>
+                                        <RecordingPlayer ref={player} src={call.recording_url} label="Call recording" />
                                     </div>
+                                ) : !call.live && (
+                                    <p className="mt-6 pt-6 text-sm text-tertiary" style={{ borderTop: '1px solid var(--separator)' }}>No recording was kept for this call.</p>
                                 )}
-                            </CardBody>
-                        </Card>
+                            </PanelBody>
+                        </Panel>
 
                         {call.contact && (
-                            <Card>
-                                <List>
-                                    <ListRow href={`/desk/contacts/${call.contact.id}`} onClick={() => router.visit(`/desk/contacts/${call.contact!.id}`)}
-                                        leading={<Avatar name={call.contact.name} initials={call.contact.initials} size={36} />}
-                                        title={<UserText>{call.contact.name}</UserText>}
-                                        subtitle="Known customer · open profile"
-                                        trailing={<ChevronRight size={15} strokeWidth={2} className="text-tertiary" />} />
-                                </List>
-                            </Card>
+                            <Panel className="overflow-hidden">
+                                <PanelRow href={`/desk/contacts/${call.contact.id}`}
+                                    leading={<Avatar name={call.contact.name} initials={call.contact.initials} size={40} />}
+                                    title={<UserText>{call.contact.name}</UserText>}
+                                    subtitle="Known customer · open profile"
+                                    trailing={<ChevronRight size={15} strokeWidth={2} className="text-tertiary" />} />
+                            </Panel>
                         )}
 
                         <div>
-                            <div className="mb-2 flex items-center justify-between px-1">
+                            <div className="mb-3 flex items-center justify-between px-1">
                                 <Eyebrow>Latency</Eyebrow>
                                 <span className="text-xs text-tertiary">voice to voice</span>
                             </div>
                             {v2v?.p50 ? (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <StatTile label="p50" icon={<Gauge size={14} strokeWidth={1.8} />} value={ms(v2v.p50)} tone={v2v.p50 > BUDGET.p50 ? 'warning' : undefined} hint={`Budget ${ms(BUDGET.p50)}`} />
-                                    <StatTile label="p95" icon={<Timer size={14} strokeWidth={1.8} />} value={ms(v2v.p95)} tone={v2v.p95 && v2v.p95 > BUDGET.p95 ? 'warning' : undefined} hint={`Budget ${ms(BUDGET.p95)}`} />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <MetricTile label="p50" icon={<Gauge size={14} strokeWidth={1.8} />} value={ms(v2v.p50)} tone={v2v.p50 > BUDGET.p50 ? 'var(--warning)' : undefined} hint={`Budget ${ms(BUDGET.p50)}`} />
+                                    <MetricTile label="p95" icon={<Timer size={14} strokeWidth={1.8} />} value={ms(v2v.p95)} tone={v2v.p95 && v2v.p95 > BUDGET.p95 ? 'var(--warning)' : undefined} hint={`Budget ${ms(BUDGET.p95)}`} />
                                 </div>
                             ) : (
-                                <Card padded><p className="text-sm text-tertiary">No latency figures on this call.</p></Card>
+                                <Panel><PanelBody><p className="text-sm text-tertiary">No latency figures on this call.</p></PanelBody></Panel>
                             )}
-                            <p className="mt-2 px-1 text-xs text-tertiary">
+                            <p className="mt-3 px-1 text-xs text-tertiary">
                                 From the caller going quiet to the agent's first audio{v2v?.turns ? `, over ${v2v.turns} turns` : ''}.
                             </p>
                         </div>
 
-                        <Card>
-                            <CardHeader title="Tickets from this call" actions={call.tickets.length ? <Badge tone="muted">{call.tickets.length}</Badge> : undefined} />
+                        <Panel>
+                            <PanelHeader title="Tickets from this call" actions={call.tickets.length ? <Badge tone="muted">{call.tickets.length}</Badge> : undefined} />
                             {call.tickets.length === 0 ? (
-                                <p className="px-5 py-4 text-sm text-tertiary">None raised. If the agent promised a follow-up, there should be one here.</p>
+                                <p className="px-7 py-5 text-sm text-tertiary">None raised. If the agent promised a follow-up, there should be one here.</p>
                             ) : (
-                                <List>
+                                <PanelRows>
                                     {call.tickets.map((t) => (
-                                        <ListRow key={t.id} href={`/desk/tickets/${t.id}`} onClick={() => router.visit(`/desk/tickets/${t.id}`)}
-                                            leading={<IconTile size={30}><Ticket size={14} strokeWidth={1.8} /></IconTile>}
+                                        <PanelRow key={t.id} href={`/desk/tickets/${t.id}`}
+                                            leading={<IconTile size={32}><Ticket size={14} strokeWidth={1.8} /></IconTile>}
                                             title={<UserText>{t.subject}</UserText>}
                                             subtitle={<Mono>{t.reference}</Mono>}
                                             trailing={<Badge tone="muted">{t.status.replace(/_/g, ' ')}</Badge>} />
                                     ))}
-                                </List>
+                                </PanelRows>
                             )}
-                        </Card>
-                    </aside>
-                </div>
-            </div>
+                        </Panel>
+                    </>
+                } />
+            </DeskPage>
         </>
     );
 }
@@ -210,9 +212,11 @@ function turnTime(at?: string) {
     return Number.isNaN(Date.parse(at)) ? null : clockTime(at);
 }
 
-function Transcript({ turns, callerName, contact }: { turns: Props['call']['transcript']; callerName: string; contact: Props['call']['contact'] }) {
+function Transcript({ turns, callerName, contact, start, onSeek }: {
+    turns: Props['call']['transcript']; callerName: string; contact: Props['call']['contact']; start: string; onSeek?: (seconds: number) => void;
+}) {
     return (
-        <div className="flex flex-col px-5 py-5">
+        <div className="flex flex-col px-7 py-6">
             {turns.map((turn, i) => {
                 const prev = turns[i - 1];
                 const startsGroup = !prev || prev.role !== turn.role;
@@ -227,6 +231,8 @@ function Transcript({ turns, callerName, contact }: { turns: Props['call']['tran
                 }
 
                 const caller = turn.role === 'caller';
+                const offset = offsetSeconds(turn.at, start);
+                const seekable = onSeek && offset != null;
 
                 return (
                     <div key={i} className={`flex items-end gap-2.5 ${caller ? 'flex-row-reverse' : ''} ${startsGroup ? 'mt-4 first:mt-0' : 'mt-1'}`}>
@@ -235,14 +241,19 @@ function Transcript({ turns, callerName, contact }: { turns: Props['call']['tran
                                 ? <Avatar name={contact?.name ?? callerName} initials={contact?.initials ?? '?'} size={28} />
                                 : <IconTile tone="info" size={28}><Bot size={14} strokeWidth={1.8} /></IconTile>)}
                         </span>
-                        <div className={`flex max-w-[76%] flex-col ${caller ? 'items-end' : 'items-start'}`}>
+                        <div className={`flex max-w-[min(76%,640px)] flex-col ${caller ? 'items-end' : 'items-start'}`}>
                             {startsGroup && (
                                 <span className="mb-1 flex items-center gap-1.5 px-1 text-xs text-tertiary">
                                     <span className="font-medium text-secondary">{caller ? callerName : 'Agent'}</span>
                                     {time && <span className="tabular-nums">{time}</span>}
+                                    {seekable && (
+                                        <button type="button" onClick={() => onSeek(offset)} className="inline-flex items-center gap-1 rounded-sm px-1 font-medium text-accent-text tabular-nums hover:underline" title="Play the recording from here">
+                                            <Play size={9} strokeWidth={2.4} fill="currentColor" aria-hidden="true" />{clock(offset)}
+                                        </button>
+                                    )}
                                 </span>
                             )}
-                            <div className="px-3.5 py-2 text-base text-primary" dir="auto" lang={turn.lang}
+                            <div className="px-4 py-2.5 text-md text-primary" dir="auto" lang={turn.lang}
                                 style={{
                                     background: caller ? 'color-mix(in srgb, var(--voice-caller) 13%, var(--surface))' : 'var(--surface-sunken)',
                                     borderRadius: 'var(--radius-xl)',
@@ -273,7 +284,7 @@ function DelegationNode({ d, last }: { d: Delegation; last: boolean }) {
     const state = delegationState(d);
 
     return (
-        <li className="relative flex gap-4 pb-5 last:pb-2">
+        <li className="relative flex gap-4 pb-6 last:pb-2">
             {!last && <span className="absolute top-9 bottom-0 left-[15px] w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />}
             <IconTile tone={state.tone} size={32}>{state.icon}</IconTile>
 
@@ -299,8 +310,8 @@ function DelegationNode({ d, last }: { d: Delegation; last: boolean }) {
                 </button>
 
                 {open && (
-                    <div className="mt-3 flex flex-col gap-3">
-                        <div className="grid gap-3 md:grid-cols-2">
+                    <div className="mt-4 flex flex-col gap-4">
+                        <div className="grid gap-4 lg:grid-cols-2">
                             <Well label="Sent to the worker">
                                 <pre className="v-code whitespace-pre-wrap text-secondary" dir="auto">{d.transcript_delta}</pre>
                             </Well>
@@ -323,7 +334,7 @@ function DelegationNode({ d, last }: { d: Delegation; last: boolean }) {
 
 function Well({ label, children, tone }: { label: string; children: ReactNode; tone?: 'danger' }) {
     return (
-        <div className="min-w-0 rounded-md p-3" style={{ background: 'var(--surface-sunken)', border: `1px solid ${tone === 'danger' ? 'var(--danger-border)' : 'var(--border)'}` }}>
+        <div className="min-w-0 rounded-md p-4" style={{ background: 'var(--surface-sunken)', border: `1px solid ${tone === 'danger' ? 'var(--danger-border)' : 'var(--border)'}` }}>
             <div className="mb-1.5 text-xs font-medium text-tertiary">{label}</div>
             {children}
         </div>
@@ -343,7 +354,7 @@ function ToolCallRow({ t, first }: { t: ToolCall; first: boolean }) {
 
     return (
         <div style={{ borderTop: first ? undefined : '1px solid var(--separator)', background: t.needs_reconciliation ? 'color-mix(in srgb, var(--danger) 5%, var(--surface))' : 'var(--surface)' }}>
-            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-surface-hover">
+            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex min-h-12 w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-surface-hover">
                 {t.needs_reconciliation
                     ? <AlertTriangle size={14} strokeWidth={2} className="shrink-0 text-danger" />
                     : <CircleDot size={14} strokeWidth={2} className="shrink-0" style={{ color: toneColor(t.tone) }} />}
@@ -357,7 +368,7 @@ function ToolCallRow({ t, first }: { t: ToolCall; first: boolean }) {
                 <ChevronDown size={13} strokeWidth={2} className="shrink-0 text-tertiary transition-transform" style={{ transform: open ? 'rotate(180deg)' : 'none' }} />
             </button>
             {open && (
-                <div className="grid gap-2.5 px-3 pb-3 md:grid-cols-2">
+                <div className="grid gap-3 px-4 pb-4 lg:grid-cols-2">
                     <Well label="Arguments"><pre className="v-code whitespace-pre-wrap text-secondary">{JSON.stringify(t.arguments ?? {}, null, 2)}</pre></Well>
                     <Well label={t.error ? 'Error' : 'Result'} tone={t.error ? 'danger' : undefined}>
                         <pre className="v-code whitespace-pre-wrap" style={{ color: t.error ? 'var(--danger)' : 'var(--text-secondary)' }}>{t.error ?? JSON.stringify(t.result ?? null, null, 2)}</pre>

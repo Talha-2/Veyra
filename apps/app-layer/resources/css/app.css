@@ -32,75 +32,78 @@
 :root {
     color-scheme: light;
 
-    /* canvas and surfaces */
-    --bg: #f7f7f8;
-    --bg-subtle: #f1f1f3;
-    --sidebar: #f0f0f2;
+    /* Light, in the Vercel/Geist manner: white cards on a faint grey canvas,
+       one hairline for structure, near-black ink, grey in two steps. */
+    --bg: #fafafa;
+    --bg-subtle: #f5f5f5;
+    --sidebar: #fafafa;
     --surface: #ffffff;
     --surface-raised: #ffffff;
-    --surface-overlay: rgba(255, 255, 255, 0.88);
-    --surface-sunken: #f2f2f4;
-    --surface-hover: rgba(0, 0, 0, 0.04);
-    --surface-active: rgba(0, 0, 0, 0.065);
+    --surface-overlay: rgba(255, 255, 255, 0.9);
+    --surface-sunken: #f5f5f5;
+    --surface-hover: rgba(0, 0, 0, 0.045);
+    --surface-active: rgba(0, 0, 0, 0.08);
 
     /* the voice stage stays dark in both themes */
-    --stage: #0e0e13;
-    --stage-raised: #18181b;
-    --stage-border: #27272a;
-    --stage-text: #f5f5f7;
-    --stage-text-muted: #8e8e93;
+    --stage: #0a0a0a;
+    --stage-raised: #111111;
+    --stage-border: #262626;
+    --stage-text: #ededed;
+    --stage-text-muted: #8f8f8f;
 
     /* hairlines */
-    --border: rgba(0, 0, 0, 0.075);
-    --border-strong: rgba(0, 0, 0, 0.13);
+    --border: #ebebeb;
+    --border-strong: #d6d6d6;
     --border-accent: rgba(233, 107, 52, 0.55);
-    --separator: rgba(0, 0, 0, 0.06);
+    --separator: #efefef;
 
     /* text */
-    --text-primary: #1d1d1f;
-    --text-secondary: #636366;
-    --text-tertiary: #8e8e93;
-    --text-disabled: #c2c2c7;
+    --text-primary: #171717;
+    --text-secondary: #5f5f5f;
+    --text-tertiary: #8f8f8f;
+    --text-disabled: #c7c7c7;
     --text-inverse: #ffffff;
     --text-on-accent: #ffffff;
 
-    /* primary action: an ink pill */
-    --primary: #1d1d1f;
-    --primary-hover: #3a3a3c;
+    /* primary action: black */
+    --primary: #171717;
+    --primary-hover: #383838;
     --primary-text: #ffffff;
 
     /* accent: Ember, spent sparingly */
     --accent: #e96b34;
     --accent-hover: #d55f2c;
     --accent-active: #c25526;
-    --accent-subtle: rgba(233, 107, 52, 0.1);
-    --accent-subtle-hover: rgba(233, 107, 52, 0.16);
+    --accent-subtle: rgba(233, 107, 52, 0.09);
+    --accent-subtle-hover: rgba(233, 107, 52, 0.15);
     --accent-text: #c2541c;
-    --accent-2: #34c759;
+    --accent-2: #1f9d55;
 
-    --success: #248a3d; --success-fill: #34c759; --success-subtle: rgba(52, 199, 89, 0.12); --success-border: rgba(36, 138, 61, 0.28);
-    --warning: #b25f00; --warning-fill: #ff9f0a; --warning-subtle: rgba(255, 159, 10, 0.13); --warning-border: rgba(178, 95, 0, 0.28);
-    --danger: #d70015;  --danger-fill: #ff3b30;  --danger-subtle: rgba(255, 59, 48, 0.1);   --danger-border: rgba(215, 0, 21, 0.26);
-    --info: #0066cc;    --info-fill: #0a84ff;    --info-subtle: rgba(10, 132, 255, 0.1);    --info-border: rgba(0, 102, 204, 0.26);
+    --success: #107d32; --success-fill: #1f9d55; --success-subtle: rgba(31, 157, 85, 0.1);  --success-border: rgba(16, 125, 50, 0.28);
+    --warning: #a35200; --warning-fill: #f5a623; --warning-subtle: rgba(245, 166, 35, 0.14); --warning-border: rgba(163, 82, 0, 0.28);
+    --danger: #cb2a2f;  --danger-fill: #e5484d;  --danger-subtle: rgba(229, 72, 77, 0.09);   --danger-border: rgba(203, 42, 47, 0.26);
+    --info: #0068d6;    --info-fill: #0070f3;    --info-subtle: rgba(0, 112, 243, 0.08);    --info-border: rgba(0, 104, 214, 0.26);
 
-    --voice-agent: #0a84ff;
+    --voice-agent: #0070f3;
     --voice-caller: #7c5cff;
 
-    --chart-1: #0a84ff; --chart-2: #34c759; --chart-3: #af52de; --chart-4: #ff9f0a; --chart-5: #5e5ce6;
+    --chart-1: #0070f3; --chart-2: #1f9d55; --chart-3: #8e4ec6; --chart-4: #f5a623; --chart-5: #3e63dd;
 
-    /* depth: a hairline plus a low, wide shadow */
-    --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.04);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 10px rgba(0, 0, 0, 0.025);
-    --shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.05), 0 10px 28px rgba(0, 0, 0, 0.07);
-    --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 18px 48px rgba(0, 0, 0, 0.16), 0 3px 10px rgba(0, 0, 0, 0.06);
-    --ring: 0 0 0 3px rgba(233, 107, 52, 0.28);
+    /* depth: the hairline does the work; shadows only lift what floats */
+    --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.03);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+    --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 16px 40px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05);
+    --ring: 0 0 0 1px var(--bg), 0 0 0 3px rgba(233, 107, 52, 0.4);
 
-    --radius-xs: 6px;
-    --radius-sm: 8px;
-    --radius-md: 10px;
-    --radius-lg: 14px;
-    --radius-xl: 20px;
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
     --radius-pill: 9999px;
+    /* buttons and inputs: Vercel's softened rectangle, not a pill */
+    --radius-control: 6px;
 
     --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
     --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
@@ -110,61 +113,63 @@
 [data-theme='dark'] {
     color-scheme: dark;
 
-    --bg: #111113;
-    --bg-subtle: #0c0c0e;
-    --sidebar: #17171a;
-    --surface: #1b1b1e;
-    --surface-raised: #232327;
-    --surface-overlay: rgba(36, 36, 40, 0.9);
-    --surface-sunken: #0d0d0f;
-    --surface-hover: rgba(255, 255, 255, 0.05);
-    --surface-active: rgba(255, 255, 255, 0.085);
+    /* Dark, in the Vercel/Geist manner: true black, cards a breath above it,
+       hairlines that are barely there, off-white ink, white primary action. */
+    --bg: #000000;
+    --bg-subtle: #0a0a0a;
+    --sidebar: #000000;
+    --surface: #0a0a0a;
+    --surface-raised: #111111;
+    --surface-overlay: rgba(17, 17, 17, 0.92);
+    --surface-sunken: #111111;
+    --surface-hover: rgba(255, 255, 255, 0.06);
+    --surface-active: rgba(255, 255, 255, 0.1);
 
-    --stage: #09090b;
-    --stage-raised: #18181b;
-    --stage-border: #27272a;
-    --stage-text: #f5f5f7;
-    --stage-text-muted: #8e8e93;
+    --stage: #000000;
+    --stage-raised: #111111;
+    --stage-border: #262626;
+    --stage-text: #ededed;
+    --stage-text-muted: #8f8f8f;
 
-    --border: rgba(255, 255, 255, 0.075);
-    --border-strong: rgba(255, 255, 255, 0.14);
-    --border-accent: rgba(255, 138, 87, 0.55);
-    --separator: rgba(255, 255, 255, 0.06);
+    --border: #1f1f1f;
+    --border-strong: #2e2e2e;
+    --border-accent: rgba(255, 138, 87, 0.5);
+    --separator: #1a1a1a;
 
-    --text-primary: #f5f5f7;
-    --text-secondary: #a1a1a6;
-    --text-tertiary: #6e6e73;
-    --text-disabled: #48484a;
-    --text-inverse: #111113;
+    --text-primary: #ededed;
+    --text-secondary: #a1a1a1;
+    --text-tertiary: #7a7a7a;
+    --text-disabled: #4d4d4d;
+    --text-inverse: #0a0a0a;
     --text-on-accent: #ffffff;
 
-    --primary: #f5f5f7;
+    --primary: #ededed;
     --primary-hover: #ffffff;
-    --primary-text: #111113;
+    --primary-text: #0a0a0a;
 
     --accent: #f07a45;
     --accent-hover: #ff8a57;
     --accent-active: #e96b34;
-    --accent-subtle: rgba(240, 122, 69, 0.14);
-    --accent-subtle-hover: rgba(240, 122, 69, 0.22);
+    --accent-subtle: rgba(240, 122, 69, 0.12);
+    --accent-subtle-hover: rgba(240, 122, 69, 0.2);
     --accent-text: #ff9b6e;
-    --accent-2: #30d158;
+    --accent-2: #3dd68c;
 
-    --success: #30d158; --success-fill: #30d158; --success-subtle: rgba(48, 209, 88, 0.14); --success-border: rgba(48, 209, 88, 0.3);
-    --warning: #ffb340; --warning-fill: #ff9f0a; --warning-subtle: rgba(255, 159, 10, 0.15); --warning-border: rgba(255, 179, 64, 0.3);
-    --danger: #ff6961;  --danger-fill: #ff453a;  --danger-subtle: rgba(255, 69, 58, 0.14);  --danger-border: rgba(255, 105, 97, 0.32);
-    --info: #64b5ff;    --info-fill: #0a84ff;    --info-subtle: rgba(10, 132, 255, 0.16);  --info-border: rgba(100, 181, 255, 0.3);
+    --success: #3dd68c; --success-fill: #29a36a; --success-subtle: rgba(61, 214, 140, 0.1);  --success-border: rgba(61, 214, 140, 0.28);
+    --warning: #ffc24b; --warning-fill: #f5a623; --warning-subtle: rgba(245, 166, 35, 0.12); --warning-border: rgba(255, 194, 75, 0.28);
+    --danger: #ff6166;  --danger-fill: #e5484d;  --danger-subtle: rgba(229, 72, 77, 0.12);  --danger-border: rgba(255, 97, 102, 0.3);
+    --info: #52a8ff;    --info-fill: #0070f3;    --info-subtle: rgba(0, 112, 243, 0.14);  --info-border: rgba(82, 168, 255, 0.3);
 
-    --voice-agent: #64b5ff;
+    --voice-agent: #52a8ff;
     --voice-caller: #a18bff;
 
-    --chart-1: #0a84ff; --chart-2: #30d158; --chart-3: #bf5af2; --chart-4: #ff9f0a; --chart-5: #5e5ce6;
+    --chart-1: #0070f3; --chart-2: #29a36a; --chart-3: #b27ae3; --chart-4: #f5a623; --chart-5: #5b7fe8;
 
     --shadow-xs: none;
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-raised: 0 8px 28px rgba(0, 0, 0, 0.45);
-    --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.6);
-    --ring: 0 0 0 3px rgba(240, 122, 69, 0.35);
+    --shadow-card: none;
+    --shadow-raised: 0 0 0 1px #262626, 0 8px 24px rgba(0, 0, 0, 0.6);
+    --shadow-overlay: 0 0 0 1px #2e2e2e, 0 24px 60px rgba(0, 0, 0, 0.7);
+    --ring: 0 0 0 1px var(--bg), 0 0 0 3px rgba(240, 122, 69, 0.5);
 }
 
 /* Tokens exposed to Tailwind: bg-surface, text-secondary, text-title, … */
@@ -222,6 +227,8 @@
     --color-success-subtle: var(--success-subtle);
     --color-warning-subtle: var(--warning-subtle);
     --color-danger-subtle: var(--danger-subtle);
+    --color-danger-fill: var(--danger-fill);
+    --color-success-fill: var(--success-fill);
     --color-info-subtle: var(--info-subtle);
 
     --radius-xs: var(--radius-xs);
@@ -294,7 +301,7 @@ code:not(pre code) {
     font-family: var(--font-mono);
     font-size: 0.88em;
     padding: 1px 5px;
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     background: var(--surface-sunken);
     border: 1px solid var(--border);
 }
@@ -356,9 +363,9 @@ code:not(pre code) {
         align-items: center;
         justify-content: center;
         gap: 6px;
-        height: 34px;
-        padding: 0 16px;
-        border-radius: var(--radius-pill);
+        height: 36px;
+        padding: 0 18px;
+        border-radius: var(--radius-control);
         border: 1px solid transparent;
         font-family: var(--font-sans);
         font-size: 13px;
@@ -393,28 +400,30 @@ code:not(pre code) {
     .v-btn--danger { background: var(--danger-subtle); color: var(--danger); }
     .v-btn--danger:hover:not(:disabled) { background: var(--danger-fill); color: #fff; }
 
-    .v-btn--sm { height: 28px; padding: 0 12px; font-size: 12px; }
-    .v-btn--icon { width: 32px; height: 32px; padding: 0; border-radius: var(--radius-sm); }
+    .v-btn--sm { height: 30px; padding: 0 13px; font-size: 12.5px; }
+    .v-btn--lg { height: 44px; padding: 0 22px; font-size: 14px; }
+    .v-btn--icon { width: 34px; height: 34px; padding: 0; border-radius: var(--radius-sm); }
 
     /* Fields: calm white wells that light up in the accent on focus. */
     .v-field {
         width: 100%;
-        height: 36px;
-        padding: 0 12px;
+        height: 40px;
+        padding: 0 14px;
         background: var(--surface);
         color: var(--text-primary);
         border: 1px solid var(--border-strong);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-control);
         font-family: var(--font-sans);
-        font-size: 13.5px;
+        font-size: 14px;
         line-height: 1.5;
         transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), background-color 160ms var(--ease-out);
     }
     .v-field::placeholder { color: var(--text-tertiary); }
     .v-field:hover:not(:disabled):not(:focus) { border-color: color-mix(in srgb, var(--text-primary) 22%, transparent); }
-    .v-field:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); border-radius: var(--radius-md); }
+    .v-field:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); border-radius: var(--radius-control); }
     .v-field:disabled { background: var(--surface-sunken); color: var(--text-tertiary); cursor: not-allowed; }
-    textarea.v-field { padding-top: 9px; padding-bottom: 9px; resize: vertical; }
+    /* Room to read and write: a textarea is where skills, prompts and notes are authored. */
+    textarea.v-field { height: auto; min-height: 96px; padding-top: 11px; padding-bottom: 11px; line-height: 1.6; resize: vertical; }
     select.v-field {
         appearance: none;
         padding-right: 32px;
@@ -427,21 +436,17 @@ code:not(pre code) {
 
     .v-label {
         display: block;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
         font-size: 13px;
         font-weight: 500;
         color: var(--text-primary);
     }
 
-    /* Text that is loading: a soft sweep, used for "Thinking" and live steps. */
-    .v-shimmer {
-        background: linear-gradient(90deg, var(--text-tertiary) 0%, var(--text-tertiary) 40%, var(--text-primary) 50%, var(--text-tertiary) 60%, var(--text-tertiary) 100%);
-        background-size: 200% 100%;
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-        animation: var(--animate-shimmer);
-    }
+    /* Text that is loading ("Thinking", a live step): a slow breath of the
+       ink, solid colour, so it reads as in-progress without decoration. */
+    .v-shimmer { color: var(--text-secondary); animation: v-breathe 1.6s ease-in-out infinite; }
+    @keyframes v-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    @media (prefers-reduced-motion: reduce) { .v-shimmer { animation: none; } }
 
     .v-skeleton {
         background: linear-gradient(90deg, var(--surface-sunken) 0%, var(--surface-hover) 50%, var(--surface-sunken) 100%);
@@ -467,7 +472,7 @@ code:not(pre code) {
     .v-prose li::marker { color: var(--text-tertiary); }
     .v-prose a { color: var(--accent-text); text-decoration: underline; text-decoration-color: var(--accent-subtle-hover); text-underline-offset: 3px; }
     .v-prose strong { font-weight: 600; }
-    .v-prose blockquote { border-left: 3px solid var(--border-strong); padding-left: 14px; color: var(--text-secondary); }
+    .v-prose blockquote { background: var(--surface-sunken); border-radius: var(--radius-md); padding: 10px 14px; color: var(--text-secondary); }
     .v-prose hr { border: none; border-top: 1px solid var(--separator); margin: 1.4em 0; }
     .v-prose pre { background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
     .v-prose pre code { font-family: var(--font-mono); background: none; border: none; padding: 0; }
