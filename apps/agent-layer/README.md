@@ -120,6 +120,11 @@ thread". The worker is too heavy for Render's free plan; host it on LiveKit
 Cloud agents or any machine with ~2 GB RAM. Laravel needs LIVEKIT_URL,
 LIVEKIT_API_KEY and LIVEKIT_API_SECRET to sign browser tokens.
 
+In production it runs from `agents/voice/Dockerfile` (arm64 and x86; model
+weights baked in, no inbound port). `deploy/voice-worker/setup.sh` installs
+or updates it on an Ubuntu VM such as an Oracle Always Free Ampere instance,
+with its settings in `/opt/veyra/voice.env` (template alongside the script).
+
 ## Proven live (2026-09-27)
 
 With the gateway on the host (`AGENT_GATEWAY_URL=http://host.docker.internal:8100`

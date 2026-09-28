@@ -64,6 +64,14 @@ services:
       # the default (premade) voices through the API, which is all the catalog lists.
       - key: ELEVENLABS_API_KEY
         sync: false
+      # Studio Talk voice: the app signs room tokens; the voice worker runs
+      # elsewhere (deploy/voice-worker) and answers the rooms.
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
       # Opt-in demo workspace (Northwind). Needs DEMO_PASSWORD, 12+ characters.
       - key: SEED_DEMO_DATA
         value: "false"
