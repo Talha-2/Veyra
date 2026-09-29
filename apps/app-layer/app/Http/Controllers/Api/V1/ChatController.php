@@ -13,6 +13,7 @@ use App\Services\Agent\LiveChat;
 use App\Support\PublicApi\ApiError;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -24,9 +25,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * written in Desk appear in `GET …/messages`.
  *
  * A session belongs to one visitor. Publishable keys run in the visitor's
- * browser, so they must present the session's `session_token` (returned once,
+ * browser, so they must present the session's `session_token` (returned only
  * when the session is created) on every later call — without it, anyone with
- * the page's key could read someone else's chat. Server keys may skip it.
+ * the page's key could read someone else's chat. Server keys may skip it, and
+ * only server keys resume a session by visitor id or match a contact.
  */
 class ChatController extends ApiController
 {
@@ -42,10 +44,19 @@ class ChatController extends ApiController
             'visitor.phone' => ['nullable', 'string', 'max:40'],
         ]);
         $visitor = $validated['visitor'];
+        $publishable = $this->key($request)->publishable;
 
-        $identifier = Identifier::resolve(IdentifierType::WebSession, 'api:'.$visitor['id']);
-        // Recognise a returning customer by what they told you about them.
-        if (! $identifier->contact_id) {
+        // A publishable key runs in a browser, where anyone can send any
+        // visitor id: so every call starts its own session (resuming one
+        // needs its session_token, which only its creator holds), and what
+        // the browser claims about email or phone is never used to match an
+        // existing contact, whose tickets and calls the agent would then see.
+        $identifier = Identifier::resolve(
+            IdentifierType::WebSession,
+            $publishable ? 'api:pk:'.$visitor['id'].':'.Str::random(24) : 'api:'.$visitor['id'],
+        );
+        // Recognise a returning customer by what your server tells us about them.
+        if (! $publishable && ! $identifier->contact_id) {
             $contact = Contact::query()
                 ->when($visitor['email'] ?? null, fn ($q, $e) => $q->orWhereRaw('lower(email) = ?', [mb_strtolower($e)]))
                 ->when($visitor['phone'] ?? null, fn ($q, $p) => $q->orWhere('phone', IdentifierType::Phone->normalize($p)))

@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "docs:sync-openapi": "node scripts/sync-openapi.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

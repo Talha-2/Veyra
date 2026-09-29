@@ -36,7 +36,7 @@ class OpenApiSpec
                     '**Authentication.** Send a server key as `Authorization: Bearer vy_sk_…`. Create keys in Studio › Developer; each key belongs to one organization and carries scopes. Publishable keys (`vy_pk_…`) are safe to embed in a web page and can only call routes marked publishable.',
                     '**Objects.** Every object has a numeric `id`, an `object` type name, and `created_at` / `updated_at` in ISO 8601 UTC.',
                     '**Lists** return `{object: "list", data, has_more, next_cursor}`, newest first. Pass `next_cursor` back as `?cursor=` for the next page; `?limit=` is 1–100 (default 25). Most lists filter by `?updated_since=` (ISO 8601).',
-                    '**Errors** are `{error: {type, message, fields?}}` with the matching status: 401 no or bad key, 403 missing scope (`insufficient_scope`), 404 not found, 422 validation (`fields` names each bad field), 429 rate limited.',
+                    '**Errors** are `{error: {type, message, fields?}}` with the matching status: 401 no or bad key, 403 missing scope (`insufficient_scope`), or a publishable key on a server-only route or without its chat session token (`permission_error`), 404 not found, 405 wrong method, 422 validation (`fields` names each bad field), 429 rate limited, 503 the agent could not answer (`agent_unavailable`).',
                     '**Rate limit.** 120 requests a minute per key. Every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (Unix seconds); a 429 adds `Retry-After`.',
                     '**Webhooks.** Register an endpoint and Veyra POSTs signed events to it as things change. Verify `X-Veyra-Signature: sha256=<hex>`, the HMAC-SHA256 of the raw body keyed with the endpoint\'s signing secret.',
                 ]),
@@ -75,7 +75,7 @@ class OpenApiSpec
             ['name' => 'Calls', 'description' => 'Phone and browser calls handled by the agent, with transcript, summary and every handoff the agent made while working.'],
             ['name' => 'Knowledge', 'description' => 'The documents the agent answers from, and the same search it uses on a call.'],
             ['name' => 'Webhooks', 'description' => 'Endpoints Veyra POSTs signed events to. The event catalog is under Webhook events.'],
-            ['name' => 'Agent chat', 'description' => 'Your website or app talks to your agent: the same agent that answers your phone, with its skills, knowledge, memory and actions. Every chat is a web-chat conversation in Desk; your team can read it and reply there, and those replies appear in the session\'s messages. Replies can stream as server-sent events. Publishable keys may call these endpoints from a browser, and must then send the session\'s `session_token` in the `X-Chat-Session-Token` header.'],
+            ['name' => 'Agent chat', 'description' => 'Your website or app talks to your agent: the same agent that answers your phone, with its skills, knowledge, memory and actions. Every chat is a web-chat conversation in Desk, where your team can read it; messages added to the conversation appear in the session\'s messages. Replies can stream as server-sent events. Publishable keys may call these endpoints from a browser, and must then send the session\'s `session_token` in the `X-Chat-Session-Token` header.'],
         ];
     }
 
@@ -201,14 +201,14 @@ class OpenApiSpec
             '/knowledge/search' => ['post' => $this->op('searchKnowledge', 'Knowledge', 'Search knowledge', 'The passages the agent would retrieve for a question, best first — the same search it runs on a call. Publishable keys may call this, so it can power a help widget on your site.', 'knowledge:read', [], ['KnowledgeSearchRequest', ['query' => 'how long do I have to return something', 'limit' => 3]], ['200', 'SearchResult', $ex['search']], publishable: true)],
 
             '/chat/sessions' => [
-                'post' => $this->op('createChatSession', 'Agent chat', 'Start a chat session', 'One session per visitor: calling again with the same `visitor.id` returns their open session (200) instead of a new one (201). Pass `email` or `phone` to link the chat to an existing contact. The `session_token` is returned **only in this response**; publishable keys need it for every later call.', 'chat:write', [], ['ChatSessionCreate', ['visitor' => ['id' => 'user_8841', 'name' => 'Maria Delgado', 'email' => 'maria.d@example.com']]], ['201', 'ChatSession', $ex['chat_session']], publishable: true),
+                'post' => $this->op('createChatSession', 'Agent chat', 'Start a chat session', 'With a server key, one session per visitor: calling again with the same `visitor.id` returns their open session (200) instead of a new one (201), and `email` or `phone` link the chat to an existing contact. With a publishable key every call starts a new session and `email` / `phone` are never used to match a contact, because a browser can claim any of them. The `session_token` is returned **only in this response**; publishable keys need it for every later call.', 'chat:write', [], ['ChatSessionCreate', ['visitor' => ['id' => 'user_8841', 'name' => 'Maria Delgado', 'email' => 'maria.d@example.com']]], ['201', 'ChatSession', $ex['chat_session']], publishable: true),
             ],
             '/chat/sessions/{id}' => [
                 'get' => $this->op('getChatSession', 'Agent chat', 'Get a chat session', null, 'chat:write', [$id('session')], null, ['200', 'ChatSession', array_diff_key($ex['chat_session'], ['session_token' => 1, 'visitor' => 1])], publishable: true),
             ],
             '/chat/sessions/{id}/messages' => [
                 'get' => $this->op('listChatMessages', 'Agent chat', 'List a session\'s messages', 'Newest first, a page at a time. Includes replies your team wrote in Desk.', 'chat:write', [$id('session'), ...$page], null, ['200', ['list' => 'Message'], $this->listOf($ex['chat_reply']['reply'])], publishable: true),
-                'post' => $this->op('sendChatMessage', 'Agent chat', 'Send a message and get the reply', 'The agent reads the conversation so far, uses its tools, and answers. Waits for the whole reply by default. With `"stream": true` or `Accept: text/event-stream` the reply streams as server-sent events, one JSON object per `data:` line: `status`, `tool` (each step as it runs and finishes), `delta` (reply text), then `message` (the stored reply) or `error`. 503 with `type: agent_unavailable` when the agent cannot answer; the visitor\'s message is still saved.', 'chat:write', [$id('session')], ['ChatMessageCreate', ['message' => 'Do you come out to Evanston?']], ['200', 'ChatReply', $ex['chat_reply']], publishable: true),
+                'post' => $this->op('sendChatMessage', 'Agent chat', 'Send a message and get the reply', 'The agent reads the conversation so far, uses its tools, and answers. Waits for the whole reply by default. With `"stream": true` or `Accept: text/event-stream` the reply streams as server-sent events, one JSON object per `data:` line: `status`, `tool` (each step as it runs and finishes), `delta` (reply text), `done` (the full reply text), then `message` (the stored reply) or `error`. 503 with `type: agent_unavailable` when the agent cannot answer; the visitor\'s message is still saved. At most 30 messages a minute per key and session.', 'chat:write', [$id('session')], ['ChatMessageCreate', ['message' => 'Do you come out to Evanston?']], ['200', 'ChatReply', $ex['chat_reply']], publishable: true),
             ],
 
             '/webhook-endpoints' => [
@@ -319,6 +319,7 @@ class OpenApiSpec
                 'parameters' => [
                     ['name' => 'X-Veyra-Event', 'in' => 'header', 'required' => true, 'schema' => ['type' => 'string'], 'example' => $event],
                     ['name' => 'X-Veyra-Delivery', 'in' => 'header', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'Unique per delivery attempt.'],
+                    ['name' => 'X-Veyra-Attempt', 'in' => 'header', 'required' => true, 'schema' => ['type' => 'integer'], 'description' => 'Which attempt this is: 1, or 2 on the one retry.'],
                     ['name' => 'X-Veyra-Signature', 'in' => 'header', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'sha256=<hex HMAC-SHA256 of the raw body, keyed with the endpoint secret>'],
                 ],
                 'requestBody' => ['content' => ['application/json' => [

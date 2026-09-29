@@ -84,8 +84,8 @@ export default function GetStarted({ baseUrl, docsUrl, hasKey, onCreateKey, onWe
                     <Callout tone="info" icon={<Info size={16} strokeWidth={2} />} title="Outbound messages are recorded, not sent — yet">
                         Sending SMS and email is not connected. A message created through the API appears in the Desk thread with status <code className="font-mono text-sm">queued</code> and stays queued until it is.
                     </Callout>
-                    <Callout tone="info" icon={<Info size={16} strokeWidth={2} />} title="Agent chat is coming">
-                        Endpoints for chatting with your agent from your own site or backend will appear under <code className="font-mono text-sm">/chat</code>. Until then the API covers the records: contacts, conversations, tickets, leads, calls and knowledge.
+                    <Callout tone="info" icon={<Info size={16} strokeWidth={2} />} title="Chat with your agent from your own product">
+                        The <code className="font-mono text-sm">/chat/sessions</code> endpoints let your site or backend hold a conversation with your agent, the same one that answers in Studio Talk. A publishable key can call them from a web page, with the session's token.
                     </Callout>
                 </div>
             </section>

@@ -35,6 +35,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(1200)
             ->by($request->route('organization') ?? $request->ip()));
 
+        // Agent chat sends (routes/api_v1.php): 30 a minute per key and
+        // session, so one busy visitor cannot use up a backend's allowance for
+        // every other session, and nothing is shared with other throttles.
+        RateLimiter::for('chat-send', fn (Request $request) => Limit::perMinute(30)
+            ->by('chat-send:'.($request->attributes->get('api_key')?->getKey() ?? $request->ip()).':'.$request->route('session')));
+
         // Public API (routes/api_v1.php): every route states the scope it
         // needs — `null` for "any valid key" — and AuthenticateApiKey refuses
         // a route that states none. `publishable()` opens a route to vy_pk_

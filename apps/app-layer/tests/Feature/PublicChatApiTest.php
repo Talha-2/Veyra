@@ -102,6 +102,30 @@ class PublicChatApiTest extends TestCase
         $this->assertSame($maria->id, $session->json('contact_id'));
     }
 
+    public function test_a_publishable_key_cannot_take_over_a_session_by_repeating_its_visitor_id(): void
+    {
+        $pk = $this->key(['chat:write'], publishable: true);
+        $first = $this->withToken($pk)->postJson('/api/v1/chat/sessions', ['visitor' => ['id' => 'browser_abc']])->assertCreated();
+        $again = $this->withToken($pk)->postJson('/api/v1/chat/sessions', ['visitor' => ['id' => 'browser_abc']])->assertCreated();
+
+        $this->assertNotSame($first->json('id'), $again->json('id'), 'a second browser gets its own session');
+        $this->assertNotSame($first->json('session_token'), $again->json('session_token'));
+        $this->withToken($pk)->withHeader('X-Chat-Session-Token', $again->json('session_token'))
+            ->getJson('/api/v1/chat/sessions/'.$first->json('id').'/messages')->assertStatus(403);
+    }
+
+    public function test_a_publishable_key_cannot_attach_a_session_to_a_customer_by_email(): void
+    {
+        Organization::setCurrent($this->org);
+        Contact::create(['name' => 'Maria Delgado', 'email' => 'maria.d@example.com', 'phone' => '+15551234567']);
+        Organization::setCurrent(null);
+
+        $session = $this->withToken($this->key(['chat:write'], publishable: true))
+            ->postJson('/api/v1/chat/sessions', ['visitor' => ['id' => 'b1', 'email' => 'maria.d@example.com', 'phone' => '+1 555 123 4567']])
+            ->assertCreated();
+        $this->assertNull($session->json('contact_id'), 'what a browser claims never links a known contact');
+    }
+
     public function test_scope_and_tenancy_are_enforced(): void
     {
         $this->withToken($this->key(['contacts:read']))->postJson('/api/v1/chat/sessions', ['visitor' => ['id' => 'x']])->assertStatus(403);

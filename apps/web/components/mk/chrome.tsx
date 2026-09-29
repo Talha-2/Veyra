@@ -16,6 +16,7 @@ const LINKS: [string, string][] = [
   ["Integrations", "/integrations"],
   ["Pricing", "/pricing"],
   ["Security", "/security"],
+  ["Docs", "/docs"],
   ["Company", "/company"],
 ];
 
@@ -83,7 +84,7 @@ const FOOTER_SOON = new Set(["Telephony"]);
 const COLUMNS: { title: string; links: [string, string][] }[] = [
   { title: "Product", links: [["Platform", "/platform"], ["Voice agents", "/platform#voice"], ["Veyra Desk", "/platform#desk"], ["Veyra Studio", "/platform#studio"], ["Pricing", "/pricing"]] },
   { title: "Solutions", links: [["Home services", "/solutions#home-services"], ["Healthcare", "/solutions#healthcare"], ["Real estate", "/solutions#real-estate"], ["Professional services", "/solutions#professional"], ["All solutions", "/solutions"]] },
-  { title: "Connect", links: [["Integrations", "/integrations"], ["Telephony", "/platform#telephony"], ["Developers", "/platform#developers"], ["Security", "/security"]] },
+  { title: "Connect", links: [["Integrations", "/integrations"], ["Telephony", "/platform#telephony"], ["Developers", "/docs"], ["API reference", "/docs/api-reference"], ["Security", "/security"]] },
   { title: "Company", links: [["About", "/company"], ["Contact", "/contact"], ["Request a demo", DEMO_URL], ["Privacy", "/privacy"], ["Terms", "/terms"]] },
 ];
 

@@ -1,0 +1,52 @@
+[
+  {
+    "title": "Getting started",
+    "pages": [
+      { "slug": "getting-started/introduction", "title": "Introduction" },
+      { "slug": "getting-started/quickstart", "title": "Quickstart" },
+      { "slug": "getting-started/concepts", "title": "Core concepts" },
+      { "slug": "getting-started/availability", "title": "What's live and coming soon" }
+    ]
+  },
+  {
+    "title": "Veyra Studio",
+    "pages": [
+      { "slug": "studio/overview", "title": "Studio overview" },
+      { "slug": "studio/identity", "title": "Identity and greeting" },
+      { "slug": "studio/voice", "title": "Voice and languages" },
+      { "slug": "studio/knowledge", "title": "Knowledge" },
+      { "slug": "studio/skills", "title": "Skills" },
+      { "slug": "studio/experts", "title": "Experts" },
+      { "slug": "studio/integrations", "title": "Integrations and actions" },
+      { "slug": "studio/memory", "title": "Memory" },
+      { "slug": "studio/automations", "title": "Automations" },
+      { "slug": "studio/talk", "title": "Talk: test your agent" },
+      { "slug": "studio/ask", "title": "Ask" },
+      { "slug": "studio/developer", "title": "API keys and webhooks" },
+      { "slug": "studio/settings", "title": "Organization and team" }
+    ]
+  },
+  {
+    "title": "Veyra Desk",
+    "pages": [
+      { "slug": "desk/overview", "title": "Desk overview" },
+      { "slug": "desk/inbox", "title": "Inbox and conversations" },
+      { "slug": "desk/calls", "title": "Calls and recordings" },
+      { "slug": "desk/contacts", "title": "Contacts" },
+      { "slug": "desk/leads", "title": "Leads and pipelines" },
+      { "slug": "desk/tickets", "title": "Tickets" },
+      { "slug": "desk/team", "title": "Team and notifications" }
+    ]
+  },
+  {
+    "title": "API guides",
+    "pages": [
+      { "slug": "api/overview", "title": "API overview" },
+      { "slug": "api/authentication", "title": "Authentication and scopes" },
+      { "slug": "api/pagination-errors", "title": "Lists, errors and rate limits" },
+      { "slug": "api/webhooks", "title": "Webhooks" },
+      { "slug": "api/chat", "title": "Chat with your agent" },
+      { "slug": "api/website-chat", "title": "Add chat to your website" }
+    ]
+  }
+]

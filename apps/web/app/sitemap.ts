@@ -1,5 +1,8 @@
 import type { MetadataRoute } from "next";
 
+import { publishedGroups } from "@/lib/docs/content";
+import { tags } from "@/lib/docs/openapi";
+
 const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://veyra.vercel.app";
 
 /* Public marketing pages only — /studio, /desk, and auth routes stay out. */
@@ -18,7 +21,14 @@ const ROUTES: { path: string; priority: number }[] = [
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return ROUTES.map((r) => ({
+  const docs = [
+    { path: "/docs", priority: 0.8 },
+    ...publishedGroups().flatMap((g) => g.pages.map((p) => ({ path: `/docs/${p.slug}`, priority: 0.6 }))),
+    { path: "/docs/api-reference", priority: 0.7 },
+    ...tags().map((t) => ({ path: `/docs/api-reference/${t.slug}`, priority: 0.5 })),
+    { path: "/docs/api-reference/events", priority: 0.5 },
+  ];
+  return [...ROUTES, ...docs].map((r) => ({
     url: `${BASE}${r.path}`,
     changeFrequency: "monthly",
     priority: r.priority,

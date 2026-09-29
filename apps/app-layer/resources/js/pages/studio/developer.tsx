@@ -97,7 +97,7 @@ export default function Developer(props: Props) {
             )}
 
             {tab === 'keys' && (
-                <Section title="API keys" description="A server key can do whatever its scopes allow — keep it on your servers. A publishable key is safe in a web page and can only search knowledge. Revoking a key stops it at once.">
+                <Section title="API keys" description="A server key can do whatever its scopes allow — keep it on your servers. A publishable key is safe in a web page: it can chat with your agent and search knowledge, nothing else. Revoking a key stops it at once.">
                     <KeyList keys={keys} onCreate={() => setCreatingKey(true)} />
                 </Section>
             )}

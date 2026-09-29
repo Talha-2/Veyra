@@ -9,6 +9,10 @@ const PRODUCTION_APP = "https://veyra-app-pe50.onrender.com";
 const APP = (process.env.NEXT_PUBLIC_APP_URL || PRODUCTION_APP).replace(/\/$/, "");
 const LEGACY_API = (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 
+/** The web app (Studio and Desk), and its public API. The docs render both. */
+export const APP_URL = APP;
+export const API_BASE = `${APP}/api/v1`;
+
 export const SIGN_IN_URL = APP ? `${APP}/login` : "/login";
 export const SIGN_UP_URL = APP ? `${APP}/register` : "/signup";
 

@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\Route;
 |     refused at runtime — forgetting it fails closed;
 |   - is refused to publishable keys (vy_pk_) unless marked ->publishable().
 |
-| Publishable today: GET /me and POST /knowledge/search.
+| Publishable today: GET /me, POST /knowledge/search and the /chat routes.
 |
 | The OpenAPI document (App\Support\PublicApi\OpenApiSpec) describes each of
 | these; PublicApiTest fails if a route here is missing from it.
@@ -99,5 +99,5 @@ Route::middleware('api.key')->group(function () {
     Route::post('/chat/sessions', [ChatController::class, 'store'])->apiScope('chat:write')->publishable()->name('chat.sessions.store');
     Route::get('/chat/sessions/{session}', [ChatController::class, 'show'])->whereNumber('session')->apiScope('chat:write')->publishable()->name('chat.sessions.show');
     Route::get('/chat/sessions/{session}/messages', [ChatController::class, 'messages'])->whereNumber('session')->apiScope('chat:write')->publishable()->name('chat.messages.index');
-    Route::post('/chat/sessions/{session}/messages', [ChatController::class, 'send'])->whereNumber('session')->apiScope('chat:write')->publishable()->middleware('throttle:30,1')->name('chat.messages.send');
+    Route::post('/chat/sessions/{session}/messages', [ChatController::class, 'send'])->whereNumber('session')->apiScope('chat:write')->publishable()->middleware('throttle:chat-send')->name('chat.messages.send');
 });

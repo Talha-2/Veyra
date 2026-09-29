@@ -14,7 +14,7 @@ import type { ApiKeyRow } from './types';
 /** `contacts:read` + `contacts:write` → one row with Read / Write. */
 export interface ScopeRow { resource: string; label: string; read?: string; write?: string; description: string }
 
-const LABELS: Record<string, string> = { contacts: 'Contacts', conversations: 'Conversations', messages: 'Messages', tickets: 'Tickets', leads: 'Leads & pipelines', calls: 'Calls', knowledge: 'Knowledge', webhooks: 'Webhook endpoints' };
+const LABELS: Record<string, string> = { contacts: 'Contacts', conversations: 'Conversations', messages: 'Messages', tickets: 'Tickets', leads: 'Leads & pipelines', calls: 'Calls', knowledge: 'Knowledge', webhooks: 'Webhook endpoints', chat: 'Agent chat' };
 
 export function scopeRows(scopes: string[], descriptions: Record<string, string>): ScopeRow[] {
     const rows = new Map<string, ScopeRow>();
@@ -143,7 +143,7 @@ export function KeyDialog({ open, onClose, scopes, descriptions, publishableScop
 
                 <div className="mb-5">
                     <Toggle checked={data.publishable} label="Publishable key"
-                        hint={`Safe to put in a web page. Can only search knowledge (${publishableScopes.join(', ')}) and read its own details.`}
+                        hint={`Safe to put in a web page. Can only use ${publishableScopes.join(', ')} and read its own details.`}
                         onChange={(v) => setData((d) => ({ ...d, publishable: v, scopes: v ? d.scopes.filter((s) => publishableScopes.includes(s)) : d.scopes }))} />
                 </div>
 

@@ -60,7 +60,7 @@ class ApiKey extends Model
      * What a publishable key may hold. A publishable key ships inside a web
      * page, so anything it can reach is effectively public: today that is
      * knowledge search, which only returns what the agent already tells any
-     * caller. Agent chat will join it when `/api/v1/chat` lands.
+     * caller, and agent chat, whose sessions are guarded by session tokens.
      */
     public const PUBLISHABLE_SCOPES = ['knowledge:read', 'chat:write'];
 
