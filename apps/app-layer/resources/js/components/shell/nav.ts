@@ -32,6 +32,8 @@ export interface ShellNavItem {
     /** Exact match when it ends in `$`, prefix match otherwise. Defaults to href. */
     match?: string;
     keywords?: string;
+    /** The page exists but what it configures does not work yet: the sidebar tags it "Coming soon". */
+    soon?: boolean;
 }
 
 export interface ShellNavGroup {
@@ -70,8 +72,10 @@ export const NAV: Record<SurfaceKey, ShellNavGroup[]> = {
         {
             heading: 'Operations',
             items: [
-                { label: 'Telephony', href: '/studio/telephony', icon: Phone, keywords: 'numbers sip twilio livekit' },
-                { label: 'Evaluations', href: '/studio/evals', icon: FlaskConical, keywords: 'tests quality' },
+                // No SIP trunk or carrier is wired: phone lines cannot reach the agent yet.
+                { label: 'Telephony', href: '/studio/telephony', icon: Phone, keywords: 'numbers sip twilio livekit', soon: true },
+                // EvalController sends runner_available=false and there is no route to start a run.
+                { label: 'Evaluations', href: '/studio/evals', icon: FlaskConical, keywords: 'tests quality', soon: true },
                 { label: 'Developer', href: '/studio/developer', icon: Code2, keywords: 'api keys webhooks' },
                 { label: 'Settings', href: '/studio/settings', icon: Settings, keywords: 'team organization profile pipelines' },
             ],

@@ -15,6 +15,7 @@ import {
 import { languageLabel, sayList } from '../../components/studio-agent/languages';
 import { StatLink } from '../../components/studio-agent/stat-link';
 import { Disclosure, Group, PageStack } from '../../components/studio/space';
+import { ComingSoon } from '../../components/ui/coming-soon';
 import { Callout, Card, IconTile, List, ListRow, Meter } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, Mono, RelativeTime } from '../../components/ui/primitives';
@@ -70,7 +71,9 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
     const unconfirmedLabel = `${unconfirmed}${unconfirmed >= RECONCILE_LIMIT ? '+' : ''}`;
     const attention = (unconfirmed > 0 ? 1 : 0) + (overBudget ? 1 : 0) + (health.agent_tickets_open > 3 ? 1 : 0) + (health.failed_delegations > 0 ? 1 : 0);
 
-    const steps: { key: string; done: boolean; title: string; detail: string; href: string }[] = [
+    // `soon`: shown so the step is not a surprise later, but it cannot be done
+    // yet, so it neither counts toward setup nor becomes "Continue setup".
+    const steps: { key: string; done: boolean; title: string; detail: string; href: string; soon?: boolean }[] = [
         {
             key: 'identity',
             done: setup.agent_named && setup.greeting_set,
@@ -93,6 +96,8 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
             title: 'Phone number',
             detail: setup.numbers > 0 ? `${plural(setup.numbers, 'active number')} answering calls` : 'Connect a number so the agent can answer calls',
             href: '/studio/telephony',
+            // No SIP trunk or carrier is wired, so a phone line cannot reach the agent yet.
+            soon: true,
         },
         {
             key: 'experts',
@@ -116,10 +121,13 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
             href: '/studio/agent#languages',
         },
     ];
-    const done = steps.filter((s) => s.done).length;
-    const next = steps.find((s) => !s.done);
+    const required = steps.filter((s) => !s.soon);
+    const done = required.filter((s) => s.done).length;
+    const next = required.find((s) => !s.done);
 
-    const remaining = steps.filter((s) => !s.done);
+    // Coming-soon steps sit at the end of the list, after everything that can be done now.
+    const remaining = [...required.filter((s) => !s.done), ...steps.filter((s) => s.soon && !s.done)];
+    const outstanding = required.length - done;
     const completed = steps.filter((s) => s.done);
 
     return (
@@ -256,13 +264,13 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
 
                 {/* Setup: only what is left is on the first screen. */}
                 <Group
-                    title={remaining.length === 0 ? 'Setup is complete' : 'Finish setting up'}
-                    description={remaining.length === 0 ? 'Everything a live call needs is in place.' : `${done} of ${steps.length} done. ${next ? `Next: ${next.title.toLowerCase()}.` : ''}`}
-                    aside={<Mono>{Math.round((done / steps.length) * 100)}%</Mono>}
+                    title={outstanding === 0 ? 'Setup is complete' : 'Finish setting up'}
+                    description={outstanding === 0 ? 'Everything a live call needs is in place.' : `${done} of ${required.length} done. ${next ? `Next: ${next.title.toLowerCase()}.` : ''}`}
+                    aside={<Mono>{Math.round((done / required.length) * 100)}%</Mono>}
                 >
                     <Card>
                         <div className="px-6 pt-6 pb-5">
-                            <Meter value={(done / steps.length) * 100} tone={done === steps.length ? 'success' : 'accent'} label="Setup progress" />
+                            <Meter value={(done / required.length) * 100} tone={outstanding === 0 ? 'success' : 'accent'} label="Setup progress" />
                         </div>
                         {remaining.length > 0 && (
                             <div style={{ borderTop: '1px solid var(--separator)' }}>
@@ -275,12 +283,13 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
                                             leading={<span className="size-6 shrink-0 rounded-full" style={{ border: '1.5px dashed var(--border-strong)' }} aria-hidden="true" />}
                                             title={s.title}
                                             subtitle={s.detail}
-                                            trailing={
+                                            dim={s.soon}
+                                            trailing={s.soon ? <ComingSoon /> : (
                                                 <span className="inline-flex items-center gap-0.5 text-sm font-medium text-accent-text">
                                                     Set up
                                                     <ArrowRight size={14} strokeWidth={1.9} />
                                                 </span>
-                                            }
+                                            )}
                                         />
                                     ))}
                                 </List>
@@ -288,7 +297,7 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
                         )}
                         {completed.length > 0 && (
                             <div className="px-6 pt-2 pb-4" style={{ borderTop: '1px solid var(--separator)' }}>
-                                <Disclosure inset title={`${completed.length} ${completed.length === 1 ? 'step' : 'steps'} done`} defaultOpen={remaining.length === 0}>
+                                <Disclosure inset title={`${completed.length} ${completed.length === 1 ? 'step' : 'steps'} done`} defaultOpen={outstanding === 0}>
                                     <ul className="-mx-3 -mt-2 flex flex-col">
                                         {completed.map((s) => (
                                             <li key={s.key}>

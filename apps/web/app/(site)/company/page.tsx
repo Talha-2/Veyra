@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, ChevronRight, Lock, Mail, MessageSquare, MessagesSquare, Phone, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, ChevronRight, Lock, ShieldCheck, Zap } from "lucide-react";
 
 import { LogoTile, PARTNERS, VeyraLogo, VeyraMark } from "@/components/mk/brand";
 import { LayerDiagram, RingingMark, WhyStory } from "@/components/mk/company-parts";
 import { SIGN_UP_URL } from "@/components/mk/links";
 import { Marquee, Reveal, Stagger, TextReveal } from "@/components/mk/motion";
+import { ChannelStatus, Soon } from "@/components/mk/soon";
 
 export const metadata: Metadata = {
   title: "About",
@@ -84,11 +85,7 @@ function PrincipleArt({ kind }: { kind?: string }) {
   }
   if (kind === "channels") {
     return (
-      <div className="flex gap-3">
-        {[Phone, MessageSquare, MessagesSquare, Mail].map((I, i) => (
-          <span key={i} className="flex size-16 items-center justify-center rounded-2xl" style={{ background: i === 0 ? "var(--mk-ember)" : "rgba(233,107,52,0.1)", color: i === 0 ? "#fff" : "var(--mk-ember)" }}><I size={28} /></span>
-        ))}
-      </div>
+      <ChannelStatus align="start" className="max-w-[440px]" />
     );
   }
   return null;
@@ -106,6 +103,8 @@ const ROLES: Record<string, string> = {
   Composio: "Actions in your apps",
   Langfuse: "Tracing and evaluation",
 };
+/* phone lines are not connected to the agent yet */
+const SOON = new Set(["Twilio", "Telnyx"]);
 
 export default function CompanyPage() {
   return (
@@ -211,6 +210,7 @@ export default function CompanyPage() {
               <LogoTile partner={p} size={104} />
               <p className="mk-h4 mt-5">{p.name}</p>
               <p className="mk-small mt-1">{ROLES[p.name]}</p>
+              {SOON.has(p.name) && <Soon className="mt-2" />}
             </div>
           ))}
         </Stagger>

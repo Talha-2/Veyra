@@ -18,6 +18,8 @@ export function ChoiceCard({
     description,
     multiple = false,
     meta,
+    disabled = false,
+    disabledReason,
 }: {
     selected: boolean;
     onSelect: () => void;
@@ -26,6 +28,8 @@ export function ChoiceCard({
     description?: ReactNode;
     multiple?: boolean;
     meta?: ReactNode;
+    disabled?: boolean;
+    disabledReason?: string;
 }) {
     return (
         <button
@@ -33,7 +37,9 @@ export function ChoiceCard({
             role={multiple ? 'checkbox' : 'radio'}
             aria-checked={selected}
             onClick={onSelect}
-            className="flex h-full w-full items-start gap-3.5 rounded-md p-4.5 text-left transition-[background-color,border-color,box-shadow] duration-150"
+            disabled={disabled}
+            title={disabled ? disabledReason : undefined}
+            className="flex h-full w-full items-start gap-3.5 rounded-md p-4.5 text-left transition-[background-color,border-color,box-shadow] duration-150 disabled:cursor-not-allowed"
             style={{
                 background: selected ? 'var(--accent-subtle)' : 'var(--surface)',
                 border: `1px solid ${selected ? 'var(--border-accent)' : 'var(--border-strong)'}`,

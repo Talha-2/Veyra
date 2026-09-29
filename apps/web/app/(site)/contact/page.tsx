@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarCheck, ChevronRight, Clock, LogIn, Mail, UserRound } from "lucide-react";
 
 import { InquiryForm } from "@/components/mk/inquiry-form";
-import { SIGN_UP_URL, SIGN_IN_URL } from "@/components/mk/links";
+import { SIGN_UP_URL, SIGN_IN_URL, DEMO_URL } from "@/components/mk/links";
 import { Reveal, Stagger } from "@/components/mk/motion";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 const WAYS = [
   { icon: Mail, title: "Email us", body: "Straight to the team building Veyra.", link: { label: "trazzaq744@gmail.com", href: "mailto:trazzaq744@gmail.com" } },
-  { icon: CalendarCheck, title: "Book a live demo", body: "Veyra on your real use case, the same day where we can.", link: { label: "Request a demo", href: "/start" } },
+  { icon: CalendarCheck, title: "Book a live demo", body: "Veyra on your real use case, the same day where we can.", link: { label: "Pick a time", href: DEMO_URL } },
   { icon: LogIn, title: "Already a customer?", body: "Sign in to Veyra Desk and Studio.", link: { label: "Sign in", href: SIGN_IN_URL } },
 ];
 
@@ -43,7 +43,7 @@ export default function ContactPage() {
                     {w.link.href.startsWith("/") ? (
                       <Link href={w.link.href} className="mk-link mt-2">{w.link.label} <ChevronRight /></Link>
                     ) : (
-                      <a href={w.link.href} className="mk-link mt-2 break-all">{w.link.label} <ChevronRight /></a>
+                      <a href={w.link.href} {...(w.link.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})} className="mk-link mt-2 break-all">{w.link.label} <ChevronRight /></a>
                     )}
                   </div>
                 </div>

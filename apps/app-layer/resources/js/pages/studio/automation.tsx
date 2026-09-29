@@ -6,6 +6,7 @@ import { ChoiceCard } from '../../components/studio-capability/choice-card';
 import { EditorWell } from '../../components/studio-capability/editor-well';
 import { SaveBar, Toggle } from '../../components/studio/form';
 import { Disclosure, PageStack, Panel, SideCard, Stacked, WithSide } from '../../components/studio/space';
+import { COMING_SOON, ComingSoon } from '../../components/ui/coming-soon';
 import { Callout, CopyButton, SegmentedControl } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, EmptyState, Mono, RelativeTime, StatusDot, type Tone } from '../../components/ui/primitives';
@@ -29,6 +30,11 @@ const TRIGGER_META: Record<string, { icon: ReactNode; title: string; description
     webhook: { icon: <Webhook size={16} strokeWidth={1.9} />, title: 'From a webhook', short: 'Webhook', description: 'Another system posts to a signed URL; the body becomes the input.' },
     app_event: { icon: <Zap size={16} strokeWidth={1.9} />, title: 'On an app event', short: 'App event', description: 'Each time something happens in Veyra, like a new ticket.' },
 };
+/**
+ * Triggers that can be saved but never fire: nothing serves /hooks/automations/{id},
+ * and nothing listens for app events to start a run. Only schedule and manual work.
+ */
+const SOON_TRIGGERS = new Set(['webhook', 'app_event']);
 const triggerMeta = (t: string) => TRIGGER_META[t] ?? { icon: <Zap size={16} strokeWidth={1.9} />, title: t.replace(/_/g, ' '), short: t.replace(/_/g, ' '), description: '' };
 
 const REASONING: { value: string; label: string; hint: string }[] = [
@@ -165,8 +171,11 @@ export default function AutomationDetail({ automation: a, actions, events, trigg
                         <div className="grid gap-4 sm:grid-cols-2">
                             {triggers.map((t) => {
                                 const m = triggerMeta(t);
+                                const soon = SOON_TRIGGERS.has(t);
                                 return (
+                                    // A coming-soon trigger already on can still be turned off, never on.
                                     <ChoiceCard key={t} multiple selected={has(t)} onSelect={() => toggleTrigger(t)} icon={m.icon} title={m.title}
+                                        meta={soon ? <ComingSoon compact /> : undefined} disabled={soon && !has(t)} disabledReason={COMING_SOON}
                                         description={t === 'schedule' && has(t) ? scheduleSummary(data.schedule) : m.description} />
                                 );
                             })}
@@ -174,7 +183,7 @@ export default function AutomationDetail({ automation: a, actions, events, trigg
                         {errors.triggers && <p className="text-sm text-danger">{errors.triggers}</p>}
 
                         {configured.map((t) => (
-                            <TriggerConfig key={t} icon={triggerMeta(t).icon} title={triggerMeta(t).title}>
+                            <TriggerConfig key={t} icon={triggerMeta(t).icon} title={triggerMeta(t).title} soon={SOON_TRIGGERS.has(t)}>
                                 {t === 'schedule' && (
                                     <>
                                         <Stacked label="Repeats" error={fieldErrors['schedule.kind']}>
@@ -283,12 +292,13 @@ export default function AutomationDetail({ automation: a, actions, events, trigg
     );
 }
 
-function TriggerConfig({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+function TriggerConfig({ icon, title, soon = false, children }: { icon: ReactNode; title: string; soon?: boolean; children: ReactNode }) {
     return (
         <div className="animate-rise flex flex-col gap-5 rounded-lg p-6" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
             <div className="flex items-center gap-2 text-base font-semibold text-primary">
                 <span className="text-tertiary">{icon}</span>
                 {title}
+                {soon && <ComingSoon />}
             </div>
             {children}
         </div>

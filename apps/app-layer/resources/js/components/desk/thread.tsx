@@ -12,7 +12,8 @@ import { Avatar, Badge, EmptyState, Kbd, UserText } from '../ui/primitives';
 import AgentSteps from '../desk-inbox/agent-steps';
 import CallCard from '../desk-inbox/call-card';
 import { AutoTextarea, AvatarStack, IconButton } from '../desk-inbox/controls';
-import { channelIcon, dateTimeLabel, fileSize, initialsOf, sameDay, snoozeOptions, timeLabel } from '../desk-inbox/helpers';
+import { canDeliver, channelIcon, dateTimeLabel, fileSize, initialsOf, sameDay, snoozeOptions, timeLabel } from '../desk-inbox/helpers';
+import { ComingSoon } from '../ui/coming-soon';
 import TagEditor from '../desk-inbox/tag-editor';
 import { DaySeparator, NoteCard, ReminderCard, TicketCard } from '../desk-inbox/timeline-cards';
 import ComposeDialog, { type Composition } from './compose-dialog';
@@ -65,7 +66,8 @@ export default function Thread({ thread: raw, team, ticketTypes, detailsOpen, on
     const [assigning, setAssigning] = useState(false);
     const [filter, setFilter] = useState<Filter>('all');
 
-    const canReply = !!thread && thread.can_compose && !thread.identifier?.blocked;
+    // can_compose is true for SMS, email and fax, none of which can be sent yet.
+    const canReply = !!thread && thread.can_compose && canDeliver(thread.channel) && !thread.identifier?.blocked;
     const [mode, setMode] = useState<Mode>(canReply ? 'reply' : 'note');
 
     const items = useMemo(() => (thread ? buildItems(thread) : []), [thread]);
@@ -497,13 +499,16 @@ const Composer = forwardRef<HTMLTextAreaElement, {
     const switchTo = (next: Mode) => { onMode(next); requestAnimationFrame(() => inner.current?.focus()); };
 
     // Why Reply is off, short enough for the tab row; the full reason is its tooltip.
+    const soon = thread.can_compose && !canDeliver(thread.channel);
     const blocked = thread.identifier?.blocked
         ? { short: `${thread.identifier.value} is blocked`, full: `${thread.identifier.value} is blocked. Unblock it in the details pane to reply.` }
-        : !thread.can_compose
-            ? thread.channel === 'call'
-                ? { short: 'Calls can’t be answered in text', full: 'A call can’t be answered in text. Text them from their contact page; notes still work here.' }
-                : { short: 'The visitor has left the chat', full: 'The visitor has left the chat, so a reply can’t reach them. Notes still work.' }
-            : null;
+        : soon
+            ? { short: `Replying by ${thread.channel_label}`, full: `Replying by ${thread.channel_label} is coming soon. Notes still work here.` }
+            : !thread.can_compose
+                ? thread.channel === 'call'
+                    ? { short: 'Calls can’t be answered in text', full: 'A call can’t be answered in text. Notes still work here.' }
+                    : { short: 'The visitor has left the chat', full: 'The visitor has left the chat, so a reply can’t reach them. Notes still work.' }
+                : null;
 
     return (
         <div className="shrink-0 px-6 pt-2 pb-5">
@@ -525,8 +530,9 @@ const Composer = forwardRef<HTMLTextAreaElement, {
                         <span className="ml-auto flex min-w-0 items-center gap-1.5 pr-2 pl-3 text-xs text-tertiary" title={blocked.full}>
                             {thread.identifier?.blocked
                                 ? <Ban size={13} strokeWidth={2} className="shrink-0 text-danger" aria-hidden="true" />
-                                : <AlertCircle size={13} strokeWidth={2} className="shrink-0" aria-hidden="true" />}
+                                : !soon && <AlertCircle size={13} strokeWidth={2} className="shrink-0" aria-hidden="true" />}
                             <span className="truncate">{blocked.short}</span>
+                            {soon && !thread.identifier?.blocked && <ComingSoon compact />}
                             <span className="sr-only">{blocked.full}</span>
                         </span>
                     ) : (

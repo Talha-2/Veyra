@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { Cell, DataTable, HeadCell, TableRow } from '../../components/desk-pages/collection';
 import { initialsOf } from '../../components/desk-pages/format';
 import { DeskPage, MetricTile, Panel } from '../../components/desk-pages/layout';
+import { ComingSoon } from '../../components/ui/coming-soon';
 import { Callout, Meter, SearchField, SegmentedControl } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Avatar, Badge, EmptyState, Mono, UserText, type Tone } from '../../components/ui/primitives';
@@ -100,7 +101,8 @@ export default function Team({ members, can_manage }: { members: Member[]; can_m
                             <HeadCell width={160}>Status</HeadCell>
                             <HeadCell width={120}>Role</HeadCell>
                             <HeadCell width={220}>Workload</HeadCell>
-                            <HeadCell width={120}>Extension</HeadCell>
+                            {/* Extensions exist for phone transfers, and there is no phone line yet. */}
+                            <HeadCell width={150}><span className="inline-flex items-center gap-1.5">Extension<ComingSoon compact /></span></HeadCell>
                             <HeadCell width={160}>Can open</HeadCell>
                         </>
                     }>

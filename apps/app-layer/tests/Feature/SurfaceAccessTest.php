@@ -118,6 +118,10 @@ class SurfaceAccessTest extends TestCase
         $builder = $this->member($organization, OrganizationRole::Admin);
         $organization->membershipFor($builder)->revoke(Surface::Desk);
         $this->actingAs($builder)->get('/')->assertRedirect('/studio');
+
+        // Holding both, Studio wins: the agent is the product, Desk the add-on.
+        $owner = $this->member($organization, OrganizationRole::Owner);
+        $this->actingAs($owner)->get('/')->assertRedirect('/studio');
     }
 
     public function test_only_accessible_surfaces_are_shared_with_the_client(): void

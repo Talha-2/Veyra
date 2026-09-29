@@ -4,10 +4,11 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { SharedProps } from '../../types';
+import { ComingSoon } from '../ui/coming-soon';
 import { Kbd } from '../ui/primitives';
 import { NAV } from './nav';
 
-interface Command { id: string; group: string; label: string; hint?: string; icon: ReactNode; keywords?: string; run: () => void }
+interface Command { id: string; group: string; label: string; hint?: string; icon: ReactNode; keywords?: string; soon?: boolean; run: () => void }
 
 /**
  * ⌘K. Every page you can open, a few actions, and — when nothing matches —
@@ -38,7 +39,7 @@ export default function CommandPalette() {
             for (const group of NAV[s.key]) {
                 for (const item of group.items) {
                     const Icon = item.icon;
-                    out.push({ id: `${s.key}:${item.href}`, group: s.label, label: item.label, hint: item.href, icon: <Icon size={15} strokeWidth={1.8} />, keywords: item.keywords, run: () => router.visit(item.href) });
+                    out.push({ id: `${s.key}:${item.href}`, group: s.label, label: item.label, hint: item.href, icon: <Icon size={15} strokeWidth={1.8} />, keywords: item.keywords, soon: item.soon, run: () => router.visit(item.href) });
                 }
             }
         }
@@ -102,6 +103,7 @@ export default function CommandPalette() {
                                     style={{ background: i === index ? 'var(--surface-active)' : 'transparent', color: 'var(--text-primary)' }}>
                                     <span className="flex size-7 shrink-0 items-center justify-center rounded-lg text-secondary" style={{ background: 'var(--surface-sunken)' }}>{c.icon}</span>
                                     <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                                    {c.soon && <ComingSoon compact />}
                                     {i === index && <CornerDownLeft size={14} className="text-tertiary" />}
                                 </button>
                             </div>

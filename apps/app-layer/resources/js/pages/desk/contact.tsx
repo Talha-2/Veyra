@@ -7,6 +7,7 @@ import { MessageDialog, TicketDialog } from '../../components/desk-pages/contact
 import { clockTime, humanize, initialsOf, isToday, longDate, money, relative } from '../../components/desk-pages/format';
 import { Menu, MenuItem, MenuLabel } from '../../components/shell/menu';
 import { DeskPage, Panel, PanelBody, PanelHeader, PanelRow, PanelRows, PanelTabs, WithSidePanel } from '../../components/desk-pages/layout';
+import { COMING_SOON, ComingSoon } from '../../components/ui/coming-soon';
 import { CopyButton, IconTile, KeyValues } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Avatar, Badge, EmptyState, Mono, RelativeTime, UserText, type Tone } from '../../components/ui/primitives';
@@ -92,8 +93,9 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
                                             ? <a href={`tel:${contact.phone}`} className="v-btn v-btn--quiet"><Phone size={14} strokeWidth={1.8} />Call</a>
                                             : <button type="button" className="v-btn v-btn--quiet" disabled title="No phone number on file"><Phone size={14} strokeWidth={1.8} />Call</button>}
                                         <button type="button" className="v-btn v-btn--quiet" onClick={() => setTicketing(true)}><TicketIcon size={14} strokeWidth={1.8} />Ticket</button>
-                                        <button type="button" className="v-btn v-btn--primary" onClick={() => setMessaging(true)} disabled={!canMessage} title={canMessage ? undefined : 'No phone or email on file'}>
-                                            <MessageSquare size={14} strokeWidth={1.8} />Message
+                                        {/* Messages go out by SMS or email, and neither can be sent yet. */}
+                                        <button type="button" className="v-btn v-btn--quiet" onClick={() => setMessaging(true)} disabled aria-disabled="true" title={COMING_SOON}>
+                                            <MessageSquare size={14} strokeWidth={1.8} />Message<ComingSoon compact />
                                         </button>
                                     </>
                                 }
@@ -122,7 +124,7 @@ export default function ContactDetail({ contact, conversations, tickets, notes, 
 
                         {tab === 'conversations' && (conversations.length === 0 ? (
                             <EmptyState icon={<MessageSquare size={20} strokeWidth={1.8} />} title="No conversations yet"
-                                action={canMessage ? <button type="button" className="v-btn v-btn--quiet" onClick={() => setMessaging(true)}>Send a message</button> : undefined}>
+                                action={canMessage ? <button type="button" className="v-btn v-btn--quiet" disabled aria-disabled="true" title={COMING_SOON}>Send a message<ComingSoon compact /></button> : undefined}>
                                 Calls, texts and emails with {contact.name} collect here as threads.
                             </EmptyState>
                         ) : (

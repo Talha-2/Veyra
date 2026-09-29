@@ -16,6 +16,17 @@ export function channelIcon(channel: string): LucideIcon {
     return CHANNEL_ICON[channel] ?? MessageSquare;
 }
 
+/**
+ * Channels nothing can send on yet. A message written to one is stored as
+ * `queued` and never leaves: there is no SMS, email or fax client or carrier
+ * wired in the app or the agent layer. Composing on them is "Coming soon".
+ */
+const UNDELIVERABLE = new Set(['sms', 'email', 'fax']);
+
+export function canDeliver(channel: string): boolean {
+    return !UNDELIVERABLE.has(channel);
+}
+
 /** "Ada Lovelace" → "AL"; "+1 312 555" → "#". */
 export function initialsOf(name: string): string {
     const letters = name

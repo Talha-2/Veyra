@@ -123,7 +123,8 @@ export default function ConversationList({ conversations, selectedId, view, sort
                     </Menu>
 
                     {!railOpen && (
-                        <IconButton label="New conversation" onClick={onNew}><SquarePen size={16} strokeWidth={1.9} /></IconButton>
+                        // SMS and email cannot be sent yet, so a new thread has nowhere to go.
+                        <IconButton label="New conversation · Coming soon" onClick={onNew} disabled><SquarePen size={16} strokeWidth={1.9} /></IconButton>
                     )}
                 </div>
 

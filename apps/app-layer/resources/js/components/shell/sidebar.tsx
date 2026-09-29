@@ -3,6 +3,7 @@ import { Building2, Check, ChevronsUpDown, LogOut, Monitor, Moon, Search, Sun, U
 import { useEffect, useState } from 'react';
 
 import type { SharedProps, SurfaceKey } from '../../types';
+import { ComingSoon } from '../ui/coming-soon';
 import { Avatar, Kbd } from '../ui/primitives';
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from './menu';
 import { NAV, isActive } from './nav';
@@ -43,7 +44,9 @@ export default function Sidebar({ product, rail = false }: { product: SurfaceKey
                                 const active = isActive(item, url);
                                 const Icon = item.icon;
                                 return (
-                                    <Link key={item.href} href={item.href} prefetch aria-current={active ? 'page' : undefined} aria-label={rail ? item.label : undefined} title={rail ? item.label : undefined}
+                                    <Link key={item.href} href={item.href} prefetch aria-current={active ? 'page' : undefined}
+                                        aria-label={rail ? (item.soon ? `${item.label} (coming soon)` : item.label) : undefined}
+                                        title={rail ? (item.soon ? `${item.label} · Coming soon` : item.label) : undefined}
                                         className={`group flex items-center rounded-lg transition-colors ${rail ? 'size-9 justify-center' : 'h-8 gap-2.5 px-2.5 text-sm font-medium'}`}
                                         style={{
                                             background: active ? 'var(--surface)' : undefined,
@@ -51,7 +54,8 @@ export default function Sidebar({ product, rail = false }: { product: SurfaceKey
                                             boxShadow: active ? 'var(--shadow-card)' : undefined,
                                         }}>
                                         <Icon size={rail ? 18 : 16} strokeWidth={active ? 2.1 : 1.8} style={{ color: active ? 'var(--accent)' : undefined }} className={active ? '' : 'opacity-80 group-hover:opacity-100'} />
-                                        {!rail && <span className="truncate">{item.label}</span>}
+                                        {!rail && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
+                                        {!rail && item.soon && <ComingSoon compact />}
                                     </Link>
                                 );
                             })}

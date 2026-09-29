@@ -6,14 +6,17 @@
 import { useId, useState } from "react";
 import { MessageSquareText, Phone, PhoneCall, Plus } from "lucide-react";
 
+import { Soon } from "./soon";
+
 /* ── FAQ: one question open at a time, fully keyboard and reader friendly ── */
 
-export function FaqAccordion({ items }: { items: [string, string][] }) {
+/** Items are [question, answer, soon?]; `soon` tags a question the product cannot answer yes to today. */
+export function FaqAccordion({ items }: { items: [string, string, boolean?][] }) {
   const [open, setOpen] = useState<number | null>(0);
   const base = useId();
   return (
     <div className="border-t border-[var(--mk-line)]">
-      {items.map(([q, a], i) => {
+      {items.map(([q, a, soon], i) => {
         const isOpen = open === i;
         const btn = `${base}-q${i}`;
         const panel = `${base}-a${i}`;
@@ -28,7 +31,7 @@ export function FaqAccordion({ items }: { items: [string, string][] }) {
                 onClick={() => setOpen(isOpen ? null : i)}
                 className="group flex w-full items-center justify-between gap-6 py-7 text-left"
               >
-                <span className="mk-h4 transition-colors group-hover:text-[var(--mk-ember-deep)]">{q}</span>
+                <span className="mk-h4 transition-colors group-hover:text-[var(--mk-ember-deep)]">{q}{soon && <Soon inline />}</span>
                 <span
                   className="flex size-9 shrink-0 items-center justify-center rounded-full"
                   style={{ background: "rgba(127,127,127,0.1)", transition: "transform 450ms var(--mk-ease), background-color 300ms", transform: isOpen ? "rotate(45deg)" : "none" }}

@@ -7,6 +7,7 @@ import { IntegrationExplorer } from "@/components/mk/integrations-parts";
 import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
 import { CountUp, HorizontalScroll, Marquee, Parallax, Reveal, Stagger } from "@/components/mk/motion";
 import { LogoOrbit } from "@/components/mk/scenes";
+import { Soon } from "@/components/mk/soon";
 
 export const metadata: Metadata = {
   title: "Integrations",
@@ -65,6 +66,8 @@ const ROLES: Record<string, string> = {
   OpenAI: "Language models", LiveKit: "Real-time voice", Deepgram: "Speech to text", Cartesia: "Voices", ElevenLabs: "Voices",
   Groq: "Fast inference", Twilio: "Phone numbers", Telnyx: "Phone numbers", Composio: "App connections", Langfuse: "A trace of every call",
 };
+/* phone lines are not connected to the agent yet */
+const SOON = new Set(["Twilio", "Telnyx"]);
 
 function Switch({ on, label }: { on: boolean; label: string }) {
   return (
@@ -312,6 +315,7 @@ export default function IntegrationsPage() {
                 <figcaption>
                   <span className="mk-h4 block">{p.name}</span>
                   <span className="mk-small mt-1 block">{ROLES[p.name]}</span>
+                  {SOON.has(p.name) && <Soon className="mt-2" />}
                 </figcaption>
               </figure>
             ))}

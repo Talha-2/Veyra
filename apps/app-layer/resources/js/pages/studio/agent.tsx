@@ -6,6 +6,7 @@ import { SectionNav } from '../../components/studio-agent/section-nav';
 import { EditorWell } from '../../components/studio-capability/editor-well';
 import { Cap, SaveBar, Toggle } from '../../components/studio/form';
 import { Disclosure, PageStack, Panel, Stacked } from '../../components/studio/space';
+import { COMING_SOON, ComingSoon } from '../../components/ui/coming-soon';
 import { Callout } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, Mono, StatusDot } from '../../components/ui/primitives';
@@ -292,14 +293,15 @@ export default function Agent({ config, profile, languages, models }: Props) {
                         </Panel>
 
                         <Panel id="calls" title="Calls" description="Limits and records that apply to every call on every number.">
-                            <Stacked label="Maximum length" htmlFor="max-call" hint="The agent starts wrapping up as this approaches, then ends the call." error={errors.max_call_seconds}>
+                            {/* The voice worker does not read max_call_seconds or record_calls yet: nothing enforces a limit or records audio. */}
+                            <Stacked label={<span className="inline-flex items-center gap-2">Maximum length<ComingSoon /></span>} htmlFor="max-call" hint="The agent starts wrapping up as this approaches, then ends the call." error={errors.max_call_seconds}>
                                 <div className="flex flex-wrap items-center gap-4">
-                                    <UnitInput id="max-call" min={60} max={7200} step={60} unit="sec" value={data.max_call_seconds} onChange={(v) => setData('max_call_seconds', v)} />
+                                    <UnitInput id="max-call" min={60} max={7200} step={60} unit="sec" value={data.max_call_seconds} onChange={(v) => setData('max_call_seconds', v)} disabled />
                                     <span className="text-sm text-secondary tabular-nums">{duration(data.max_call_seconds)}</span>
                                 </div>
                             </Stacked>
                             <div className="border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
-                                <Toggle checked={data.record_calls} onChange={(v) => setData('record_calls', v)} label="Record calls" hint="Recordings appear on the conversation in Desk. Some regions require telling the caller." />
+                                <Toggle checked={data.record_calls} onChange={(v) => setData('record_calls', v)} label="Record calls" hint="Recordings appear on the conversation in Desk. Some regions require telling the caller." soon />
                             </div>
                         </Panel>
 
@@ -360,10 +362,10 @@ function Legend({ term, children }: { term: string; children: ReactNode }) {
 }
 
 /** A number field with its unit inside the well, so the value never floats unitless. */
-function UnitInput({ id, value, onChange, unit, min, max, step }: { id?: string; value: number; onChange: (v: number) => void; unit: string; min: number; max: number; step: number }) {
+function UnitInput({ id, value, onChange, unit, min, max, step, disabled = false }: { id?: string; value: number; onChange: (v: number) => void; unit: string; min: number; max: number; step: number; disabled?: boolean }) {
     return (
-        <div className="relative w-40">
-            <input id={id} type="number" min={min} max={max} step={step} className="v-field pr-12 tabular-nums" value={value} onChange={(e) => onChange(Number(e.target.value))} />
+        <div className="relative w-40" title={disabled ? COMING_SOON : undefined}>
+            <input id={id} type="number" min={min} max={max} step={step} className="v-field pr-12 tabular-nums disabled:cursor-not-allowed disabled:opacity-55" value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} />
             <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-sm text-tertiary">{unit}</span>
         </div>
     );

@@ -10,8 +10,8 @@ use Illuminate\Http\RedirectResponse;
  *
  * Because Desk and Studio are separate products with separate access, there is
  * no single home page to render — where you belong depends on what you were
- * granted. An operator lands in Desk, an owner in Desk as well (it is first in
- * surface order), and someone with only Studio lands in Studio.
+ * granted. Anyone with Studio (owners, admins) lands there; an operator with
+ * only Desk lands in Desk.
  */
 class SurfaceRedirectController extends Controller
 {

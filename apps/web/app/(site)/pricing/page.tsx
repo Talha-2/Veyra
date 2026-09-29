@@ -19,6 +19,7 @@ import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/
 import { CountUp, Reveal, Stagger } from "@/components/mk/motion";
 import { FaqAccordion, PassThroughArt } from "@/components/mk/pricing-parts";
 import { VoiceOrb } from "@/components/mk/scenes";
+import { Soon } from "@/components/mk/soon";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -91,6 +92,15 @@ const PLANS: Plan[] = [
   },
 ];
 
+/* Plan lines the product cannot deliver yet. They keep their place in the
+   plan and carry the Coming soon tag; remove a line from here when it ships. */
+const SOON = new Set([
+  "Telephony: real numbers, calls and SMS",
+  "Real phone numbers, calls and SMS",
+  "Evals and simulated callers",
+  "SSO and provisioning",
+]);
+
 /* The comparison. `true` is included, `false` is not, a string is the value. */
 type Cell = boolean | string;
 const COMPARE: { group: string; rows: [string, Cell, Cell, Cell][] }[] = [
@@ -128,8 +138,8 @@ const COMPARE: { group: string; rows: [string, Cell, Cell, Cell][] }[] = [
   },
 ];
 
-const INCLUDED = [
-  { icon: MessageSquare, title: "Voice and chat agents", body: "Build an agent that talks on the phone and chats on your site." },
+const INCLUDED: { icon: typeof MessageSquare; title: string; body: React.ReactNode }[] = [
+  { icon: MessageSquare, title: "Voice and chat agents", body: <>Build an agent that talks and chats with your customers. <span className="whitespace-nowrap">Phone lines<Soon inline /></span></> },
   { icon: Workflow, title: "Visual workflow builder", body: "Lay out what should happen, step by step, without code." },
   { icon: BookOpen, title: "A knowledge base", body: "Upload your prices and policies. Answers come from what you wrote." },
   { icon: CirclePlay, title: "Live demo playground", body: "Talk to your agent and hear it before a single customer does." },
@@ -139,10 +149,10 @@ const INCLUDED = [
   { icon: Lock, title: "Your data stays yours", body: "We do not train on your conversations or sell your data." },
 ];
 
-const FAQS: [string, string][] = [
+const FAQS: [string, string, boolean?][] = [
   ["Is there really a free plan?", "Yes. Starter is free forever. Build voice and chat agents, lay out workflows in the visual builder, ground them in your knowledge base, and try it all in the live demo before you ever add a card."],
   ["How is voice billed?", "Voice minutes, phone numbers and SMS are billed at provider cost, passed straight through with no markup. Your plan covers the platform. Usage is pay as you go, so you only pay for the conversations you actually run."],
-  ["Can I use my own phone numbers?", "Yes. Get new numbers inside Veyra in more than 100 countries, or connect numbers you already own. The agent you tuned runs on whichever line you point at it."],
+  ["Can I use my own phone numbers?", "Yes. Get new numbers inside Veyra in more than 100 countries, or connect numbers you already own. The agent you tuned runs on whichever line you point at it.", true],
   ["What languages are supported?", "Eight in Studio today: English, Spanish, French, German, Portuguese, Hindi, Arabic and Urdu, each with its own voice. It follows a caller who switches language mid-sentence, with no setting to change."],
   ["Can I self-host or bring my own models?", "On Scale you can bring your own models and custom voices, and route to the providers you prefer. Talk to us about self-hosting and where your data lives if you are a regulated team."],
   ["How does the deep agent work?", "Describe your business in plain English. The deep agent plans the work, hands pieces to specialists, and builds your workflows, knowledge and voice. You review and approve everything before it goes live."],
@@ -221,7 +231,7 @@ export default function PricingPage() {
                   {p.features.map((f) => (
                     <li key={f} className="flex items-start gap-3 text-[15px] leading-snug">
                       <Check size={18} strokeWidth={2.4} className="mt-0.5 shrink-0" style={{ color: p.recommended ? "var(--mk-ember-soft)" : "var(--mk-ember)" }} aria-hidden="true" />
-                      <span>{f}</span>
+                      <span>{f}{SOON.has(f) && <Soon inline />}</span>
                     </li>
                   ))}
                 </ul>
@@ -252,6 +262,7 @@ export default function PricingPage() {
           <div>
             <div className="mk-h1"><CountUp to={100} suffix="+" /></div>
             <p className="mk-body mx-auto mt-3 max-w-[22ch]">Countries where you can get a number</p>
+            <Soon className="mt-3" />
           </div>
           <div>
             <div className="mk-h1"><CountUp to={8} /></div>
@@ -303,7 +314,7 @@ export default function PricingPage() {
                   </tr>
                   {g.rows.map(([label, ...cells]) => (
                     <tr key={label}>
-                      <th scope="row" className="border-t border-[var(--mk-line)] py-5 pr-6 text-[17px] font-normal text-[var(--mk-ink)]">{label}</th>
+                      <th scope="row" className="border-t border-[var(--mk-line)] py-5 pr-6 text-[17px] font-normal text-[var(--mk-ink)]">{label}{SOON.has(label) && <Soon inline />}</th>
                       {cells.map((c, i) => (
                         <td key={PLAN_NAMES[i]} className={`border-t border-[var(--mk-line)] px-4 py-5 text-center ${i === 1 ? "bg-[var(--mk-bg-alt)]" : ""}`}>
                           <CellMark value={c} strong={i === 1} />
@@ -340,7 +351,7 @@ export default function PricingPage() {
                         const c = cells[pi];
                         return (
                           <li key={label} className={`flex items-center justify-between gap-4 border-b border-[var(--mk-line)] py-3 text-[15px] ${c === false ? "text-[var(--mk-ink-3)]" : ""}`}>
-                            <span>{label}</span>
+                            <span>{label}{SOON.has(label) && <Soon inline />}</span>
                             <span className="shrink-0 text-right">
                               {c === true ? <><Check size={18} strokeWidth={2.4} style={{ color: p.recommended ? "var(--mk-ember-soft)" : "var(--mk-ember)" }} aria-hidden="true" /><span className="sr-only">Included</span></> : c === false ? <><Minus size={16} className="opacity-60" aria-hidden="true" /><span className="sr-only">Not included</span></> : <span className="font-medium">{c}</span>}
                             </span>

@@ -12,6 +12,7 @@ import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/
 import { CountUp, HorizontalScroll, Marquee, Parallax, Reveal, Stagger, TextReveal } from "@/components/mk/motion";
 import { PhoneFrame, VoiceOrb } from "@/components/mk/scenes";
 import { IndustryCall, type IndustryId } from "@/components/mk/solutions-parts";
+import { ChannelStatus, Soon } from "@/components/mk/soon";
 
 export const metadata: Metadata = {
   title: "Solutions",
@@ -32,7 +33,7 @@ type Industry = {
   headline: string;
   lead: string;
   quote: string;
-  calls: { icon: LucideIcon; title: string; body: string }[];
+  calls: { icon: LucideIcon; title: string; body: string; soon?: boolean }[];
   tools: string[];
   after: { name: string; initials: string; meta: string; status: string; summary: string; did: [string, string][]; flag?: string };
   guard?: { title: string; body: string };
@@ -70,7 +71,7 @@ const INDUSTRIES: Industry[] = [
     calls: [
       { icon: UserPlus, title: "New patients", body: "It asks your intake questions, takes their details and books a first visit in the slots you keep for it." },
       { icon: CalendarClock, title: "Reschedules and cancellations", body: "Found, moved and confirmed in one call, with a text of the new time." },
-      { icon: PhoneForwarded, title: "Anything urgent", body: "It asks the triage questions you write and routes by your answers, to your on-call line when you say so." },
+      { icon: PhoneForwarded, title: "Anything urgent", body: "It asks the triage questions you write and routes by your answers, to your on-call line when you say so.", soon: true },
       { icon: MessageSquareText, title: "Office questions", body: "Hours, parking, which insurers you accept, what to bring. Answered from what you wrote." },
     ],
     tools: ["Google Calendar", "Outlook", "Gmail", "Microsoft Teams", "Google Sheets", "Slack"],
@@ -90,7 +91,7 @@ const INDUSTRIES: Industry[] = [
     lead: "Buyers ask about three listings at once. The agent who calls first usually gets the showing. Veyra calls every inquiry back, answers from the listing and books the tour.",
     quote: "Is 14 Alder Lane still available?",
     calls: [
-      { icon: PhoneOutgoing, title: "Instant call-backs", body: "Hand it the new inquiry and it calls the buyer back right away, by name, about the home they asked about." },
+      { icon: PhoneOutgoing, title: "Instant call-backs", body: "Hand it the new inquiry and it calls the buyer back right away, by name, about the home they asked about.", soon: true },
       { icon: BookOpen, title: "Listing questions", body: "Bedrooms, parking, HOA fees, school district. From the listing sheet you uploaded, never a guess." },
       { icon: Route, title: "Qualifying, politely", body: "Budget, timeline, pre-approval, and whether they have a home to sell first." },
       { icon: KeyRound, title: "Showings, booked", body: "Straight onto the right agent’s calendar, with the details sent to the buyer." },
@@ -128,18 +129,18 @@ const INDUSTRIES: Industry[] = [
 const byId = (id: IndustryId) => INDUSTRIES.find((i) => i.id === id)!;
 
 /* a day of calls on one home-services line; each card is one call */
-const DAY: { time: string; quote: string; did: string; tool: string | null; outcome: string }[] = [
+const DAY: { time: string; quote: string; did: string; tool: string | null; outcome: string; soon?: boolean }[] = [
   { time: "6:52 AM", quote: "No hot water since this morning.", did: "Asked the three questions you set for water heaters, then booked the first open window.", tool: "Google Calendar", outcome: "Booked, today 12 to 3" },
   { time: "9:15 AM", quote: "How much is a drain cleaning?", did: "Quoted the price from your price sheet, word for word, and booked Thursday.", tool: "Google Sheets", outcome: "Quoted and booked" },
   { time: "12:40 PM", quote: "Can you push me to next week?", did: "Found the visit by the caller’s number, offered two windows and moved it.", tool: "Google Calendar", outcome: "Rescheduled" },
   { time: "3:05 PM", quote: "I think I was charged twice.", did: "Found the invoice, didn’t promise a refund, and opened a billing ticket for the office.", tool: "QuickBooks", outcome: "Ticket for the office" },
   { time: "6:30 PM", quote: "Do you come out to Skokie?", did: "Checked your service area. Skokie isn’t in it, so it said so, kindly, and noted the call.", tool: null, outcome: "Answered from your area list" },
-  { time: "11:48 PM", quote: "Water is coming through the ceiling.", did: "Talked them to the shut-off valve, posted to #on-call and transferred to Dev with a brief.", tool: "Slack", outcome: "Warm transfer" },
+  { time: "11:48 PM", quote: "Water is coming through the ceiling.", did: "Talked them to the shut-off valve, posted to #on-call and transferred to Dev with a brief.", tool: "Slack", outcome: "Warm transfer", soon: true },
 ];
 
-const LEAD_STEPS: { icon: LucideIcon; time: string; title: string; body: string }[] = [
+const LEAD_STEPS: { icon: LucideIcon; time: string; title: string; body: string; soon?: boolean }[] = [
   { icon: Inbox, time: "4:02 PM", title: "A lead comes in", body: "Priya asks about 14 Alder Lane on your website." },
-  { icon: PhoneOutgoing, time: "4:02 PM", title: "Veyra calls her back", body: "By name, about that home, while the listing is still on her screen." },
+  { icon: PhoneOutgoing, time: "4:02 PM", title: "Veyra calls her back", body: "By name, about that home, while the listing is still on her screen.", soon: true },
   { icon: CalendarCheck, time: "4:06 PM", title: "The showing is booked", body: "On Maya’s calendar, in your CRM, and in Priya’s inbox." },
 ];
 
@@ -175,7 +176,7 @@ function IndustryStage({ ind, flip = false }: { ind: Industry; flip?: boolean })
         <Stagger className="mt-6 grid gap-x-10 gap-y-9 sm:grid-cols-2" step={110}>
           {ind.calls.map((c) => (
             <div key={c.title} className="border-t border-[var(--mk-line)] pt-6">
-              <c.icon size={26} className="text-[var(--mk-ember)]" />
+              <div className="flex items-center justify-between gap-3"><c.icon size={26} className="text-[var(--mk-ember)]" />{c.soon && <Soon />}</div>
               <h3 className="mk-h4 mt-4">{c.title}</h3>
               <p className="mk-body mt-2">{c.body}</p>
             </div>
@@ -285,6 +286,7 @@ export default function SolutionsPage() {
             <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Request a demo</a>
           </Reveal>
+          <Reveal variant="fade" delay={360} className="mt-8"><ChannelStatus /></Reveal>
         </div>
         {/* four phones at two depths: the inner pair drifts faster than the outer */}
         <div className="mk-wrap mk-wrap--wide mt-8 grid grid-cols-2 items-start gap-4 pt-12 pb-16 sm:gap-6 lg:grid-cols-4 lg:gap-10">
@@ -341,7 +343,7 @@ export default function SolutionsPage() {
           >
             {DAY.map((d) => (
               <article key={d.time} className="mk-card flex shrink-0 flex-col p-8" style={{ width: "min(380px, 80vw)", height: "min(470px, calc(100svh - 330px))", minHeight: 380 }}>
-                <p className="mk-kicker">{d.time}</p>
+                <div className="flex items-center justify-between gap-3"><p className="mk-kicker">{d.time}</p>{d.soon && <Soon />}</div>
                 <h4 className="mk-h3 mt-4">“{d.quote}”</h4>
                 <p className="mk-body mt-4">{d.did}</p>
                 <div className="mt-auto flex items-center gap-4 border-t border-[var(--mk-line)] pt-5">
@@ -384,7 +386,7 @@ export default function SolutionsPage() {
                   <span className="flex size-12 items-center justify-center rounded-2xl" style={{ background: i === 1 ? "var(--mk-ember)" : "rgba(233,107,52,0.1)", color: i === 1 ? "#fff" : "var(--mk-ember)" }}><s.icon size={22} /></span>
                   <span className="mk-pill tabular-nums">{s.time}</span>
                 </div>
-                <h3 className="mk-h4 mt-6">{s.title}</h3>
+                <h3 className="mk-h4 mt-6">{s.title}{s.soon && <Soon inline />}</h3>
                 <p className="mk-body mt-2">{s.body}</p>
               </div>
             ))}
@@ -413,11 +415,12 @@ export default function SolutionsPage() {
             [<><span key="lt" className="align-top text-[0.55em]">&lt;</span><CountUp to={1.2} decimals={1} suffix="s" /></>, "Voice to voice, the target every call is measured against"],
             [<CountUp key="l" to={8} />, "Languages in Studio, each with its own voice"],
             [<CountUp key="a" to={1500} suffix="+" />, "Apps it can work in, one sign-in each"],
-            [<CountUp key="c" to={100} suffix="+" />, "Countries you can call and answer"],
-          ].map(([fig, label], i) => (
+            [<CountUp key="c" to={100} suffix="+" />, "Countries you can call and answer", true],
+          ].map(([fig, label, soon], i) => (
             <div key={i}>
               <div className="mk-h1">{fig}</div>
               <p className="mk-body mx-auto mt-3 max-w-[22ch]">{label}</p>
+              {soon && <Soon className="mt-3" />}
             </div>
           ))}
         </Stagger>

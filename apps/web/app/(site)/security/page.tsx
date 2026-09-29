@@ -26,6 +26,7 @@ import { LogoTile, PARTNERS } from "@/components/mk/brand";
 import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/mk/links";
 import { CountUp, HorizontalScroll, Parallax, Reveal, Stagger, TextReveal } from "@/components/mk/motion";
 import { DataFlow, PrincipleArt, ShieldArt } from "@/components/mk/security-parts";
+import { Soon } from "@/components/mk/soon";
 
 export const metadata: Metadata = {
   title: "Security",
@@ -59,7 +60,7 @@ const FAILSAFE = [
   { icon: LifeBuoy, title: "Degrade to safe.", body: "When something breaks, Veyra falls back to a person or a callback. It never makes up a policy to fill a silence.", tag: "Human fallback" },
   { icon: Radio, title: "Provider failover.", body: "If a voice or model provider falters mid-call, Veyra switches over on its own. The caller hears a voice, not dead air.", tag: "Mid-call" },
   { icon: BookOpen, title: "Grounded, never guessing.", body: "It answers from your knowledge, or it says it does not know. A confident wrong answer counts as a failure.", tag: "No improvising" },
-  { icon: PhoneForwarded, title: "Warm handoffs, always.", body: "Transfers carry the context. If the person is busy, the caller gets a callback instead of a long hold.", tag: "Context carried" },
+  { icon: PhoneForwarded, title: "Warm handoffs, always.", body: "Transfers carry the context. If the person is busy, the caller gets a callback instead of a long hold.", tag: "Context carried", soon: true },
 ];
 
 const CARRIERS = PARTNERS.filter((p) => ["Twilio", "Telnyx", "LiveKit"].includes(p.name));
@@ -174,6 +175,7 @@ export default function SecurityPage() {
             <div>
               <Reveal><h3 className="mk-h2 max-w-[16ch]">Calls ride carrier-grade networks.</h3></Reveal>
               <Reveal delay={100}><p className="mk-body mt-4 max-w-[42ch]">Voice and phone traffic runs on established providers, with encryption in transit handled at the provider level.</p></Reveal>
+              <Reveal delay={140}><p className="mk-small mt-4 flex flex-wrap items-center gap-2">Phone lines through Twilio and Telnyx <Soon /></p></Reveal>
             </div>
             <Stagger className="flex items-center justify-center gap-4 sm:gap-5 lg:justify-end" step={120}>
               {CARRIERS.map((p) => (
@@ -203,7 +205,7 @@ export default function SecurityPage() {
                   </span>
                   <span className="mk-pill mk-pill--ember">{f.tag}</span>
                 </div>
-                <h3 className="mk-h3 mt-8">{f.title}</h3>
+                <h3 className="mk-h3 mt-8">{f.title}{f.soon && <Soon inline />}</h3>
                 <p className="mk-body mt-3 max-w-[44ch]">{f.body}</p>
               </article>
             ))}

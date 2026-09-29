@@ -6,6 +6,7 @@ import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/
 import { CountUp, HorizontalScroll, Marquee, Parallax, Reveal, Stagger, TextReveal, ZoomOnScroll } from "@/components/mk/motion";
 import { AskScreen, DeskScreen, Globe, LanguageCloud, LaptopFrame, LogoOrbit, StudioScreen, VoiceOrb, Waveform } from "@/components/mk/scenes";
 import { CallStory } from "@/components/mk/sections";
+import { ChannelStatus, MobileAppSoon, Soon } from "@/components/mk/soon";
 
 /* Home. A product page, not a feature list: one idea per screen, the
    product shown working, and the reader's scroll driving the story. */
@@ -14,8 +15,8 @@ const CAPABILITIES = [
   { icon: Zap, title: "Fast enough to feel human.", body: "Replies start in about a second, voice to voice. Callers don’t wait through a silence wondering if anyone is there.", figure: "<1.2s", label: "voice to voice, target", art: "wave" },
   { icon: AudioLines, title: "Interrupt it. It listens.", body: "A real interruption stops it mid-word. A cough, or an “mm-hm”, does not.", figure: "~100ms", label: "to stop speaking", art: "barge" },
   { icon: Languages, title: "Speaks your callers’ language.", body: "English, Spanish, Urdu and more, each with its own voice, and it follows a caller who switches mid-sentence.", figure: "8", label: "languages in Studio today", art: "lang" },
-  { icon: Globe2, title: "A real number, anywhere.", body: "Use the lines you have or add new ones, and answer and place calls across 100+ countries.", figure: "100+", label: "countries reachable", art: "globe" },
-  { icon: PhoneForwarded, title: "Hands off, warmly.", body: "It briefs the person it transfers to. If they’re busy, the caller gets a callback, not a dead line.", figure: "Warm", label: "or cold transfers, your call", art: "handoff" },
+  { icon: Globe2, title: "A real number, anywhere.", body: "Use the lines you have or add new ones, and answer and place calls across 100+ countries.", figure: "100+", label: "countries reachable", art: "globe", soon: true },
+  { icon: PhoneForwarded, title: "Hands off, warmly.", body: "It briefs the person it transfers to. If they’re busy, the caller gets a callback, not a dead line.", figure: "Warm", label: "or cold transfers, your call", art: "handoff", soon: true },
   { icon: ShieldCheck, title: "Honest when it isn’t sure.", body: "If a booking times out, it says so and flags it for your team instead of pretending it went through.", figure: "Flagged", label: "never faked", art: "shield" },
 ];
 
@@ -69,6 +70,7 @@ export default function Home() {
       {/* ── hero ─────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden pt-16 pb-10 md:pt-24">
         <div className="mk-wrap text-center">
+          <Reveal variant="blur" className="mb-6"><MobileAppSoon /></Reveal>
           <Reveal variant="blur"><p className="mk-eyebrow">Veyra</p></Reveal>
           <Reveal variant="rise" delay={80}><h1 className="mk-display mx-auto mt-3">Every call answered.<br className="hidden sm:block" /> Every job booked.</h1></Reveal>
           <Reveal variant="rise" delay={180}>
@@ -78,6 +80,7 @@ export default function Home() {
             <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Request a demo</a>
           </Reveal>
+          <Reveal variant="fade" delay={360} className="mt-8"><ChannelStatus /></Reveal>
         </div>
         <Reveal variant="zoom" delay={200} className="mt-8 flex justify-center md:mt-4">
           <Parallax speed={-0.12}><VoiceOrb size="min(620px, 88vw)" /></Parallax>
@@ -124,7 +127,7 @@ export default function Home() {
           {CAPABILITIES.map((c) => (
             <article key={c.title} className="mk-card flex shrink-0 flex-col" style={{ width: "min(400px, 80vw)", height: "min(520px, calc(100svh - 330px))", minHeight: 400 }}>
               <div className="p-8 pb-0">
-                <c.icon size={28} className="text-[var(--mk-ember)]" />
+                <div className="flex items-center justify-between gap-3"><c.icon size={28} className="text-[var(--mk-ember)]" />{c.soon && <Soon />}</div>
                 <h3 className="mk-h3 mt-5">{c.title}</h3>
                 <p className="mk-body mt-3">{c.body}</p>
               </div>
@@ -144,6 +147,7 @@ export default function Home() {
           <Reveal><p className="mk-eyebrow">Veyra Desk</p></Reveal>
           <Reveal delay={80}><h2 className="mk-h1 mx-auto mt-2 max-w-[18ch]">Every conversation. One inbox.</h2></Reveal>
           <Reveal delay={160}><p className="mk-lead mx-auto mt-5 max-w-[46ch]">Calls, texts and email land in one thread per customer, with what the agent did already written down. Your team picks up where it left off.</p></Reveal>
+          <Reveal delay={220} className="mt-7"><ChannelStatus /></Reveal>
         </div>
         <div className="mk-wrap mk-wrap--wide mt-14">
           <ZoomOnScroll from={0.78}><LaptopFrame><DeskScreen /></LaptopFrame></ZoomOnScroll>
@@ -215,11 +219,12 @@ export default function Home() {
             [<><span className="text-[0.55em] align-top">&lt;</span><CountUp to={1.2} decimals={1} suffix="s" /></>, "Voice to voice, the target every call is measured against"],
             [<><span className="text-[0.55em] align-top">~</span><CountUp to={100} suffix="ms" /></>, "To stop talking when a caller interrupts"],
             [<CountUp key="a" to={1500} suffix="+" />, "Apps the agent can act in"],
-            [<CountUp key="c" to={100} suffix="+" />, "Countries you can call and answer"],
-          ].map(([fig, label], i) => (
+            [<CountUp key="c" to={100} suffix="+" />, "Countries you can call and answer", true],
+          ].map(([fig, label, soon], i) => (
             <div key={i}>
               <div className="mk-h1">{fig}</div>
               <p className="mk-body mx-auto mt-3 max-w-[22ch]">{label}</p>
+              {soon && <Soon className="mt-3" />}
             </div>
           ))}
         </Stagger>

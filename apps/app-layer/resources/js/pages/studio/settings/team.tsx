@@ -8,7 +8,8 @@ import SettingsShell from '../../../components/studio/settings-shell';
 import { MenuItem, MenuSeparator } from '../../../components/shell/menu';
 import Dialog from '../../../components/ui/dialog';
 import { DialogActions, PanelHeader } from '../../../components/studio-ops/page-parts';
-import { Callout, Card, CopyButton, IconTile, List } from '../../../components/ui/kit';
+import { COMING_SOON, ComingSoon } from '../../../components/ui/coming-soon';
+import { Callout, Card, IconTile, List } from '../../../components/ui/kit';
 import { Avatar, Badge, EmptyState, RelativeTime } from '../../../components/ui/primitives';
 import { toast } from '../../../components/ui/toaster';
 import type { SharedProps } from '../../../types';
@@ -45,7 +46,8 @@ export default function TeamSettings({ members, invitations, roles, surface_opti
             title="Team & access"
             description="Who can sign in, what they can change, and which of Desk and Studio each person opens."
             meta={<><Badge>{members.length} {members.length === 1 ? 'member' : 'members'}</Badge>{invitations.length > 0 && <Badge tone="info" dot>{invitations.length} pending</Badge>}</>}
-            actions={can_manage ? <button type="button" className="v-btn v-btn--primary" onClick={() => setInviting(true)}><UserPlus size={15} strokeWidth={2} />Invite</button> : undefined}
+            // Invitation links point at /invitations/{token}, which no route serves, and no email goes out.
+            actions={can_manage ? <button type="button" className="v-btn v-btn--quiet" onClick={() => setInviting(true)} disabled aria-disabled="true" title={COMING_SOON}><UserPlus size={15} strokeWidth={2} />Invite<ComingSoon compact /></button> : undefined}
         >
             {!can_manage && (
                 <div className="mb-6"><Callout tone="info">Only owners and admins can change roles, access or extensions. Ask one of them if something here is wrong.</Callout></div>
@@ -57,7 +59,8 @@ export default function TeamSettings({ members, invitations, roles, surface_opti
             <Card className="mb-6">
                 <PanelHeader title="Members" description="Desk and Studio are granted separately. A support agent can have Desk and never see Studio; an admin can have Studio without Desk." />
                 <div className={`hidden h-11 items-center gap-5 px-7 text-xs font-medium text-tertiary md:grid ${COLS}`} style={{ borderBottom: '1px solid var(--separator)' }}>
-                    <span>Member</span><span>Role</span><span>Can open</span><span>Extension</span><span className="sr-only">Actions</span>
+                    {/* The extension is only used to transfer a phone call, and there is no phone line yet. */}
+                    <span>Member</span><span>Role</span><span>Can open</span><span className="flex flex-wrap items-center gap-1.5">Extension<ComingSoon compact /></span><span className="sr-only">Actions</span>
                 </div>
                 <div className="divide-y" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
                     {members.map((m) => (
@@ -68,11 +71,11 @@ export default function TeamSettings({ members, invitations, roles, surface_opti
 
             <Card>
                 <PanelHeader
-                    title="Pending invitations"
+                    title={<span className="inline-flex items-center gap-2">Pending invitations<ComingSoon /></span>}
                     description="Each invitation is a link that expires seven days after it was created. Share it with the person it is for."
                 />
                 {invitations.length === 0 ? (
-                    <EmptyState icon={<Mail size={20} strokeWidth={1.8} />} title="No one is waiting to join" action={can_manage ? <button type="button" className="v-btn v-btn--quiet" onClick={() => setInviting(true)}><UserPlus size={14} strokeWidth={2} />Invite someone</button> : undefined}>
+                    <EmptyState icon={<Mail size={20} strokeWidth={1.8} />} title="No one is waiting to join" action={can_manage ? <button type="button" className="v-btn v-btn--quiet" onClick={() => setInviting(true)} disabled aria-disabled="true" title={COMING_SOON}><UserPlus size={14} strokeWidth={2} />Invite someone<ComingSoon compact /></button> : undefined}>
                         Invite a teammate by email and choose what they can open before they arrive.
                     </EmptyState>
                 ) : (
@@ -85,7 +88,8 @@ export default function TeamSettings({ members, invitations, roles, surface_opti
                                     <div className="truncate text-sm text-secondary">{i.role} · {i.surfaces.map(surfaceLabel).join(' + ')}{i.invited_by && <> · invited by {i.invited_by}</>}</div>
                                 </div>
                                 <span className="hidden text-sm text-tertiary sm:inline">Expires <RelativeTime at={i.expires_at} className="text-sm" /></span>
-                                <CopyButton value={i.link} label="Copy link" />
+                                {/* The link leads nowhere yet: nothing accepts an invitation. */}
+                                <button type="button" className="v-btn v-btn--quiet v-btn--sm" disabled aria-disabled="true" title={COMING_SOON}><Copy size={13} strokeWidth={2} />Copy link</button>
                                 {can_manage && (
                                     <RowMenu label={`More for ${i.email}`}>
                                         {(close) => (

@@ -43,7 +43,7 @@ class TenancyTest extends TestCase
         $organization = $this->organization();
         $organization->addMember($user, OrganizationRole::Owner);
 
-        $this->actingAs($user)->get('/')->assertRedirect('/desk');
+        $this->actingAs($user)->get('/')->assertRedirect('/studio');
 
         $this->assertSame($organization->id, session(Organization::SESSION_KEY));
     }
@@ -80,7 +80,7 @@ class TenancyTest extends TestCase
         // names that organization; the next request must not honour it.
         $second->memberships()->where('user_id', $user->id)->delete();
 
-        $this->actingAs($user)->get('/')->assertRedirect('/desk');
+        $this->actingAs($user)->get('/')->assertRedirect('/studio');
         $this->assertSame($first->id, session(Organization::SESSION_KEY));
     }
 

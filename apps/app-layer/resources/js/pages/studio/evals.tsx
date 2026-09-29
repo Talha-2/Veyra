@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, ChevronRight, FlaskConical, Gauge, PlugZap
 import { useMemo, useState } from 'react';
 
 import { PageSection, StatRow } from '../../components/studio-ops/page-parts';
+import { ComingSoon } from '../../components/ui/coming-soon';
 import { Callout, Card, Meter, SearchField, SegmentedControl, Toolbar } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, EmptyState, RelativeTime, StatusDot, type Tone } from '../../components/ui/primitives';
@@ -102,7 +103,13 @@ export default function Evals({ runs, personas, runner_available }: Props) {
             <PageHeader
                 title="Evaluations"
                 description="Simulated callers run against the same prompt, skills and knowledge as a live call. If the interrupter scores badly here, real callers were about to find out for you."
-                meta={runs.length > 0 ? <Badge>Last {runs.length} {runs.length === 1 ? 'run' : 'runs'}</Badge> : undefined}
+                meta={
+                    <>
+                        {/* Runs start from the agent layer, which has no eval runner yet (runner_available is always false). */}
+                        {!runner_available && <ComingSoon />}
+                        {runs.length > 0 && <Badge>Last {runs.length} {runs.length === 1 ? 'run' : 'runs'}</Badge>}
+                    </>
+                }
             />
 
             <div className="mt-3">

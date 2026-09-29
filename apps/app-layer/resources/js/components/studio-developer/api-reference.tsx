@@ -1,6 +1,7 @@
 import { ChevronRight, Lock, MessagesSquare, Radio } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
+import { ComingSoon as ComingSoonTag } from '../ui/coming-soon';
 import { Card, CopyButton } from '../ui/kit';
 import { Badge, EmptyState, Eyebrow } from '../ui/primitives';
 import { CodeBlock, CodeTabs, pretty } from './code-block';
@@ -85,7 +86,7 @@ export default function ApiReference({ spec, baseUrl }: { spec: OpenApiDoc; base
                                                 className="flex h-9 w-full items-center gap-2 rounded-md px-3 text-left text-sm transition-colors hover:bg-surface-hover"
                                                 style={on ? { background: 'var(--accent-subtle)', color: 'var(--accent-text)', fontWeight: 600 } : { color: 'var(--text-secondary)' }}>
                                                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                                                {item.soon ? <span className="text-2xs text-tertiary">Soon</span> : item.count ? <span className="text-2xs text-tertiary tabular-nums">{item.count}</span> : null}
+                                                {item.soon ? <ComingSoonTag compact /> : item.count ? <span className="text-2xs text-tertiary tabular-nums">{item.count}</span> : null}
                                             </button>
                                         </li>
                                     );
@@ -183,7 +184,7 @@ function Overview({ spec, baseUrl, resources, go }: { spec: OpenApiDoc; baseUrl:
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 text-md font-semibold text-primary">
                                     {r.name}
-                                    {r.comingSoon && <Badge tone="info">Coming</Badge>}
+                                    {r.comingSoon && <ComingSoonTag />}
                                 </div>
                                 <p className="mt-1 line-clamp-2 text-sm text-secondary"><InlineProse text={r.description} /></p>
                             </div>

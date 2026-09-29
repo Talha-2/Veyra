@@ -11,6 +11,7 @@ import { SIGN_UP_URL, DEMO_URL, demoLinkProps as demoProps } from "@/components/
 import { CountUp, HorizontalScroll, Marquee, Parallax, Reveal, Stagger, TextReveal, ZoomOnScroll } from "@/components/mk/motion";
 import { AgentDiagram, AskStream, ReplyLanes, WebhookCode } from "@/components/mk/platform-parts";
 import { CallScreen, DeskScreen, Globe, LanguageCloud, LaptopFrame, LogoOrbit, PhoneFrame, VoiceOrb, Waveform } from "@/components/mk/scenes";
+import { ChannelStatus, Soon } from "@/components/mk/soon";
 
 export const metadata: Metadata = {
   title: "Platform",
@@ -27,8 +28,8 @@ const AZURE: Partner = { name: "Azure", logo: null, kind: "voice" };
 /* ── hero: the channels orbiting one call ─────────────────────────────── */
 
 const CHANNELS = [
-  { icon: MessageSquare, label: "Text", who: "Ahmed Raza", body: "جی دستیاب ہے۔ کیا یہ وقت مناسب ہے؟", rtl: true, status: "Replied in Urdu", pos: "left-0 top-[6%]", from: "left" as const, delay: 420, speed: 0.08 },
-  { icon: Mail, label: "Email", who: "Lena Kowalski", body: "Can you send the quote again?", status: "Quote sent", pos: "left-[5%] top-[56%]", from: "left" as const, delay: 620, speed: -0.06 },
+  { icon: MessageSquare, label: "Text", who: "Ahmed Raza", body: "جی دستیاب ہے۔ کیا یہ وقت مناسب ہے؟", rtl: true, status: "Replied in Urdu", pos: "left-0 top-[6%]", from: "left" as const, delay: 420, speed: 0.08, soon: true },
+  { icon: Mail, label: "Email", who: "Lena Kowalski", body: "Can you send the quote again?", status: "Quote sent", pos: "left-[5%] top-[56%]", from: "left" as const, delay: 620, speed: -0.06, soon: true },
   { icon: MessagesSquare, label: "Website chat", who: "Visitor", body: "Do you do weekend visits?", status: "Answered from Knowledge", pos: "right-0 top-[12%]", from: "right" as const, delay: 520, speed: -0.08 },
   { icon: Ticket, label: "Ticket raised", who: "#2 Furnace grinding", body: "Technician visit, tomorrow 8–11 AM", status: "Assigned to Sam", pos: "right-[4%] top-[60%]", from: "right" as const, delay: 720, speed: 0.06 },
 ];
@@ -101,18 +102,19 @@ function VoiceArt({ kind }: { kind: string }) {
 /* ── Desk: what your team sees ────────────────────────────────────────── */
 
 const DESK_CHANNELS = [
-  { icon: Phone, label: "Calls" },
-  { icon: MessageSquare, label: "Texts" },
-  { icon: Mail, label: "Email" },
   { icon: MessagesSquare, label: "Chat" },
-  { icon: Printer, label: "Fax" },
+  { icon: AudioLines, label: "Voice" },
+  { icon: Phone, label: "Calls", soon: true },
+  { icon: MessageSquare, label: "Texts", soon: true },
+  { icon: Mail, label: "Email", soon: true },
+  { icon: Printer, label: "Fax", soon: true },
 ];
 
 const DESK_FEATURES = [
   { title: "Tickets it raises itself.", body: "When it promises a callback or a visit, it opens a ticket with the details, so every promise has an owner.", art: "ticket" },
   { title: "A pipeline that fills itself.", body: "Callers asking about new work become leads you can move from first call to won.", art: "leads" },
   { title: "Every call, word for word.", body: "The recording, the transcript, and each lookup or booking the agent made along the way.", art: "transcript" },
-  { title: "Handoffs with a briefing.", body: "When it transfers a call, your teammate knows who is calling and why before they say hello.", art: "handoff" },
+  { title: "Handoffs with a briefing.", body: "When it transfers a call, your teammate knows who is calling and why before they say hello.", art: "handoff", soon: true },
   { title: "Speed you can see.", body: "Each call shows how fast the agent replied, turn by turn, against the target.", art: "latency" },
   { title: "Urdu, right to left.", body: "Messages render in their own script and direction, never as a fallback.", art: "rtl" },
 ];
@@ -184,7 +186,7 @@ const STUDIO = [
   { icon: BookOpen, title: "Knowledge", body: "Prices, policies, service areas. Test what it finds before a caller asks.", art: "knowledge" },
   { icon: Brain, title: "Memory", body: "Facts no document states. It adds to them after calls, and you can edit every one.", art: "memory" },
   { icon: Plug, title: "Integrations", body: "1,500+ apps through Composio, your own MCP servers, and custom HTTP actions.", art: "integrations" },
-  { icon: FlaskConical, title: "Evaluations", body: "Simulated callers test it before real ones do: the rambler, the interrupter, the one who switches language.", art: "evals" },
+  { icon: FlaskConical, title: "Evaluations", body: "Simulated callers test it before real ones do: the rambler, the interrupter, the one who switches language.", art: "evals", soon: true },
 ];
 
 function StudioArt({ kind }: { kind: string }) {
@@ -290,6 +292,7 @@ export default function PlatformPage() {
             <a href={SIGN_UP_URL} className="mk-btn mk-btn--primary">Get started</a>
             <a href={DEMO_URL} {...demoProps} className="mk-btn mk-btn--ghost">Request a demo</a>
           </Reveal>
+          <Reveal variant="fade" delay={360} className="mt-8"><ChannelStatus /></Reveal>
         </div>
 
         <div className="mk-wrap relative mt-16">
@@ -305,7 +308,7 @@ export default function PlatformPage() {
                     <div className="mk-card p-5 text-left" style={{ boxShadow: "var(--mk-shadow-float)" }}>
                       <div className="flex items-center gap-2.5">
                         <span className="flex size-9 items-center justify-center rounded-xl" style={{ background: "rgba(233,107,52,0.12)" }}><c.icon size={18} className="text-[var(--mk-ember)]" /></span>
-                        <div className="min-w-0"><div className="mk-kicker">{c.label}</div><div className="truncate text-[14px] font-semibold">{c.who}</div></div>
+                        <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="mk-kicker">{c.label}</span>{c.soon && <Soon />}</div><div className="truncate text-[14px] font-semibold">{c.who}</div></div>
                       </div>
                       <p className="mt-3 text-[14px] leading-snug text-[var(--mk-ink-2)]" dir={c.rtl ? "rtl" : undefined} style={c.rtl ? { fontFamily: "'Noto Nastaliq Urdu', serif", fontSize: 17 } : undefined}>{c.body}</p>
                       <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--mk-ember-deep)]"><Check size={14} strokeWidth={2.4} />{c.status}</div>
@@ -325,12 +328,13 @@ export default function PlatformPage() {
             [<><span className="mr-0.5 align-[0.1em] text-[0.7em] font-medium">&lt;</span><CountUp to={1.2} decimals={1} suffix="s" /></>, "voice to voice, the target"],
             [<><span className="mr-0.5 align-[0.1em] text-[0.7em] font-medium">~</span><CountUp to={100} suffix="ms" /></>, "to stop when interrupted"],
             [<CountUp key="l" to={8} />, "languages in Studio"],
-            [<CountUp key="c" to={100} suffix="+" />, "countries you can call"],
+            [<CountUp key="c" to={100} suffix="+" />, "countries you can call", true],
             [<CountUp key="a" to={1500} suffix="+" />, "apps it can act in"],
-          ].map(([fig, label], i) => (
+          ].map(([fig, label, soon], i) => (
             <div key={i} className="max-lg:last:col-span-2">
               <div className="mk-h2">{fig}</div>
               <p className="mk-body mx-auto mt-2 max-w-[18ch]">{label}</p>
+              {soon && <Soon className="mt-3" />}
             </div>
           ))}
         </Stagger>
@@ -411,7 +415,7 @@ export default function PlatformPage() {
       <section id="telephony" className="mk-night mk-section overflow-hidden">
         <div className="mk-wrap grid items-center gap-16 lg:grid-cols-2">
           <div>
-            <Reveal><p className="mk-eyebrow">Telephony</p></Reveal>
+            <Reveal><p className="mk-eyebrow">Telephony<Soon inline /></p></Reveal>
             <Reveal delay={80}><h2 className="mk-h1 mt-2">A real number, anywhere.</h2></Reveal>
             <Reveal delay={160}><p className="mk-lead mt-5 max-w-[38ch]">Buy a number in a click or bring the lines you already have. Answer and place calls worldwide, with every text in the same thread as the call.</p></Reveal>
             <Reveal delay={240} className="mt-10 flex items-baseline gap-4">
@@ -439,7 +443,7 @@ export default function PlatformPage() {
             const Icon = I as typeof Phone;
             return (
               <div key={t as string} className="mk-card p-7">
-                <Icon size={26} className="text-[var(--mk-ember-soft)]" />
+                <div className="flex items-center justify-between gap-3"><Icon size={26} className="text-[var(--mk-ember-soft)]" /><Soon /></div>
                 <h3 className="mk-h4 mt-5">{t as string}</h3>
                 <p className="mk-body mt-2">{b as string}</p>
               </div>
@@ -455,11 +459,12 @@ export default function PlatformPage() {
           <Reveal delay={80}><h2 className="mk-h1 mx-auto mt-2 max-w-[17ch]">Your team’s side of every conversation.</h2></Reveal>
           <Reveal delay={160}><p className="mk-lead mx-auto mt-5 max-w-[46ch]">One inbox for every channel, one thread per customer, and the agent’s work already written down. Contacts, tickets and leads sit right beside it.</p></Reveal>
         </div>
-        <Stagger className="mk-wrap mt-12 flex justify-center gap-3 sm:gap-6" step={90}>
+        <Stagger className="mk-wrap mt-12 flex flex-wrap items-start justify-center gap-x-3 gap-y-6 sm:gap-x-6" step={90}>
           {DESK_CHANNELS.map((c) => (
             <div key={c.label} className="flex flex-col items-center gap-2.5">
-              <span className="flex size-14 items-center justify-center rounded-[18px] bg-[var(--mk-card)] sm:size-20 sm:rounded-[22px]" style={{ boxShadow: "var(--mk-shadow-card)" }}><c.icon className="size-6 text-[var(--mk-ember)] sm:size-[30px]" /></span>
+              <span className="flex size-14 items-center justify-center rounded-[18px] bg-[var(--mk-card)] sm:size-20 sm:rounded-[22px]" style={{ boxShadow: "var(--mk-shadow-card)" }}><c.icon className={`size-6 sm:size-[30px] ${c.soon ? "text-[var(--mk-ink-3)]" : "text-[var(--mk-ember)]"}`} /></span>
               <span className="mk-small">{c.label}</span>
+              {c.soon && <Soon />}
             </div>
           ))}
         </Stagger>
@@ -469,7 +474,7 @@ export default function PlatformPage() {
         <Stagger className="mk-wrap mt-20 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" step={100}>
           {DESK_FEATURES.map((f) => (
             <article key={f.title} className="mk-card mk-card-lift flex flex-col p-7">
-              <h3 className="mk-h4">{f.title}</h3>
+              <h3 className="mk-h4">{f.title}{f.soon && <Soon inline />}</h3>
               <p className="mk-body mt-2">{f.body}</p>
               <div className="mt-auto pt-7"><DeskArt kind={f.art} /></div>
             </article>
@@ -493,7 +498,7 @@ export default function PlatformPage() {
           {STUDIO.map((s) => (
             <article key={s.title} className="mk-card flex shrink-0 flex-col" style={{ width: "min(380px, 80vw)", height: "min(500px, calc(100svh - 330px))", minHeight: 420 }}>
               <div className="p-8 pb-0">
-                <span className="flex size-12 items-center justify-center rounded-2xl" style={{ background: "rgba(233,107,52,0.1)" }}><s.icon size={24} className="text-[var(--mk-ember)]" /></span>
+                <div className="flex items-center justify-between gap-3"><span className="flex size-12 items-center justify-center rounded-2xl" style={{ background: "rgba(233,107,52,0.1)" }}><s.icon size={24} className="text-[var(--mk-ember)]" /></span>{s.soon && <Soon />}</div>
                 <h3 className="mk-h3 mt-5">{s.title}</h3>
                 <p className="mk-body mt-2">{s.body}</p>
               </div>

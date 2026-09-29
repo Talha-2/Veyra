@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 
 import { SaveBar } from '../../components/studio/form';
 import { DeskPage, Panel } from '../../components/desk-pages/layout';
+import { COMING_SOON, ComingSoon } from '../../components/ui/coming-soon';
 import { IconTile, Switch } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Eyebrow, type Tone } from '../../components/ui/primitives';
@@ -53,7 +54,8 @@ export default function NotificationPreferences({ events, channels }: Props) {
                         <div className="grid grid-cols-[minmax(0,1fr)_96px_96px] items-center gap-x-2 px-7 py-4" style={{ borderBottom: '1px solid var(--separator)', background: 'var(--bg-subtle)' }}>
                             <Eyebrow>Event</Eyebrow>
                             <ColumnHead icon={<Bell size={14} strokeWidth={1.8} />} label="In Desk" checked={allOn('in_app')} onChange={(v) => setAll('in_app', v)} />
-                            <ColumnHead icon={<Mail size={14} strokeWidth={1.8} />} label="Email" checked={allOn('email')} onChange={(v) => setAll('email', v)} />
+                            {/* Nothing sends notification email yet: no mail is dispatched anywhere in the app. */}
+                            <ColumnHead icon={<Mail size={14} strokeWidth={1.8} />} label="Email" checked={allOn('email')} onChange={(v) => setAll('email', v)} soon />
                         </div>
 
                         <ul className="divide-y" style={{ ['--tw-divide-color' as string]: 'var(--separator)' }}>
@@ -71,7 +73,7 @@ export default function NotificationPreferences({ events, channels }: Props) {
                                             </div>
                                         </div>
                                         <div className="flex justify-center"><Switch checked={value.in_app} onChange={(v) => set(e.key, 'in_app', v)} label={`${e.label} in Desk`} /></div>
-                                        <div className="flex justify-center"><Switch checked={value.email} onChange={(v) => set(e.key, 'email', v)} label={`${e.label} by email`} /></div>
+                                        <div className="flex justify-center" title={COMING_SOON}><Switch checked={value.email} onChange={(v) => set(e.key, 'email', v)} label={`${e.label} by email`} disabled /></div>
                                     </li>
                                 );
                             })}
@@ -87,11 +89,13 @@ export default function NotificationPreferences({ events, channels }: Props) {
     );
 }
 
-function ColumnHead({ icon, label, checked, onChange }: { icon: React.ReactNode; label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function ColumnHead({ icon, label, checked, onChange, soon = false }: { icon: React.ReactNode; label: string; checked: boolean; onChange: (v: boolean) => void; soon?: boolean }) {
     return (
         <div className="flex flex-col items-center gap-1.5">
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-secondary">{icon}{label}</span>
-            <Switch size="sm" checked={checked} onChange={onChange} label={checked ? `Turn off all ${label}` : `Turn on all ${label}`} />
+            {soon
+                ? <ComingSoon compact />
+                : <Switch size="sm" checked={checked} onChange={onChange} label={checked ? `Turn off all ${label}` : `Turn on all ${label}`} />}
         </div>
     );
 }

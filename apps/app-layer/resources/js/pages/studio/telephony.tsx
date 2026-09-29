@@ -5,6 +5,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { Field, SaveBar, Toggle } from '../../components/studio/form';
 import { plural } from '../../components/studio-knowledge/format';
 import { DialogActions, PageSection, SettingRow, SettingsGroup, StatRow } from '../../components/studio-ops/page-parts';
+import { COMING_SOON, ComingSoon } from '../../components/ui/coming-soon';
 import Dialog from '../../components/ui/dialog';
 import { Callout, Card, IconTile, SegmentedControl } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
@@ -68,6 +69,8 @@ export default function Telephony({ provider, configured, numbers, credential_ke
                 description="Your phone numbers, who answers each one, and the carrier account they run on."
                 meta={
                     <>
+                        {/* No SIP trunk or carrier webhook is wired, so no phone line reaches the agent yet. */}
+                        <ComingSoon />
                         <Badge tone={configured ? 'success' : 'warning'} dot>{configured ? `${PROVIDER_LABEL[provider as Provider] ?? provider} connected` : 'No carrier connected'}</Badge>
                         <Badge tone={sip_trunk ? 'success' : 'warning'} dot>{sip_trunk ? 'Inbound ready' : 'Inbound not set up'}</Badge>
                     </>
@@ -183,14 +186,17 @@ function NumberLine({ n, language, fallbackLabel, inherited, onOpen }: { n: Numb
     );
 }
 
-function Choice({ on, onClick, icon, title, hint }: { on: boolean; onClick: () => void; icon: ReactNode; title: string; hint: string }) {
+function Choice({ on, onClick, icon, title, hint, soon = false }: { on: boolean; onClick: () => void; icon: ReactNode; title: string; hint: string; soon?: boolean }) {
+    // A choice that is not built yet can still be switched away from, never to.
+    const locked = soon && !on;
+
     return (
-        <button type="button" role="radio" aria-checked={on} onClick={onClick}
-            className="flex items-start gap-3.5 rounded-lg p-4 text-left transition-colors"
+        <button type="button" role="radio" aria-checked={on} onClick={onClick} disabled={locked} aria-disabled={locked || undefined} title={locked ? COMING_SOON : undefined}
+            className="flex items-start gap-3.5 rounded-lg p-4 text-left transition-colors disabled:cursor-not-allowed"
             style={{ background: on ? 'var(--accent-subtle)' : 'var(--surface)', boxShadow: `inset 0 0 0 1px ${on ? 'var(--border-accent)' : 'var(--border-strong)'}` }}>
             <IconTile tone={on ? 'accent' : 'muted'} size={32}>{icon}</IconTile>
             <span className="min-w-0">
-                <span className="block text-base font-medium text-primary">{title}</span>
+                <span className="flex flex-wrap items-center gap-2 text-base font-medium text-primary">{title}{soon && <ComingSoon compact />}</span>
                 <span className="mt-0.5 block text-sm text-secondary">{hint}</span>
             </span>
         </button>
@@ -221,7 +227,7 @@ function NumberDialog({ n, team, languages, defaultLanguage, onClose }: { n: Num
                 <Field label="Who answers" error={errors.assigned_user_id}>
                     <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Who answers">
                         <Choice on={!person} onClick={() => { setPerson(false); setData('assigned_user_id', null); }} icon={<Bot size={15} strokeWidth={2} />} title="The agent" hint="Answers every call itself." />
-                        <Choice on={person} onClick={() => { setPerson(true); if (data.assigned_user_id === null && team[0]) setData('assigned_user_id', team[0].id); }} icon={<UserRound size={15} strokeWidth={2} />} title="A person" hint="The agent screens, then transfers." />
+                        <Choice on={person} onClick={() => { setPerson(true); if (data.assigned_user_id === null && team[0]) setData('assigned_user_id', team[0].id); }} icon={<UserRound size={15} strokeWidth={2} />} title="A person" hint="The agent screens, then transfers." soon />
                     </div>
                     {person && (
                         <select className="v-field mt-3" value={data.assigned_user_id ?? ''} aria-label="Person who answers" onChange={(e) => setData('assigned_user_id', e.target.value ? Number(e.target.value) : null)}>
@@ -252,7 +258,7 @@ function NumberDialog({ n, team, languages, defaultLanguage, onClose }: { n: Num
 
                 {n.capabilities.sms && (
                     <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--separator)' }}>
-                        <Toggle checked={data.sms_autoreply} onChange={(v) => setData('sms_autoreply', v)} label="Reply to texts automatically" hint="Incoming text messages to this number get an automatic reply." />
+                        <Toggle checked={data.sms_autoreply} onChange={(v) => setData('sms_autoreply', v)} label="Reply to texts automatically" hint="Incoming text messages to this number get an automatic reply." soon />
                     </div>
                 )}
 

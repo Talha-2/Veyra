@@ -61,10 +61,16 @@ class Membership extends Pivot
         ));
     }
 
-    /** Where this member should land after sign-in, or null if they may open nothing. */
+    /**
+     * Where this member should land after sign-in, or null if they may open
+     * nothing. Studio when they have it: the agent is the product, and Desk is
+     * the optional workspace a team adds on. Desk-only operators land in Desk.
+     */
     public function landingSurface(): ?Surface
     {
-        return $this->accessibleSurfaces()[0] ?? null;
+        $surfaces = $this->accessibleSurfaces();
+
+        return in_array(Surface::Studio, $surfaces, true) ? Surface::Studio : ($surfaces[0] ?? null);
     }
 
     public function grant(Surface $surface): void

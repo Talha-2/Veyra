@@ -1,4 +1,4 @@
-import { ArrowUp, AudioLines, Square } from 'lucide-react';
+import { ArrowUp, Square } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 /** "openai:gpt-4.1-mini" reads as "GPT-4.1 mini". */
@@ -68,10 +68,14 @@ const Composer = forwardRef<ComposerHandle, {
             <div className="flex items-center justify-between gap-3 px-3 pt-1 pb-2.5">
                 <span className="truncate pl-1 text-2xs text-disabled">{model ? modelName(model) : 'Veyra agent'}</span>
                 <div className="flex shrink-0 items-center gap-2">
+                {/* Empty field: voice is the invitation, a labelled pill in Send's
+                    place (as in ChatGPT). Once something is typed it steps
+                    aside to an icon and Send returns. */}
                 {onVoice && !streaming && (
                     <button type="button" onClick={onVoice} aria-label="Talk with voice" title="Talk with voice"
-                        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-primary transition-colors hover:bg-surface-active active:scale-95">
-                        <AudioLines size={16} />
+                        className={`v-voice shrink-0 ${text.trim() ? 'v-voice--icon' : ''}`}>
+                        <span className="v-eq" aria-hidden="true"><i /><i /><i /><i /></span>
+                        {!text.trim() && 'Voice'}
                     </button>
                 )}
                 {streaming ? (
@@ -79,7 +83,7 @@ const Composer = forwardRef<ComposerHandle, {
                         className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-ink-text transition-transform active:scale-95">
                         <Square size={11} fill="currentColor" />
                     </button>
-                ) : (
+                ) : onVoice && !text.trim() ? null : (
                     <button type="button" onClick={send} aria-label="Send" disabled={!text.trim()}
                         className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-ink-text transition-all active:scale-95 disabled:bg-surface-active disabled:text-disabled">
                         <ArrowUp size={16} strokeWidth={2.25} />

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, ChevronRight } from "lucide-react";
+import { ArrowRight, Check, ChevronRight, Clock } from "lucide-react";
 
 import { VeyraMark } from "@/components/mk/brand";
 import { InquiryForm } from "@/components/mk/inquiry-form";
-import { SIGN_UP_URL } from "@/components/mk/links";
+import { SIGN_UP_URL, DEMO_URL, demoLinkProps } from "@/components/mk/links";
 import { Reveal, Stagger } from "@/components/mk/motion";
+import { Soon } from "@/components/mk/soon";
 
 export const metadata: Metadata = {
   title: "Request a demo",
@@ -17,11 +18,12 @@ export const metadata: Metadata = {
    configured. Two doors, side by side: a demo request that files into Veyra
    Desk, and self-serve sign-up. */
 
-const SELF_SERVE = [
-  "Calls, texts, chat and email on one agent",
-  "Knowledge grounded in your business",
-  "Try every skill in Studio before it goes live",
-  "Free to start. No credit card required",
+const SELF_SERVE: { line: string; soon?: boolean }[] = [
+  { line: "Voice and chat on one agent" },
+  { line: "Phone calls, texts and email", soon: true },
+  { line: "Knowledge grounded in your business" },
+  { line: "Try every skill in Studio before it goes live" },
+  { line: "Free to start. No credit card required" },
 ];
 
 const NEXT = [
@@ -51,7 +53,8 @@ export default function StartPage() {
             <div className="mk-card p-6 sm:p-10" style={{ boxShadow: "var(--mk-shadow-float)" }}>
               <span className="mk-pill mk-pill--ember">20 minutes</span>
               <h2 className="mk-h2 mt-4">Book a demo</h2>
-              <p className="mk-body mt-3 mb-8 max-w-[44ch]">Tell us a little about your business and we’ll show you Veyra configured for it, not a canned tour.</p>
+              <p className="mk-body mt-3 max-w-[44ch]">Pick a time that suits you, or tell us a little about your business and we’ll show you Veyra configured for it, not a canned tour.</p>
+              <a href={DEMO_URL} {...demoLinkProps} className="mk-btn mk-btn--primary mt-6 mb-8">Pick a time <ArrowRight /></a>
               <InquiryForm
                 page="/start"
                 topic="demo"
@@ -72,10 +75,10 @@ export default function StartPage() {
                 <h2 className="mk-h2 mt-8">Start free</h2>
                 <p className="mk-body mt-3">Set it up yourself. The full platform, free to start.</p>
                 <ul className="mt-8 flex flex-col gap-4">
-                  {SELF_SERVE.map((line) => (
+                  {SELF_SERVE.map(({ line, soon }) => (
                     <li key={line} className="flex items-start gap-3 text-[17px] leading-[1.45] text-[var(--mk-ink)]">
-                      <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(233,107,52,0.2)", color: "var(--mk-ember-soft)" }}><Check size={14} strokeWidth={2.6} /></span>
-                      {line}
+                      <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full" style={soon ? { background: "rgba(255,255,255,0.08)", color: "var(--mk-ink-3)" } : { background: "rgba(233,107,52,0.2)", color: "var(--mk-ember-soft)" }}>{soon ? <Clock size={14} strokeWidth={2.4} /> : <Check size={14} strokeWidth={2.6} />}</span>
+                      <span>{line}{soon && <Soon inline />}</span>
                     </li>
                   ))}
                 </ul>

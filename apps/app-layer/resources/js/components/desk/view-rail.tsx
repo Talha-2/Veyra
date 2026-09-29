@@ -3,6 +3,7 @@ import { Archive, AtSign, Bookmark, Clock, Inbox, Mail, Plus, SquarePen, Star, T
 import type { LucideIcon } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 
+import { COMING_SOON, ComingSoon } from '../ui/coming-soon';
 import { Switch } from '../ui/kit';
 import { Eyebrow } from '../ui/primitives';
 import { channelIcon, queryInbox, type InboxState } from '../desk-inbox/helpers';
@@ -51,9 +52,11 @@ export default function ViewRail({
         <nav className="flex w-[220px] shrink-0 flex-col" style={{ background: 'var(--bg)', borderRight: '1px solid var(--border)' }} aria-label="Inbox views">
             {onNew && (
                 <div className="shrink-0 px-3 pt-4 pb-2">
-                    <button type="button" onClick={onNew} className="v-btn v-btn--quiet w-full justify-start">
+                    {/* Starting a thread means an SMS or email, and neither can be sent yet. */}
+                    <button type="button" onClick={onNew} disabled aria-disabled="true" title={COMING_SOON} className="v-btn v-btn--quiet w-full justify-start disabled:cursor-not-allowed">
                         <SquarePen size={15} strokeWidth={1.9} />
-                        New conversation
+                        <span className="min-w-0 flex-1 truncate text-left">New conversation</span>
+                        <ComingSoon compact />
                     </button>
                 </div>
             )}

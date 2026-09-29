@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { COMING_SOON, ComingSoon } from '../ui/coming-soon';
 import { Switch } from '../ui/kit';
 
 /**
@@ -89,22 +90,27 @@ export function Toggle({
     label,
     hint,
     caution,
+    soon = false,
 }: {
     checked: boolean;
     onChange: (value: boolean) => void;
     label: string;
     hint?: string;
     caution?: string;
+    /** What it switches is not built yet: tagged, and the switch is locked at its saved value. */
+    soon?: boolean;
 }) {
     return (
         <div className="flex items-start justify-between gap-6 border-t py-3.5 first:border-t-0 first:pt-0 last:pb-0" style={{ borderColor: 'var(--separator)' }}>
             <div className="min-w-0">
-                <div className="text-base font-medium text-primary">{label}</div>
+                <div className="flex flex-wrap items-center gap-2 text-base font-medium text-primary">{label}{soon && <ComingSoon />}</div>
                 {hint && <div className="mt-0.5 text-sm text-secondary">{hint}</div>}
                 {/* A caution is a consequence the person needs before flipping this. */}
                 {caution && <div className="mt-1 text-sm text-warning">{caution}</div>}
             </div>
-            <Switch checked={checked} onChange={onChange} label={label} />
+            <span title={soon ? COMING_SOON : undefined} className="inline-flex">
+                <Switch checked={checked} onChange={onChange} label={label} disabled={soon} />
+            </span>
         </div>
     );
 }
