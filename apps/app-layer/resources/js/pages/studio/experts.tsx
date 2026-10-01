@@ -15,6 +15,8 @@ interface ExpertRow {
     id: number; slug: string; name: string; description: string;
     runtime: string; runtime_label: string; model: string | null;
     is_builtin: boolean; enabled: boolean; skills_count: number; actions_count: number;
+    /** The first enabled expert of its runtime: the talker that speaks, the worker that starts. */
+    primary: boolean;
 }
 
 interface Props {
@@ -40,7 +42,7 @@ export default function Experts({ experts, runtimes }: Props) {
 
             <PageHeader
                 title="Experts"
-                description="An expert is a prompt, a set of skills and a set of actions. There is one agent loop; switching expert swaps what it is told and what it can reach."
+                description="An expert is a prompt, a set of skills and a set of actions. There is one agent loop: it starts as the first enabled worker and switches to another when that one’s description fits the task better."
                 meta={<Mono>{count(experts.length, 'expert')} · {enabled} enabled</Mono>}
                 actions={
                     <button type="button" className="v-btn v-btn--primary" onClick={() => setCreating('worker')}>
@@ -103,16 +105,20 @@ export default function Experts({ experts, runtimes }: Props) {
                                                             <span className="flex items-center gap-2">
                                                                 <span className="truncate">{e.name}</span>
                                                                 {e.is_builtin && <Badge>Built-in</Badge>}
+                                                                {e.primary && group.filter((x) => x.enabled).length > 1 && <Badge tone="info">{e.runtime === 'talker' ? 'Speaks' : 'Starts here'}</Badge>}
+                                                                {e.enabled && !e.primary && e.runtime === 'talker' && <Badge tone="warning">Not used</Badge>}
                                                                 {!e.enabled && <Badge tone="warning" dot>Disabled</Badge>}
                                                             </span>
                                                         }
                                                         subtitle={e.description}
                                                         trailing={
                                                             <>
-                                                                <span className="hidden items-center gap-6 text-sm text-secondary tabular-nums md:flex">
-                                                                    <span>{count(e.skills_count, 'skill')}</span>
-                                                                    <span>{count(e.actions_count, 'action')}</span>
-                                                                </span>
+                                                                {e.runtime !== 'talker' && (
+                                                                    <span className="hidden items-center gap-6 text-sm text-secondary tabular-nums md:flex">
+                                                                        <span>{count(e.skills_count, 'skill')}</span>
+                                                                        <span>{count(e.actions_count, 'action')}</span>
+                                                                    </span>
+                                                                )}
                                                                 <span className="hidden w-36 truncate text-right lg:block">
                                                                     <Mono>{e.model || 'Runtime default'}</Mono>
                                                                 </span>

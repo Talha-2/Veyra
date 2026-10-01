@@ -34,7 +34,7 @@ Instructions can be up to 30,000 characters, but shorter is better.
 
 ## Grant the skill to an expert
 
-A new skill is not used until an expert has it. The skill's page says "Not granted to any expert yet" until you grant it.
+A new skill is not used until an expert has it. The skill's page says "Not granted to any expert yet" until you grant it. If you have several worker experts, grant the skill to the one whose description covers it: the agent hands a task to that expert and then sees its skills. See [Experts](/docs/studio/experts#how-the-agent-chooses-an-expert).
 
 1. Open **Studio → Experts** and choose the worker expert (for a new organization, **Operations**).
 2. Under **Skills**, tick the skill.
@@ -47,12 +47,27 @@ The skills list shows **No expert yet** on any skill that is not granted. See [E
 | Mode | What it does | Watch out for |
 | --- | --- | --- |
 | **Prose** | The model reads the instructions and uses its judgement. It handles cases you did not write down. | On a fast voice model, long prose skills can drift. Keep them short and concrete. |
-| **Step-gated** | Meant for procedures that must not be improvised, such as a payment or an identity check. You write a **Framing** section and a list of **Steps**. | The page says the agent cannot adapt to anything the steps do not cover. |
+| **Step-gated** | For procedures that must not be improvised, such as a payment or an identity check. You write a **Framing** section and a list of **Steps**, and the agent works through them in order. | The agent cannot adapt to anything the steps do not cover. |
 
 For a step-gated skill, the **Framing** text holds rules that apply to every step. Each step has a name and an instruction (up to 1,000 characters), and you can have up to 30 steps. Use **Add step**, drag the handle, or the arrows to reorder. A step-gated skill needs at least one step before it can be saved.
 
-> [!SOON]
-> Step-by-step enforcement is coming soon. Today the agent reads a step-gated skill's **Framing** text, but not its **Steps**, and nothing yet holds it to one step at a time. For a procedure you need working now, choose **Prose** and write the steps into the instructions as a numbered list.
+### How a step-gated skill runs
+
+The same rules apply in voice sessions, chat, Ask, automations and **Try it**:
+
+1. When the agent opens the skill, it gets the **Framing**, the names of all the steps, and the full instruction for the first step only.
+2. When a step is done, the agent marks it done. Only then does it get the next step's instruction. It cannot mark a later step done while an earlier one is open.
+3. While a step is open, the agent cannot give its final answer. If it tries, it is sent back to the open step.
+
+There are two ways to answer before the last step:
+
+- **Waiting**: the step needs something only the customer can give, such as an invoice number. The agent asks for it, and the same step continues when the customer answers.
+- **Abandon**: the skill does not fit the situation after all. The agent closes it, says why, and nothing in the remaining steps is done.
+
+In the agent's steps (in **Talk**, **Ask** and **Try it**), each step shows as **Checked off a step**, with the skill and the step number.
+
+> [!NOTE]
+> If the agent ignores an open step three times in one turn, its answer is let through so the conversation does not stall. Keep each step's instruction short and concrete so this does not happen.
 
 ## Versions
 
@@ -68,7 +83,9 @@ The **Try it** panel runs the saved version of a skill against a situation you d
 2. Type something a customer might say, for example: "Hi, I need to move my Thursday visit to next week. My reference is 4471."
 3. Press **Run the saved version** (or Ctrl+Enter).
 
-The result shows whether it **Replied** or **Failed**, the tools the agent used, the tokens used, and the reply. Reads are real: the agent really searches your knowledge and records. Writes are simulated, so no ticket or contact is created.
+The result shows whether it **Replied** or **Failed**, the tools the agent used, the tokens used, and the reply. Reads are real: the agent really searches your knowledge and records. Writes are simulated, so no ticket or contact is created, and an action that needs approval is not sent for approval.
+
+**Try it** starts as the worker expert that has the skill, with that expert's model and reasoning effort.
 
 The reply is the worker's private guidance to the talker, not the words a caller would hear. To hear the full conversation, use [Talk](/docs/studio/talk).
 

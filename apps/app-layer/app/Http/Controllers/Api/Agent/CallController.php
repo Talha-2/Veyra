@@ -13,9 +13,11 @@ use App\Models\Conversation;
 use App\Models\Identifier;
 use App\Models\Organization;
 use App\Models\PhoneNumber;
+use App\Services\Agent\ActingFor;
 use App\Services\Agent\CallContextBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -59,7 +61,7 @@ class CallController extends Controller
         Organization::setCurrent($organization);
 
         try {
-            $result = DB::transaction(function () use ($validated, $line, $builder) {
+            $result = DB::transaction(function () use ($validated, $line) {
                 $existing = Call::query()->where('provider', $validated['provider'])->where('provider_sid', $validated['provider_sid'])->first();
 
                 $identifier = Identifier::resolve(IdentifierType::Phone, $validated['from']);
@@ -162,11 +164,18 @@ class CallController extends Controller
             'limit' => ['nullable', 'integer', 'between:1,100'],
         ]);
 
+        // On a customer conversation, only that customer's calls: the
+        // business's call log is not something to read out to a caller.
+        $scope = ActingFor::from($request);
+
         $calls = Call::query()
             ->with(['contact:id,name,phone', 'transcript:id,call_id,summary'])
+            ->when($scope->customerFacing(), fn ($q) => $scope->contactId()
+                ? $q->where('contact_id', $scope->contactId())
+                : $q->where('conversation_id', $scope->conversation->id))
             // Parsed, not passed through: SQLite compares datetimes as text,
             // and an ISO "T" sorts after the stored space.
-            ->when($validated['since'] ?? null, fn ($q, $since) => $q->where('created_at', '>=', \Illuminate\Support\Carbon::parse($since)))
+            ->when($validated['since'] ?? null, fn ($q, $since) => $q->where('created_at', '>=', Carbon::parse($since)))
             ->when($validated['contact_id'] ?? null, fn ($q, $id) => $q->where('contact_id', $id))
             ->when($validated['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->latest()

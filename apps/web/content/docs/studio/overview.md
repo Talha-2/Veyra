@@ -47,6 +47,15 @@ Four numbers, each linking to the page where you fix it:
 - **Agent tickets open**: tickets the agent raised that the team has not resolved yet. Opens the agent's ticket view in Desk.
 - **Failed handoffs**: tasks the talker handed to the worker that failed, timed out or were stopped. Opens **Experts**.
 
+### Waiting for approval
+
+Shown only when the agent has asked to run an action that is set to need approval. Each request shows the action, whether it **Writes** or **Reads**, who it is for, the expert that asked, and the arguments the agent would use. Nothing has happened yet.
+
+- **Approve** runs it once, now, and shows the result.
+- **Reject** records that it never ran.
+
+A waiting request also counts as one thing that needs your attention at the top of the page. See [Approve actions](/docs/studio/integrations#approve-actions).
+
 ### Needs a human to check
 
 If an action timed out in the middle of a write, it is listed here with the customer's name and a link to the conversation in Desk (**Open in Desk**). Check the other system by hand before anyone tells the customer the action did or did not happen. When nothing is waiting, the page shows **Nothing needs a human**.

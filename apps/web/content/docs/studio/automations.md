@@ -70,6 +70,8 @@ Under **Advanced**, **Reasoning** sets how hard the agent thinks on each run:
 - **Balanced**: the default. Right for summaries, follow-ups and most reports.
 - **Deep**: slower and costs more per run. For jobs that weigh several sources before acting.
 
+The setting only changes models that have a reasoning setting; other models ignore it. A run follows [step-gated skills](/docs/studio/skills#how-a-step-gated-skill-runs) step by step, the same as a conversation.
+
 ## Run history
 
 The **Run history** panel shows the last 30 runs: the trigger, the status (**Queued**, **Running**, **Done** or **Failed**), when it started, how long it took, the tokens used, the tools it called, and the result or the error. The agent writes the result for your team: what it found, what it did, and anything that needs a person, with that first. The history shows the first 300 characters of each result.

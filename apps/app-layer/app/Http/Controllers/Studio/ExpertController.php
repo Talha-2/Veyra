@@ -17,10 +17,16 @@ class ExpertController extends Controller
 {
     public function index(): Response
     {
+        // The agent layer's order: the first enabled expert of a runtime is
+        // its primary (the one that speaks, or the worker that starts).
         $experts = Expert::query()
             ->withCount(['skills', 'actions'])
             ->orderBy('position')
-            ->get()
+            ->orderBy('id')
+            ->get();
+        $primary = $experts->where('enabled', true)->groupBy(fn (Expert $e) => $e->runtime->value)->map(fn ($group) => $group->first()->id);
+
+        $experts = $experts
             ->map(fn (Expert $e) => [
                 'id' => $e->id,
                 'slug' => $e->slug,
@@ -33,6 +39,7 @@ class ExpertController extends Controller
                 'enabled' => $e->enabled,
                 'skills_count' => $e->skills_count,
                 'actions_count' => $e->actions_count,
+                'primary' => $primary->get($e->runtime->value) === $e->id,
             ]);
 
         return Inertia::render('studio/experts', [
@@ -64,6 +71,10 @@ class ExpertController extends Controller
                 'enabled' => $expert->enabled,
                 'skill_ids' => $expert->skills->pluck('id')->all(),
                 'action_ids' => $expert->actions->pluck('id')->all(),
+                // How the agent layer will use it: the first enabled expert of
+                // its runtime is the primary; other workers are routed to.
+                'primary' => $expert->enabled && Expert::query()->enabled()->forRuntime($expert->runtime)->orderBy('position')->orderBy('id')->value('id') === $expert->id,
+                'siblings' => Expert::query()->enabled()->forRuntime($expert->runtime)->whereKeyNot($expert->id)->count(),
             ],
             // Everything it could be granted, so the page is one form rather
             // than a picker per relation.
@@ -86,7 +97,7 @@ class ExpertController extends Controller
 
         $expert = Expert::create([
             ...$validated,
-            'slug' => str($validated['name'])->slug()->value(),
+            'slug' => $this->uniqueSlug($validated['name']),
             'position' => Expert::query()->max('position') + 1,
         ]);
 
@@ -103,7 +114,9 @@ class ExpertController extends Controller
             'description' => ['sometimes', 'string', 'max:160'],
             'system_prompt' => ['sometimes', 'nullable', 'string', 'max:20000'],
             'model' => ['sometimes', 'nullable', 'string', 'max:80'],
-            'reasoning_effort' => ['sometimes', 'nullable', 'string', 'max:20'],
+            // The agent layer sends these as the provider's reasoning_effort;
+            // anything else would be silently dropped there.
+            'reasoning_effort' => ['sometimes', 'nullable', Rule::in(['low', 'medium', 'high'])],
             'enabled' => ['sometimes', 'boolean'],
             'skill_ids' => ['sometimes', 'array'],
             'skill_ids.*' => ['integer', 'exists:skills,id'],
@@ -130,5 +143,20 @@ class ExpertController extends Controller
         $expert->delete();
 
         return redirect()->route('studio.experts');
+    }
+
+    /**
+     * A slug no other expert in this organization holds.
+     * Two with the same name used to collide on the unique index and 500.
+     */
+    private function uniqueSlug(string $name): string
+    {
+        $base = str($name)->slug()->value() ?: 'expert';
+        $slug = $base;
+        for ($n = 2; Expert::query()->where('slug', $slug)->exists(); $n++) {
+            $slug = "{$base}-{$n}";
+        }
+
+        return $slug;
     }
 }

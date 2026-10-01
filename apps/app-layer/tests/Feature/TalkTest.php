@@ -130,7 +130,11 @@ class TalkTest extends TestCase
         Organization::setCurrent($org);
         try {
             $this->assertSame(['front-desk', 'operations'], Expert::query()->orderBy('position')->pluck('slug')->all());
-            $this->assertSame(['create_ticket', 'find_contact'], Expert::query()->where('slug', 'operations')->sole()->actions()->pluck('slug')->sort()->values()->all());
+            // The front-desk tools in StarterAgent's catalog that are granted by default.
+            $granted = collect(\App\Services\Organization\StarterAgent::catalog())->filter(fn ($a) => $a[6])->keys()->sort()->values()->all();
+            $this->assertSame($granted, Expert::query()->where('slug', 'operations')->sole()->actions()->pluck('slug')->sort()->values()->all());
+            $this->assertContains('find_contact', $granted);
+            $this->assertContains('hand_off', $granted);
         } finally {
             Organization::setCurrent(null);
         }

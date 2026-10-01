@@ -31,13 +31,13 @@ In Desk, each handoff on a call is listed under **Handoffs**, with what was sent
 
 An expert is a configuration for one part of the agent: a system prompt, a model, the skills it can use and the actions it may call. Each expert has a runtime: **Talker (speaks)** or **Worker (acts)**.
 
-A new organization starts with two experts: **Front desk** (talker) and **Operations** (worker). Today one worker expert handles a conversation: the first enabled worker in your list. See [Experts](/docs/studio/experts).
+A new organization starts with two experts: **Front desk** (talker) and **Operations** (worker). A conversation starts with the first enabled worker in your list. If you add more workers, the agent hands each task to the one whose description fits it (in chat and Ask; voice sessions use the first worker for now). See [Experts](/docs/studio/experts).
 
 ## Skills
 
 A skill is a written procedure the worker follows, such as "how to book a repair" or "how to handle a refund request". The worker sees each skill's name and description, and reads the full text only when it becomes relevant.
 
-A skill runs in one of two modes. **Prose**: the model reads the instructions and uses its judgement. **Step-gated**: the model is held to one step at a time and cannot skip ahead. See [Skills](/docs/studio/skills).
+A skill runs in one of two modes. **Prose**: the model reads the instructions and uses its judgement. **Step-gated**: the agent gets one step at a time, must mark each step done before the next, and cannot give its final answer while a step is open. See [Skills](/docs/studio/skills).
 
 ## Knowledge
 
@@ -55,11 +55,13 @@ An action is something the agent can do. When the agent uses an action during a 
 
 | Kind | What it is |
 |---|---|
-| **Built-in** | Actions that run inside Veyra, like **Find contact** and **Create ticket**. |
+| **Built-in** | Actions that run inside Veyra on your Desk records: find, create and update contacts, add notes, raise, check and update tickets, summarize and hand off a conversation, set reminders, and save leads. See [Built-in actions](/docs/studio/integrations#built-in-actions). |
 | **HTTP request** | A call to your own API, configured in Studio. |
 | **Composio** | A tool from an app connected through an integration. |
 
 Every tool call is recorded with its status: **Succeeded**, **Failed**, **Timed out**, **Rejected** and others. A timed-out action that changes another system may or may not have happened, so Desk marks it for review instead of calling it a success or a failure.
+
+In a call or chat, built-in actions work only on the customer in that conversation. The agent cannot read out or change another customer's records, and it cannot close your team's tickets.
 
 ## Integrations
 

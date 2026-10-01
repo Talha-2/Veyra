@@ -14,8 +14,18 @@ from typing import Any
 from app_sdk.errors import Conflict, NotFound
 from app_sdk.models import (
     CallContext,
+    ContactHistory,
+    ContactLinked,
     ContactLookup,
     ContactRecord,
+    ContactSaved,
+    ConversationWrapUp,
+    HandoffResult,
+    LeadSaved,
+    NoteRecord,
+    ReminderRecord,
+    TicketDetail,
+    TicketUpdate,
     DelegationOutcome,
     DelegationRecord,
     KnowledgeHit,
@@ -106,6 +116,11 @@ class FakeSdk:
         self.memories: dict[str, str] = {}
         self.contacts: dict[int, dict[str, Any]] = {}
         self.calls: list[str] = []
+        # Every front-desk request as (method, kwargs), acting_for included.
+        self.requests: list[tuple[str, dict[str, Any]]] = []
+        self.notes: list[dict[str, Any]] = []
+        # Set to make the next front-desk call raise this error.
+        self.fail_with: Exception | None = None
         self.delay: float = 0.0
 
     # tool calls
@@ -158,33 +173,107 @@ class FakeSdk:
             return KnowledgeResult(query=query, results=[KnowledgeHit(document_id=1, document="Service area", position=1, score=1, excerpt="Evanston is inside the area.", content="Evanston is inside the area.")])
         return KnowledgeResult(query=query, results=[])
 
+    def _seen(self, method: str, kw: dict[str, Any]) -> None:
+        self.calls.append(method)
+        self.requests.append((method, kw))
+        if self.fail_with is not None:
+            error, self.fail_with = self.fail_with, None
+            raise error
+
     async def lookup_contact(self, **kw: Any) -> ContactLookup:
-        self.calls.append("lookup_contact")
+        self._seen("lookup_contact", kw)
+        if kw.get("name") == "tom" and not kw.get("acting_for"):
+            return ContactLookup(found=False, matched_by="name", matches=[
+                ContactRecord(id=1, name="Tom Byrne", phone="+17735550111"), ContactRecord(id=2, name="Tomasz Nowak"),
+            ])
+        if kw.get("email") == "tom@example.test" and kw.get("acting_for"):
+            return ContactLookup(found=True, matched_by="email", linked=False, masked=True, contact=ContactRecord(id=1, name="Tom Byrne", phone="•••0111", email="t•••@example.test"))
+        if kw.get("contact_id"):
+            return ContactLookup(found=True, matched_by="id", linked=bool(kw.get("acting_for")), contact=ContactRecord(id=int(kw["contact_id"]), name="Tom Byrne", phone="+17735550111"),
+                                 open_tickets=[{"id": 1, "reference": "#1", "subject": "Grinding noise", "status": "open"}])
         return ContactLookup(found=False, identifier={"id": 3, "type": "phone", "value": kw.get("phone") or "+1"})
+
+    async def contact_history(self, contact_id: int, **kw: Any) -> ContactHistory:
+        self._seen("contact_history", {"contact_id": contact_id, **kw})
+        return ContactHistory.model_validate({
+            "contact": {"id": contact_id, "name": "Tom Byrne"},
+            "conversations": [{"id": 9, "channel": "call", "status": "open", "current": True, "messages": [{"from": "customer", "body": "The heat is out."}]}],
+            "calls": [{"at": "2026-09-30T10:00:00Z", "direction": "inbound", "duration": "2:10", "summary": "Reported no heat."}],
+            "tickets": [{"reference": "#1", "subject": "No heat", "status": "open"}],
+        })
+
+    async def ticket(self, number: int, **kw: Any) -> TicketDetail:
+        self._seen("ticket", {"number": number, **kw})
+        if number != 1:
+            raise NotFound(f"There is no ticket #{number} on this customer's record.", status=404)
+        return TicketDetail(id=1, number=1, reference="#1", subject="No heat", status="pending", assignees=["Sam Rivera"], last_activity={"description": "Agent added a note", "at": "2026-10-01T09:00:00Z"})
+
+    async def update_ticket(self, number: int, **kw: Any) -> TicketUpdate:
+        self._seen("update_ticket", {"number": number, **kw})
+        status = kw.get("status") or "open"
+        changes = [f"status Pending to {status.title()}"] if kw.get("status") else ["note added"]
+        return TicketUpdate(changes=changes, ticket=TicketDetail(id=1, number=number, reference=f"#{number}", subject="No heat", status=status, assignees=["Sam Rivera"]))
+
+    async def link_contact(self, conversation_id: int, **kw: Any) -> ContactLinked:
+        self._seen("link_contact", {"conversation_id": conversation_id, **kw})
+        return ContactLinked(linked=True, mode="identifier", contact=ContactRecord(id=1, name="Tom Byrne"))
+
+    async def add_contact_note(self, contact_id: int, body: str, **kw: Any) -> NoteRecord:
+        self._seen("add_contact_note", {"contact_id": contact_id, "body": body, **kw})
+        self.notes.append({"subject": "contact", "id": contact_id, "body": body})
+        return NoteRecord(id=len(self.notes), subject="contact", subject_id=contact_id, body=body)
+
+    async def add_conversation_note(self, conversation_id: int, body: str, **kw: Any) -> NoteRecord:
+        self._seen("add_conversation_note", {"conversation_id": conversation_id, "body": body, **kw})
+        self.notes.append({"subject": "conversation", "id": conversation_id, "body": body})
+        return NoteRecord(id=len(self.notes), subject="conversation", subject_id=conversation_id, body=body)
+
+    async def summarize_conversation(self, conversation_id: int, **kw: Any) -> ConversationWrapUp:
+        self._seen("summarize_conversation", {"conversation_id": conversation_id, **kw})
+        return ConversationWrapUp(summarized=bool(kw.get("summary")), tags_added=kw.get("tags") or [], tags=kw.get("tags") or [])
+
+    async def set_reminder(self, conversation_id: int, **kw: Any) -> ReminderRecord:
+        self._seen("set_reminder", {"conversation_id": conversation_id, **kw})
+        matched = (kw.get("teammate") == "Sam") if kw.get("teammate") else None
+        return ReminderRecord.model_validate({"id": 1, "text": kw["text"], "due_at": kw.get("due_at") or "2026-10-02T12:00:00+00:00", "for": "Sam Rivera" if matched else None, "teammate_matched": matched})
+
+    async def hand_off(self, conversation_id: int, **kw: Any) -> HandoffResult:
+        self._seen("hand_off", {"conversation_id": conversation_id, **kw})
+        matched = kw.get("teammate") == "Sam"
+        return HandoffResult(handed_off=True, assigned_to=["Sam Rivera"] if matched else [], notified=["Sam Rivera"] if matched else ["Ada Owner"], teammate_matched=matched if kw.get("teammate") else None, tag="Needs attention")
+
+    async def save_lead(self, **kw: Any) -> LeadSaved:
+        self._seen("save_lead", kw)
+        return LeadSaved(created=True, lead={"id": 1, "contact_id": kw.get("contact_id") or 1, "pipeline": "Sales", "stage": kw.get("stage") or "New"})
 
     async def recent_calls(self, **kw: Any) -> list:
         from app_sdk.models import CallSummary
 
-        self.calls.append("recent_calls")
+        self._seen("recent_calls", kw)
         return [CallSummary(id=41, at="2026-09-26T19:10:00Z", direction="inbound", contact="Maria Delgado", duration="2:18", status="completed", summary="Booked furnace repair for tomorrow.")]
 
     async def tickets(self, **kw: Any) -> list:
-        self.calls.append("tickets")
+        self._seen("tickets", kw)
         return [TicketRecord(id=1, number=1, reference="#1", subject="Confirm Thursday booking", status="open", assignees=["Ada"])]
 
     # writes
-    async def create_contact(self, *, name: str, phone: str | None = None, email: str | None = None, company: str | None = None, source: str = "call") -> tuple[ContactRecord, bool]:
-        self.calls.append("create_contact")
+    async def create_contact(self, **kw: Any) -> ContactSaved:
+        self._seen("create_contact", kw)
+        for existing in self.contacts.values():
+            if (kw.get("phone") and existing["phone"] == kw["phone"]) or (kw.get("email") and existing["email"] == kw["email"]):
+                return ContactSaved(created=False, reason="matched", conversation_linked=bool(kw.get("acting_for")), contact=ContactRecord(**existing))
         cid = len(self.contacts) + 1
-        self.contacts[cid] = {"id": cid, "name": name, "display_name": name, "phone": phone, "email": email, "company": company}
-        return ContactRecord(**self.contacts[cid]), True
+        name = kw.get("name")
+        self.contacts[cid] = {"id": cid, "name": name, "display_name": name or "", "phone": kw.get("phone"), "email": kw.get("email"), "company": kw.get("company")}
+        return ContactSaved(created=True, conversation_linked=bool(kw.get("acting_for")), contact=ContactRecord(**self.contacts[cid]))
 
-    async def update_contact(self, contact_id: int, **fields: Any) -> ContactRecord:
-        self.contacts[contact_id].update(fields)
+    async def update_contact(self, contact_id: int, *, acting_for: int | None = None, **fields: Any) -> ContactRecord:
+        self._seen("update_contact", {"contact_id": contact_id, "acting_for": acting_for, **fields})
+        self.contacts.setdefault(contact_id, {"id": contact_id, "name": "Tom Byrne"}).update(fields)
         return ContactRecord(**self.contacts[contact_id])
 
     async def create_ticket(self, **kw: Any) -> tuple[TicketRecord, bool]:
-        self.calls.append("create_ticket")
+        self._seen("create_ticket", kw)
         if self.delay:
             await asyncio.sleep(self.delay)
         key = kw.get("idempotency_key")
@@ -193,7 +282,7 @@ class FakeSdk:
                 return TicketRecord(**t["record"]), False
         number = len(self.created_tickets) + 1
         record = {"id": number, "number": number, "reference": f"#{number}", "subject": kw["subject"], "status": "open", "assignees": ["Ada"]}
-        self.created_tickets.append({"idempotency_key": key, "record": record, "call_id": kw.get("call_id"), "conversation_id": kw.get("conversation_id")})
+        self.created_tickets.append({"idempotency_key": key, "record": record, "call_id": kw.get("call_id"), "conversation_id": kw.get("conversation_id"), "acting_for": kw.get("acting_for"), "contact_id": kw.get("contact_id")})
         return TicketRecord(**record), True
 
     async def send_message(self, **kw: Any) -> MessageRecord:

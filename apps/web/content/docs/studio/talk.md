@@ -18,7 +18,7 @@ The bar above the conversation shows **Web chat as a customer**, with two button
 - **Open in Desk** opens this conversation in the Desk inbox, as your team would see it.
 - **New chat** starts a fresh conversation.
 
-In chat, one agent both answers and acts: it uses the first enabled worker expert with its skills and tools, and a prompt written for a customer chat. It writes in the agent's primary language and switches when the customer writes in another language you turned on. See [Experts](/docs/studio/experts#which-experts-are-used-today).
+In chat, one agent both answers and acts: it starts as the first enabled worker expert, with its skills, tools, model and reasoning effort, and a prompt written for a customer chat. With several workers, it hands each task to the one whose description fits, and the steps show which expert ran them. It writes in the agent's primary language and switches when the customer writes in another language you turned on. See [Experts](/docs/studio/experts#which-experts-are-used).
 
 The same agent answers the [chat API](/docs/api/chat) and [chat on your website](/docs/api/website-chat).
 

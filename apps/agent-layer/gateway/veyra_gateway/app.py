@@ -67,6 +67,26 @@ class SkillTestRequest(BaseModel):
     scenario: str = Field(min_length=1, max_length=20000)
 
 
+class McpToolsRequest(BaseModel):
+    """List an MCP server's tools, for Studio to mirror as actions. The app
+    resolves the stored credentials into `headers`; nothing is kept here."""
+
+    url: str = Field(min_length=8, max_length=500)
+    transport: Literal["streamable_http", "sse"] = "streamable_http"
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
+class ToolExecuteRequest(BaseModel):
+    """Run one action a person approved. `tool` is the action's tool spec,
+    exactly as the context bundle ships it; `arguments` are the ones the agent
+    asked for when the approval was requested."""
+
+    organization_id: int
+    tool_call_id: int | None = None
+    tool: dict[str, Any]
+    arguments: dict[str, Any] = Field(default_factory=dict)
+
+
 class OutboundCallRequest(BaseModel):
     organization_id: int
     to: str
@@ -186,6 +206,37 @@ def create_app(*, sdk: AppSdk | None = None, runner: TextRunner | None = None, c
             return await asyncio.wait_for(app.state.runner.test_skill(body.organization_id, body.skill, body.scenario), timeout=120)
         except asyncio.TimeoutError:
             raise HTTPException(504, "The skill test did not finish within 120s.")
+
+    @app.post("/v1/mcp/tools")
+    async def mcp_tools(body: McpToolsRequest, _: None = Depends(authenticated)) -> dict[str, Any]:
+        """An MCP initialize + tools/list handshake against the server Studio added."""
+        from veyra_harness.mcp import McpClient, McpError, tool_specs
+
+        try:
+            tools = await asyncio.wait_for(McpClient(body.url, transport=body.transport, headers=body.headers, timeout=20).list_tools(), timeout=45)
+        except asyncio.TimeoutError:
+            raise HTTPException(504, "The MCP server did not answer within 45 s.")
+        except McpError as e:
+            raise HTTPException(502, str(e)[:400])
+        except Exception as e:  # noqa: BLE001 — a transport fault is the server's state, reported as such
+            raise HTTPException(502, f"Could not talk to the MCP server: {type(e).__name__}: {e}"[:400])
+        return {"tools": tool_specs(tools)}
+
+    @app.post("/v1/tools/execute")
+    async def tools_execute(body: ToolExecuteRequest, _: None = Depends(authenticated)) -> dict[str, Any]:
+        """Run an approved action once. Synchronous: the person who approved it is waiting for the result."""
+        from app_sdk.models import ToolSpec
+
+        try:
+            spec = ToolSpec.model_validate(body.tool)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(422, f"Not a tool spec: {e}"[:300])
+        try:
+            return await asyncio.wait_for(app.state.runner.execute_tool(body.organization_id, spec, body.arguments), timeout=max(5.0, spec.timeout_ms / 1000 + 10))
+        except asyncio.TimeoutError:
+            return {"ok": False, "status": "timeout", "error": "timeout", "output": "No response in time. The outcome is unknown.", "duration_ms": spec.timeout_ms}
+        except AppSdkError as e:
+            raise HTTPException(502, f"Could not load the organization's context: {e}"[:300])
 
     @app.post("/v1/calls/outbound", status_code=501)
     async def outbound(body: OutboundCallRequest, _: None = Depends(authenticated)) -> dict[str, Any]:

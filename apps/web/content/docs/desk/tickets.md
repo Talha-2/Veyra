@@ -70,10 +70,22 @@ A ticket raised by the agent:
 
 - carries the **Raised by the agent** label and shows the agent as its creator;
 - is linked to the call or conversation it came from, and to the contact if one is known;
-- gets the type's default people as assignees when the agent names a type that exists, and each of them gets an in-app notification;
+- is filed under the ticket type the agent chose. If it chose none, or a type you do not have, the ticket goes under your first enabled type;
+- gets the type's default people as assignees, and each of them gets an in-app notification;
 - appears on the call page under **Tickets from this call**.
 
 When a call ends with work left unfinished, the agent can raise one ticket after the call, recording what was done and what the team needs to do next.
+
+### What the agent can change on a ticket
+
+When a customer asks about a ticket by its number, the agent can read its status, but only for that customer's own tickets. With the **Update ticket** action it can:
+
+- add what the customer said as a note. The people assigned get a notification;
+- reopen a **Pending** or **Resolved** ticket when the customer says the problem is back. The people assigned get a notification;
+- set an **Open** or **In progress** ticket to **Pending** (waiting on the customer);
+- raise the priority.
+
+It cannot close a ticket, set **In progress**, reopen a **Closed** ticket or lower a priority your team set. It can set **Resolved** only to withdraw a ticket it raised in the same conversation. A ticket with nobody assigned is given its type's default people when the agent updates it. Every change is listed in the ticket's activity as done by the agent.
 
 Use the **Raised by agent** scope to check these tickets. If it is empty, nothing the agent promised is still open.
 

@@ -35,13 +35,14 @@ const SECTIONS: { id: string; label: string; title: string; body: React.ReactNod
   {
     id: "billing",
     label: "Billing",
-    title: "Flat fee plus pass-through usage",
+    title: "Plan fees plus usage",
     body: (
       <p>
-        The Starter plan is free. Paid plans bill a flat monthly fee. Usage — voice minutes,
-        phone numbers, SMS — passes through at provider cost with no markup, metered and
-        visible in your dashboard. You can cancel any time; billing stops at the end of the
-        period.
+        New accounts receive free usage credit. Veyra Desk bills a monthly fee per business
+        location; Veyra Studio Pro and Scale bill a monthly fee that is added to your balance
+        as usage credit. Usage (voice minutes, chat messages, phone numbers and SMS) is billed
+        at the rates on the pricing page. Calls to the data API are not billed. You can cancel
+        any time; billing stops at the end of the period.
       </p>
     ),
   },

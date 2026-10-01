@@ -66,13 +66,19 @@ class AgentGateway
             return false;
         }
 
-        return Cache::remember('agent-gateway:available', now()->addSeconds(30), function () {
-            try {
-                return $this->client(timeout: 2)->get('/v1/health')->successful();
-            } catch (ConnectionException) {
-                return false;
-            }
-        });
+        // Up is remembered for 30 s, down for 10 s: a gateway waking from
+        // sleep should not read as offline for long after it answers.
+        if (Cache::has('agent-gateway:available')) {
+            return (bool) Cache::get('agent-gateway:available');
+        }
+        try {
+            $up = $this->client(timeout: 8)->get('/v1/health')->successful();
+        } catch (ConnectionException) {
+            $up = false;
+        }
+        Cache::put('agent-gateway:available', $up, now()->addSeconds($up ? 30 : 10));
+
+        return $up;
     }
 
     /**
@@ -89,15 +95,27 @@ class AgentGateway
             return $empty;
         }
 
-        return Cache::remember('agent-gateway:capabilities', now()->addMinutes(5), function () use ($empty) {
-            try {
-                $body = $this->decode($this->client(timeout: 4)->get('/v1/capabilities')->throw());
+        if ($cached = Cache::get('agent-gateway:capabilities')) {
+            return $cached;
+        }
+        // A gateway on a sleeping host takes tens of seconds to wake, and it
+        // verifies each provider key on first ask: wait long enough for that,
+        // keep a good answer for 10 minutes, and a failure only briefly so
+        // the page recovers as soon as the gateway is up.
+        if (Cache::get('agent-gateway:capabilities-failed')) {
+            return $empty;
+        }
+        try {
+            $body = $this->decode($this->client(timeout: 25)->get('/v1/capabilities')->throw());
+            $result = ['providers' => $body['providers'] ?? [], 'defaults' => $body['defaults'] ?? $empty['defaults'], 'voice' => $body['voice'] ?? []];
+            Cache::put('agent-gateway:capabilities', $result, now()->addMinutes(10));
 
-                return ['providers' => $body['providers'] ?? [], 'defaults' => $body['defaults'] ?? $empty['defaults'], 'voice' => $body['voice'] ?? []];
-            } catch (ConnectionException|RequestException) {
-                return $empty;
-            }
-        });
+            return $result;
+        } catch (ConnectionException|RequestException) {
+            Cache::put('agent-gateway:capabilities-failed', true, now()->addSeconds(20));
+
+            return $empty;
+        }
     }
 
     /**
@@ -221,6 +239,57 @@ class AgentGateway
             'goal' => $goal,
             'context' => $context,
         ]);
+    }
+
+    /**
+     * An MCP server's tools, by an initialize + tools/list handshake the
+     * agent layer runs (it is the side that calls them later). Throws
+     * AgentUnavailable with the server's own complaint when it refuses.
+     *
+     * @param  array<string, string>  $headers
+     * @return list<array{name: string, title: ?string, description: string, input_schema: array, read_only: bool, idempotent: bool, destructive: bool}>
+     */
+    public function mcpTools(string $url, string $transport, array $headers): array
+    {
+        $body = $this->postExplained('/v1/mcp/tools', ['url' => $url, 'transport' => $transport, 'headers' => $headers ?: new \stdClass], timeout: 50);
+
+        return array_values(array_filter($body['tools'] ?? [], fn ($t) => is_array($t) && filled($t['name'] ?? null)));
+    }
+
+    /**
+     * Run one action a person approved, once, through the agent layer's
+     * executor. Synchronous: the person who pressed Approve sees the result.
+     *
+     * @return array{ok: bool, status: string, output?: string, result?: mixed, error?: ?string, duration_ms?: int}
+     */
+    public function executeTool(array $tool, array $arguments, ?int $toolCallId = null): array
+    {
+        $timeout = (int) min(150, ceil(($tool['timeout_ms'] ?? 15000) / 1000) + 15);
+
+        return $this->postExplained('/v1/tools/execute', [
+            'organization_id' => Organization::currentId(),
+            'tool_call_id' => $toolCallId,
+            'tool' => $tool,
+            'arguments' => $arguments ?: new \stdClass,
+        ], timeout: $timeout);
+    }
+
+    /** Like `post`, but a refusal carries the gateway's `detail` rather than the raw body. */
+    private function postExplained(string $path, array $payload, int $timeout): array
+    {
+        if (! $this->configured()) {
+            throw AgentUnavailable::notConfigured();
+        }
+
+        try {
+            return $this->decode($this->client($timeout)->post($path, $payload)->throw());
+        } catch (ConnectionException $e) {
+            Cache::forget('agent-gateway:available');
+            throw AgentUnavailable::because($e->getMessage());
+        } catch (RequestException $e) {
+            $detail = $e->response->json('detail');
+            throw new AgentUnavailable(is_string($detail) && $detail !== '' ? $detail : "HTTP {$e->response->status()} from {$path}");
+        }
     }
 
     private function post(string $path, array $payload, ?int $timeout = null): array

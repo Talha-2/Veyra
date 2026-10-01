@@ -119,7 +119,9 @@ final class StreamedTurn
 
     private function tool(array $event): void
     {
-        $step = array_intersect_key($event, array_flip(['id', 'name', 'status', 'label', 'detail', 'summary', 'ms']));
+        // `expert` / `expert_name`: which expert ran the step, present when
+        // the organization has several to route between.
+        $step = array_intersect_key($event, array_flip(['id', 'name', 'status', 'label', 'detail', 'summary', 'ms', 'expert', 'expert_name']));
         foreach ($this->parts as $i => $part) {
             if ($part['type'] === 'tool' && ($part['id'] ?? null) === ($event['id'] ?? null)) {
                 $this->parts[$i] = [...$part, ...$step];

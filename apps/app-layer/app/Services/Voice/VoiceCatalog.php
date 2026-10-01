@@ -12,8 +12,8 @@ use Throwable;
 /**
  * The voices Studio can offer, and a way to hear them.
  *
- * Two providers, read live and cached: Cartesia (Sonic — ~90 ms, 15
- * languages including Urdu, Arabic and Hindi) and ElevenLabs (Flash). A
+ * Two providers, read live and cached: Cartesia (Sonic-3, 15 languages;
+ * not Urdu or Arabic) and ElevenLabs (Turbo v2.5). A
  * provider with no key is absent; one whose key is rejected is listed with
  * the error, so a dead key shows on the page instead of as a silent
  * fallback to the curated voices.
@@ -31,6 +31,23 @@ class VoiceCatalog
      * (tested 2026-09-27), so those voices are not offered.
      */
     public const CARTESIA_LANGUAGES = ['en', 'fr', 'de', 'es', 'pt', 'zh', 'ja', 'hi', 'it', 'ko', 'nl', 'pl', 'ru', 'sv', 'tr'];
+
+    /**
+     * The voice a call uses when the tenant has not chosen one. The agent
+     * layer's pipeline carries the same ids (veyra_voice.pipeline
+     * DEFAULT_VOICES), so the default Studio shows is the voice a caller
+     * hears — never a provider's own hidden default. Both are premade/public
+     * voices, so any key (a free ElevenLabs plan included) can use them.
+     */
+    public const DEFAULTS = [
+        'elevenlabs' => ['id' => 'cgSgspJ2msm6clMCkdW9', 'name' => 'Jessica'],
+        'cartesia' => ['id' => 'f786b574-daa5-4673-aa0c-cbe3e8534c02', 'name' => 'Katie'],
+    ];
+
+    /** The realtime models a call speaks with, so a preview sounds like a call. */
+    public const CALL_MODELS = ['cartesia' => 'sonic-3', 'elevenlabs' => 'eleven_turbo_v2_5'];
+
+    public const LABELS = ['cartesia' => 'Cartesia', 'elevenlabs' => 'ElevenLabs'];
 
     public const SAMPLES = [
         'en' => 'Hi, thanks for calling. I can book that for you — what day works best?',
@@ -80,11 +97,80 @@ class VoiceCatalog
         return null;
     }
 
+    /**
+     * The default voice, decided without a network call (it sits on the
+     * call's greeting path): ElevenLabs when this deployment has its key,
+     * else Cartesia.
+     *
+     * @return array{provider:string,id:string,name:string,label:string}
+     */
+    public function defaultVoice(): array
+    {
+        return self::voice(filled(config('services.elevenlabs.key')) ? 'elevenlabs' : 'cartesia');
+    }
+
+    /**
+     * The voice a call actually uses for a saved choice. A provider without
+     * a voice gets that provider's default; no provider (or the illustrative
+     * "curated" list) gets the deployment default.
+     *
+     * @return array{provider:string,id:string,name:?string,label:string,is_default:bool}
+     */
+    public function effective(?string $provider, ?string $id): array
+    {
+        if (isset(self::DEFAULTS[$provider ?? ''])) {
+            return filled($id)
+                ? ['provider' => $provider, 'id' => $id, 'name' => null, 'label' => self::LABELS[$provider], 'is_default' => false]
+                : [...self::voice($provider), 'is_default' => true];
+        }
+
+        return [...$this->defaultVoice(), 'is_default' => true];
+    }
+
+    /**
+     * For provisioning a new organization: the default checked against the
+     * live catalog. ElevenLabs first when its key works here, else Cartesia;
+     * a provider whose default voice is gone gives its first English voice.
+     * Unreachable providers fall back to defaultVoice(), so provisioning never
+     * fails for want of a voice.
+     *
+     * @return array{provider:string,id:string,name:string,label:string}
+     */
+    public function pickDefault(): array
+    {
+        foreach (array_keys(self::DEFAULTS) as $provider) {
+            try {
+                if (! filled(config("services.{$provider}.key")) || ! $this->status($provider)['ok']) {
+                    continue;
+                }
+                if ($this->find($provider, self::DEFAULTS[$provider]['id'])) {
+                    return self::voice($provider);
+                }
+                $first = collect($this->voicesFor($provider))->first(fn ($v) => in_array('en', $v['languages'], true));
+                if ($first) {
+                    return ['provider' => $provider, 'id' => $first['id'], 'name' => $first['name'], 'label' => self::LABELS[$provider]];
+                }
+            } catch (Throwable $e) {
+                Log::warning('voices.default_pick_failed', ['provider' => $provider, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $this->defaultVoice();
+    }
+
+    /** @return array{provider:string,id:string,name:string,label:string} */
+    private static function voice(string $provider): array
+    {
+        return ['provider' => $provider, ...self::DEFAULTS[$provider], 'label' => self::LABELS[$provider]];
+    }
+
     /** MP3 bytes for a short sample in the given language, from disk when already made. */
     public function preview(string $provider, string $voiceId, string $language): string
     {
         $language = array_key_exists($language, self::SAMPLES) ? $language : 'en';
-        $path = "voice-previews/{$provider}-".preg_replace('/[^a-zA-Z0-9_-]/', '_', $voiceId)."-{$language}.mp3";
+        // Keyed by model too: a preview made on an older model is not what a caller hears now.
+        $model = self::CALL_MODELS[$provider] ?? 'x';
+        $path = "voice-previews/{$provider}-{$model}-".preg_replace('/[^a-zA-Z0-9_-]/', '_', $voiceId)."-{$language}.mp3";
         if (Storage::exists($path)) {
             return Storage::get($path);
         }
@@ -191,7 +277,7 @@ class VoiceCatalog
             throw new \InvalidArgumentException("Cartesia cannot synthesise {$language}.");
         }
         $response = $this->cartesia()->post('/tts/bytes', [
-            'model_id' => 'sonic-2',
+            'model_id' => self::CALL_MODELS['cartesia'],
             'transcript' => $text,
             'voice' => ['mode' => 'id', 'id' => $voiceId],
             'output_format' => ['container' => 'mp3', 'bit_rate' => 64000, 'sample_rate' => 44100],
@@ -204,7 +290,12 @@ class VoiceCatalog
     private function elevenTts(string $voiceId, string $text): string
     {
         return $this->eleven()->withOptions(['query' => ['output_format' => 'mp3_44100_64']])
-            ->post("/text-to-speech/{$voiceId}", ['text' => $text, 'model_id' => 'eleven_flash_v2_5'])->throw()->body();
+            ->post("/text-to-speech/{$voiceId}", [
+                'text' => $text,
+                'model_id' => self::CALL_MODELS['elevenlabs'],
+                // The settings the voice worker speaks with (veyra_voice.pipeline ELEVEN_VOICE_SETTINGS).
+                'voice_settings' => ['stability' => 0.45, 'similarity_boost' => 0.8, 'style' => 0.0, 'use_speaker_boost' => true],
+            ])->throw()->body();
     }
 
     private function cartesia()

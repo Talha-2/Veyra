@@ -4,9 +4,11 @@ use App\Http\Controllers\Api\Agent\AutomationController;
 use App\Http\Controllers\Api\Agent\CallController;
 use App\Http\Controllers\Api\Agent\ContactController;
 use App\Http\Controllers\Api\Agent\ContextController;
+use App\Http\Controllers\Api\Agent\ConversationController;
 use App\Http\Controllers\Api\Agent\DelegationController;
 use App\Http\Controllers\Api\Agent\HealthController;
 use App\Http\Controllers\Api\Agent\KnowledgeController;
+use App\Http\Controllers\Api\Agent\LeadController;
 use App\Http\Controllers\Api\Agent\MemoryController;
 use App\Http\Controllers\Api\Agent\MessageController;
 use App\Http\Controllers\Api\Agent\SkillController;
@@ -73,9 +75,24 @@ Route::prefix('agent/v1')->name('agent.')->middleware('agent.auth')->group(funct
         Route::get('/contacts/lookup', [ContactController::class, 'lookup'])->name('contacts.lookup');
         Route::post('/contacts', [ContactController::class, 'store'])->name('contacts.store');
         Route::patch('/contacts/{contact}', [ContactController::class, 'update'])->name('contacts.update');
+        Route::post('/contacts/{contact}/notes', [ContactController::class, 'storeNote'])->name('contacts.notes.store');
+        Route::get('/contacts/{contact}/history', [ContactController::class, 'history'])->name('contacts.history');
+
+        // Front-desk work on the conversation the agent is having. With
+        // X-Veyra-Conversation set, the path must name that conversation.
+        Route::post('/conversations/{conversation}/link', [ConversationController::class, 'link'])->name('conversations.link');
+        Route::post('/conversations/{conversation}/notes', [ConversationController::class, 'storeNote'])->name('conversations.notes.store');
+        Route::post('/conversations/{conversation}/summary', [ConversationController::class, 'summary'])->name('conversations.summary');
+        Route::post('/conversations/{conversation}/reminders', [ConversationController::class, 'reminder'])->name('conversations.reminders.store');
+        Route::post('/conversations/{conversation}/handoff', [ConversationController::class, 'handoff'])->name('conversations.handoff');
 
         Route::get('/tickets', [TicketController::class, 'index'])->name('tickets');
         Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
+        // By the per-tenant number customers quote ("#12"), not the row id.
+        Route::get('/tickets/{number}', [TicketController::class, 'show'])->whereNumber('number')->name('tickets.show');
+        Route::patch('/tickets/{number}', [TicketController::class, 'update'])->whereNumber('number')->name('tickets.update');
+
+        Route::post('/leads', [LeadController::class, 'store'])->name('leads.store');
 
         Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 

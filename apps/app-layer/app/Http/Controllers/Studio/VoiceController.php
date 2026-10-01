@@ -25,9 +25,9 @@ class VoiceController extends Controller
 {
     /** Vendor-published latency figures, labelled as such. Not our measurements. */
     public const TTS_MODELS = [
-        ['id' => 'flash', 'label' => 'Flash', 'latency_ms' => 90, 'note' => 'The realtime tier: Cartesia Sonic-2 or ElevenLabs Flash. Use this unless a language rules it out.'],
-        ['id' => 'turbo', 'label' => 'Turbo', 'latency_ms' => 300, 'note' => 'Balanced. Noticeably slower on a phone call.'],
-        ['id' => 'expressive', 'label' => 'Expressive', 'latency_ms' => 1200, 'note' => 'Highest fidelity, not realtime.'],
+        ['id' => 'flash', 'label' => 'Flash', 'latency_ms' => 90, 'note' => 'The realtime tier: Cartesia Sonic-3 or ElevenLabs Turbo v2.5. Use this unless a language rules it out.'],
+        ['id' => 'turbo', 'label' => 'Turbo', 'latency_ms' => 300, 'note' => 'Balanced: ElevenLabs Multilingual v2 (Cartesia stays on Sonic-3). Noticeably slower on a phone call.'],
+        ['id' => 'expressive', 'label' => 'Expressive', 'latency_ms' => 1200, 'note' => 'Highest fidelity (ElevenLabs v3), not realtime.'],
     ];
 
     /** Shown only when no provider is configured, so the page still explains itself. */
@@ -49,6 +49,10 @@ class VoiceController extends Controller
         return Inertia::render('studio/voice', [
             'voice_id' => $config->voice_id,
             'voice_provider' => $config->voice_provider,
+            // What a call speaks with when nothing is saved: the same answer
+            // CallContextBuilder sends the voice worker, so the page never
+            // shows an empty choice while callers hear some hidden voice.
+            'default_voice' => $catalog->effective($config->voice_provider, null),
             'tts_model' => $config->advanced['tts_model'] ?? 'flash',
             'languages' => $languages,
             'providers' => $providers,

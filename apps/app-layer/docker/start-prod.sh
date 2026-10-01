@@ -17,6 +17,11 @@ export APP_URL="${APP_URL:-${RENDER_EXTERNAL_URL:-http://localhost:${PORT}}}"
 
 php artisan migrate --force --no-interaction
 
+# Bring every organization's built-in agent tools up to date: creates what is
+# missing, never touches what an owner edited or switched off. Safe on every
+# boot; a failure here must not keep the app from serving.
+php artisan veyra:provision-agent --no-interaction || echo "veyra:provision-agent failed; continuing" >&2
+
 # Opt-in: the demo organization (Northwind) with its sample calls, inbox and
 # skills, loaded only into an empty database. Sign in as owner@veyra.test with
 # the DEMO_PASSWORD you set; without one the command refuses to seed.

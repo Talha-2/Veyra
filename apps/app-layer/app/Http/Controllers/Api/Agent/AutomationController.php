@@ -168,8 +168,10 @@ class AutomationController extends Controller
                 'goal' => $automation->goal,
                 'reasoning' => $automation->reasoning,
                 'can_search_knowledge' => $automation->can_search_knowledge,
-                'tools' => Action::query()->enabled()->whereIn('id', $automation->allowed_action_ids ?? [])->get()
-                    ->map(fn (Action $a) => [...$a->toToolSchema(), 'id' => $a->id, 'kind' => $a->kind->value, 'is_idempotent' => $a->is_idempotent, 'is_durable_write' => $a->is_durable_write, 'requires_approval' => $a->requires_approval, 'timeout_ms' => $a->timeout_ms, 'config' => $a->kind->isExternal() ? ($a->config ?: new \stdClass) : null])
+                // The same tool spec an expert's actions get (CallContextBuilder),
+                // so an MCP action carries its server and auth headers here too.
+                'tools' => Action::query()->enabled()->with('integration')->whereIn('id', $automation->allowed_action_ids ?? [])->get()
+                    ->map(fn (Action $a) => $a->toToolSpec())
                     ->all(),
             ],
         ];

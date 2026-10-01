@@ -16,6 +16,10 @@ interface Props {
         runtime: string; runtime_label: string; runtime_description: string; latency_critical: boolean;
         model: string | null; reasoning_effort: string | null; is_builtin: boolean; enabled: boolean;
         skill_ids: number[]; action_ids: number[];
+        /** The first enabled expert of its runtime. */
+        primary: boolean;
+        /** Other enabled experts on the same runtime. */
+        siblings: number;
     };
     all_skills: { id: number; name: string; description: string; gated: boolean }[];
     all_actions: { id: number; name: string; kind: string; durable: boolean }[];
@@ -59,6 +63,10 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
     const setAll = (key: 'skill_ids' | 'action_ids', ids: number[]) => setData(key, ids);
 
     const look = runtimeLook(expert.runtime);
+    // The talker's tools are fixed (answer from knowledge, hand off to the
+    // worker) and it runs through the voice pipeline, which has no reasoning
+    // setting: only its prompt and model take effect, so only those are offered.
+    const talker = expert.runtime === 'talker';
     // A rough rule of thumb (about four characters a token in English) — good
     // enough to show what a prompt costs on every turn, not a billing figure.
     const promptTokens = Math.ceil(data.system_prompt.length / 4);
@@ -97,9 +105,14 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
                                 <Fact label="Runtime">{expert.runtime_label}</Fact>
                                 <Fact label="Type">{expert.is_builtin ? 'Built-in' : 'Custom'}</Fact>
                                 <Fact label="Model">{data.model ? <span className="font-mono text-xs break-all">{data.model}</span> : <span className="text-secondary">Runtime default</span>}</Fact>
-                                <Fact label="Reasoning">{effortLabel}</Fact>
-                                <Fact label="Skills">{data.skill_ids.length} of {all_skills.length}</Fact>
-                                <Fact label="Tools">{writes > 0 ? `${data.action_ids.length} · ${writes} ${writes === 1 ? 'write' : 'writes'}` : data.action_ids.length}</Fact>
+                                {!talker && (
+                                    <>
+                                        <Fact label="Reasoning">{effortLabel}</Fact>
+                                        <Fact label="Skills">{data.skill_ids.length} of {all_skills.length}</Fact>
+                                        <Fact label="Tools">{writes > 0 ? `${data.action_ids.length} · ${writes} ${writes === 1 ? 'write' : 'writes'}` : data.action_ids.length}</Fact>
+                                    </>
+                                )}
+                                <Fact label="Role">{roleLabel(expert)}</Fact>
                                 <Fact label="Slug"><Mono className="break-all">{expert.slug}</Mono></Fact>
                             </SideCard>
 
@@ -126,12 +139,12 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
                         </>
                     }
                 >
-                    <Panel title="Identity" description="How other experts see this one when deciding whether to hand off.">
+                    <Panel title="Identity" description={talker ? 'How your team tells this talker apart. The talker is not routed to; it is the voice.' : 'The description is how the agent decides to hand a task to this expert, so say what it handles.'}>
                         <Stacked label="Name" htmlFor="expert-name" error={errors.name}>
                             <input id="expert-name" className="v-field max-w-md" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} />
                         </Stacked>
                         <Stacked label="One-line description" htmlFor="expert-description" error={errors.description}
-                            hint="Every other expert’s routing block includes this line, so its length is paid on every turn of every call."
+                            hint={talker ? 'For your team. Not sent to the model.' : 'Every other expert’s routing block includes this line, so its length is paid on every turn of every call.'}
                             aside={<Mono style={{ color: data.description.length > 140 ? 'var(--warning)' : undefined }}>{data.description.length}/160</Mono>}>
                             <input id="expert-description" className="v-field" value={data.description} maxLength={160} onChange={(e) => setData('description', e.target.value)} />
                         </Stacked>
@@ -159,6 +172,14 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
                         />
                     </Panel>
 
+                    {talker ? (
+                        <Panel title="Skills and tools" description="Fixed for the talker.">
+                            <p className="text-sm text-secondary">
+                                The talker answers from your knowledge and hands everything else to the worker, so it has no skills or actions of its own.
+                                Grant skills and actions to a <Link href="/studio/experts" className="text-accent-text hover:underline">worker expert</Link>.
+                            </p>
+                        </Panel>
+                    ) : (<>
                     <Panel
                         flush
                         title="Skills"
@@ -214,20 +235,27 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
                             </Checklist>
                         )}
                     </Panel>
+                    </>)}
 
                     <Disclosure
                         title="Advanced"
-                        summary={`Model: ${data.model || 'runtime default'} · Reasoning: ${effortLabel.toLowerCase()}`}
+                        summary={talker ? `Model: ${data.model || 'Identity default'}` : `Model: ${data.model || 'runtime default'} · Reasoning: ${effortLabel.toLowerCase()}`}
                         defaultOpen={!!errors.model || !!errors.reasoning_effort}
                     >
-                        <p className="text-sm text-secondary">Leave both on default and the runtime decides. Override only when this expert needs something the default cannot do.</p>
+                        <p className="text-sm text-secondary">
+                            {talker
+                                ? <>Leave it on default to use the talker model set on <Link href="/studio/agent#models" className="text-accent-text hover:underline">Identity → Models</Link>. A model here replaces it in voice sessions.</>
+                                : 'Leave both on default and the runtime decides. Override only when this expert needs something the default cannot do.'}
+                        </p>
                         <Stacked label="Model" htmlFor="expert-model" error={errors.model}
-                            hint={expert.latency_critical ? 'Latency-critical: a bigger model here is heard as a pause.' : 'Quality-critical: tool use and long instructions. The agent layer resolves the provider.'}>
-                            <input id="expert-model" className="v-field max-w-md font-mono text-sm" value={data.model} onChange={(e) => setData('model', e.target.value)} placeholder="Runtime default" />
+                            hint={expert.latency_critical ? 'Latency-critical: a bigger model here is heard as a pause. Written as provider:model, for example openai:gpt-4o-mini.' : 'Quality-critical: tool use and long instructions. Written as provider:model, for example openai:gpt-4.1-mini. Used in voice, chat, Ask and skill tests.'}>
+                            <input id="expert-model" className="v-field max-w-md font-mono text-sm" value={data.model} onChange={(e) => setData('model', e.target.value)} placeholder={talker ? 'Identity default' : 'Runtime default'} />
                         </Stacked>
-                        <Stacked label="Reasoning effort" error={errors.reasoning_effort} hint="Higher thinks longer before acting: better on hard tasks, slower on every one.">
-                            <SegmentedControl<Effort> value={effort} onChange={(v) => setData('reasoning_effort', v)} options={EFFORTS} />
-                        </Stacked>
+                        {!talker && (
+                            <Stacked label="Reasoning effort" error={errors.reasoning_effort} hint="Higher thinks longer before acting: better on hard tasks, slower on every one. Applies in voice, chat, Ask and skill tests; a model without a reasoning setting ignores it.">
+                                <SegmentedControl<Effort> value={effort} onChange={(v) => setData('reasoning_effort', v)} options={EFFORTS} />
+                            </Stacked>
+                        )}
                     </Disclosure>
                 </WithSide>
             </PageStack>
@@ -235,6 +263,15 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
             <SaveBar processing={processing} dirty={isDirty} onDiscard={() => reset()} />
         </form>
     );
+}
+
+/** How the agent layer uses this expert, in a few words. */
+function roleLabel(expert: Props['expert']): string {
+    if (!expert.enabled) return 'Not used (disabled)';
+    if (expert.runtime === 'talker') return expert.primary ? 'Speaks in voice sessions' : 'Not used: an earlier talker speaks';
+    if (expert.runtime === 'text') return expert.primary ? 'Starts every Ask thread' : 'Ask hands tasks to it';
+    if (!expert.primary) return 'Gets tasks that fit its description';
+    return expert.siblings > 0 ? 'Starts each conversation, hands off to others' : 'Handles every task';
 }
 
 function Empty({ children }: { children: ReactNode }) {

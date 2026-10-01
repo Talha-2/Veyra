@@ -29,6 +29,7 @@ import hashlib
 import json
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -63,6 +64,11 @@ class ActionExecutor:
         # Attempts per idempotency key, so a legitimate re-run after a
         # *definite* failure carries attempt=2 rather than pretending to be new.
         self._attempts: dict[str, int] = {}
+        # A run without a call (a live chat, Ask, an automation) has no call
+        # id to scope its keys by. Without this every chat in the tenant
+        # shared "call0-d0-…": a second visitor raising a ticket with the same
+        # words got the first visitor's ticket back as a duplicate.
+        self._run = uuid.uuid4().hex[:12]
 
     @property
     def write_in_flight(self) -> bool:
@@ -72,21 +78,33 @@ class ActionExecutor:
         """Stable across a retry of the same call with the same arguments.
 
         Scoped to the delegation, not the call: a caller who books two slots in
-        two exchanges has made two bookings, and they must not collapse.
+        two exchanges has made two bookings, and they must not collapse. A run
+        with no call is scoped to this executor (one per chat conversation,
+        Ask thread or automation run).
         """
         digest = hashlib.sha256(json.dumps(arguments, sort_keys=True, default=str).encode()).hexdigest()[:16]
-        return f"call{self.scope.call_id or 0}-d{self.scope.delegation_id or 0}-{tool.name}-{digest}"
+        where = f"call{self.scope.call_id}" if self.scope.call_id else f"run{self._run}"
+        return f"{where}-d{self.scope.delegation_id or 0}-{tool.name}-{digest}"
 
     async def execute(self, tool: Tool, arguments: dict[str, Any], state: Any) -> ToolResult:
         if not tool.audited:
             return await self._dispatch(tool, arguments, state)
 
         if tool.requires_approval:
-            # Recorded so a person can approve it later; never run on the call.
+            if self.scope.dry_run:
+                # A simulation must not put a request in front of a person.
+                return ToolResult.success({"simulated": True, "needs_approval": True}, text="Simulated. In a live conversation this action would wait for a person to approve it in Studio before running.")
+            # Recorded so a person can approve it (Studio → Overview). Never
+            # run here: the approval runs it, through `run_approved`.
             record = await self._start(tool, arguments, key=None)
-            if record is not None:
-                await self._finish(record["id"], status="awaiting_approval", error="Requires human approval.")
-            return ToolResult.failure("This action needs a person to approve it before it runs. It has been recorded for review.")
+            if record is None:
+                return ToolResult.failure("This action needs a person to approve it, and the request could not be recorded. Nothing was done.")
+            await self._finish(record["id"], status="awaiting_approval", error="Requires human approval.")
+            return ToolResult.failure(
+                "Not run yet: this action needs a person to approve it, and it is now waiting for approval. "
+                "Do not say it was done. Say a member of the team will review it.",
+                data={"awaiting_approval": True, "tool_call_id": record["id"]},
+            )
 
         if self.scope.dry_run and tool.is_durable_write:
             logger.info("executor.dry_run_write tool=%s", tool.name)
@@ -122,6 +140,19 @@ class ActionExecutor:
         status = "succeeded" if result.ok else ("timeout" if result.error == "timeout" else "failed")
         await self._finish(tool_call_id, status=status, result=_jsonable(result.data), error=result.error, duration_ms=duration_ms)
         return result
+
+    async def run_approved(self, tool: Tool, arguments: dict[str, Any], state: Any) -> tuple[ToolResult, int]:
+        """Run an action a person approved, once, with its own timeout. Returns the result and the duration.
+
+        No new audit row: the approval request *is* the row, and the app
+        closes it with this result. Not retried — a person pressed the button
+        once, and a write that times out stays unconfirmed for a person to
+        check, exactly as on a call.
+        """
+        started = time.perf_counter()
+        with span(f"tool.{tool.name}", kind=tool.kind, durable=tool.is_durable_write, approved=True):
+            result = await self._run_with_timeout(tool, arguments, state)
+        return result, int((time.perf_counter() - started) * 1000)
 
     # ── steps ────────────────────────────────────────────────────────────
 

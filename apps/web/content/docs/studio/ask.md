@@ -37,7 +37,7 @@ Ask cannot change Studio settings for you. It does not create or edit skills, au
 
 ## Which expert Ask uses
 
-Ask uses the first enabled expert with the **Text** runtime. If you have none, it uses the first enabled worker expert, with that expert's skills and tools. To give Ask its own prompt, tools or model, create a Text expert in **Studio → Experts**. See [Experts](/docs/studio/experts).
+Ask starts as the first enabled expert with the **Text** runtime. If you have none, it starts as the first enabled worker expert, with that expert's skills, tools, model and reasoning effort. When you have several, it hands a task to the one whose description fits, and the steps show which expert ran them. To give Ask its own prompt, tools or model, create a Text expert in **Studio → Experts**. See [Experts](/docs/studio/experts#how-the-agent-chooses-an-expert).
 
 ## Manage chats
 

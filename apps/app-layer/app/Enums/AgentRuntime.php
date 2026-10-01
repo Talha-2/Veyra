@@ -28,9 +28,9 @@ enum AgentRuntime: string
     public function description(): string
     {
         return match ($this) {
-            self::Talker => 'Holds the conversation. Answers what it can; delegates what needs doing. Never blocks.',
-            self::Worker => 'Runs skills, lookups and actions. Never speaks — its replies are private guidance for the talker.',
-            self::Text => 'Handles chat, SMS and email, where there is no speaking clock.',
+            self::Talker => 'Holds a voice conversation. Answers what it can; delegates what needs doing. Never blocks. The first enabled talker is the one that speaks.',
+            self::Worker => 'Runs skills, lookups and actions, in voice and chat. The first enabled worker starts each conversation and hands a task to another worker when its description fits better.',
+            self::Text => 'Answers your team in Ask, where there is no speaking clock. With no Text expert, Ask uses the workers.',
         };
     }
 

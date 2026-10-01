@@ -17,6 +17,9 @@ export interface ToolPart {
     detail?: string;
     summary?: string;
     ms?: number;
+    /** Which expert ran the step; sent only when the organization has more than one to route between. */
+    expert?: string;
+    expert_name?: string;
 }
 
 export interface TextPart {

@@ -165,6 +165,13 @@ class MemoryEntry(_Model):
     content: str | None = None
 
 
+class SessionInfo(_Model):
+    """The conversation a live chat's tools act for (sent back as ``X-Veyra-Conversation``)."""
+
+    conversation_id: int
+    channel: str | None = None
+
+
 class TenantContext(_Model):
     """``GET /context``: everything for one tenant, without a call."""
 
@@ -176,6 +183,10 @@ class TenantContext(_Model):
     skills: list[SkillStub] = Field(default_factory=list)
     ticket_types: list[TicketTypeInfo] = Field(default_factory=list)
     memory: list[MemoryEntry] = Field(default_factory=list)
+    # Internal (built-in) action slugs an owner switched off in Studio.
+    disabled_actions: list[str] = Field(default_factory=list)
+    # Present on a live chat's bundle: the conversation the tools act for.
+    session: SessionInfo | None = None
 
     @field_validator("contract")
     @classmethod
@@ -329,14 +340,91 @@ class ConversationSummary(_Model):
 
 
 class ContactLookup(_Model):
+    """``GET /contacts/lookup``.
+
+    On a customer conversation a record that is not that conversation's
+    customer comes back ``masked`` (phone and email partly hidden, no tickets
+    or history) and ``linked`` is False. ``matches`` lists several people when
+    a name fits more than one.
+    """
+
     found: bool
+    matched_by: str | None = None
+    linked: bool | None = None
+    masked: bool = False
     identifier: IdentifierInfo | None = None
     contact: ContactRecord | None = None
+    matches: list[ContactRecord] = Field(default_factory=list)
     open_tickets: list[OpenTicket] = Field(default_factory=list)
     conversations: list[ConversationSummary] = Field(default_factory=list)
 
 
+class HistoryMessage(_Model):
+    from_: str = Field(default="customer", alias="from")
+    body: str = ""
+    at: str | None = None
+
+
+class HistoryConversation(_Model):
+    id: int
+    channel: str
+    status: str
+    current: bool = False
+    last_message_at: str | None = None
+    messages: list[HistoryMessage] = Field(default_factory=list)
+
+
+class HistoryCall(_Model):
+    at: str | None = None
+    direction: str = "inbound"
+    status: str | None = None
+    duration: str | None = None
+    summary: str | None = None
+
+
+class HistoryTicket(_Model):
+    reference: str
+    subject: str
+    status: str
+    updated_at: str | None = None
+
+
+class ContactHistory(_Model):
+    """``GET /contacts/{id}/history``: one person across channels. ``notes`` only on staff runs."""
+
+    contact: ContactRecord
+    conversations: list[HistoryConversation] = Field(default_factory=list)
+    calls: list[HistoryCall] = Field(default_factory=list)
+    tickets: list[HistoryTicket] = Field(default_factory=list)
+    notes: list[dict[str, Any]] = Field(default_factory=list)
+
+
 # ── Writes ───────────────────────────────────────────────────────────────
+
+
+class ContactSaved(_Model):
+    """``POST /contacts``. ``created`` False means an existing person came back (``reason``: matched | restored | already_linked)."""
+
+    created: bool
+    reason: str | None = None
+    conversation_linked: bool = False
+    contact: ContactRecord
+
+
+class ContactLinked(_Model):
+    """``POST /conversations/{id}/link``. ``mode``: identifier (their number/session now theirs) | conversation (this thread only) | already."""
+
+    linked: bool
+    mode: str
+    contact: ContactRecord
+
+
+class NoteRecord(_Model):
+    id: int
+    subject: str
+    subject_id: int
+    body: str
+    created_at: str | None = None
 
 
 class TicketRecord(_Model):
@@ -349,6 +437,71 @@ class TicketRecord(_Model):
     type: str | None = None
     assignees: list[str] = Field(default_factory=list)
     created_at: str | None = None
+    # Set on a create when the requested type was not one of the business's
+    # and the ticket was filed under the default instead.
+    type_note: str | None = None
+
+
+class TicketDetail(TicketRecord):
+    """``GET /tickets/{number}``: a ticket with what a customer asking after it wants to know."""
+
+    status_label: str | None = None
+    created_by_agent: bool = False
+    updated_at: str | None = None
+    resolved_at: str | None = None
+    last_activity: dict[str, Any] | None = None
+
+
+class TicketUpdate(_Model):
+    """``PATCH /tickets/{number}``: what changed, in words."""
+
+    changes: list[str] = Field(default_factory=list)
+    type_note: str | None = None
+    ticket: TicketDetail
+
+
+class ConversationWrapUp(_Model):
+    """``POST /conversations/{id}/summary``."""
+
+    summarized: bool = False
+    tags_added: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+
+
+class ReminderRecord(_Model):
+    id: int
+    text: str
+    due_at: str
+    for_: str | None = Field(default=None, alias="for")
+    teammate_matched: bool | None = None
+
+
+class HandoffResult(_Model):
+    """``POST /conversations/{id}/handoff``. Never a live transfer: assigned, flagged and notified."""
+
+    handed_off: bool
+    assigned_to: list[str] = Field(default_factory=list)
+    notified: list[str] = Field(default_factory=list)
+    teammate_matched: bool | None = None
+    teammate_candidates: list[str] = Field(default_factory=list)
+    tag: str | None = None
+
+
+class LeadRecord(_Model):
+    id: int
+    contact_id: int
+    pipeline: str | None = None
+    stage: str | None = None
+    value: int = 0
+
+
+class LeadSaved(_Model):
+    """``POST /leads``: create-or-advance. ``note`` explains a move that did not happen."""
+
+    created: bool
+    moved: bool = False
+    note: str | None = None
+    lead: LeadRecord
 
 
 class MessageRecord(_Model):

@@ -9,6 +9,8 @@ member of the team, or to nobody, and you may address them directly.
 # How you work
 
 Read the skill that matches the task with `read_skill` before acting on it.
+A step-gated skill opens as a checklist: do its steps in order and mark each
+one with `skill_step` before the next.
 Use your tools to find facts before asking. Issue independent reads together.
 Never parallelise writes.
 
@@ -31,5 +33,7 @@ that needs a human.
 ## Skills
 
 {{skills}}
+
+{{peers}}
 
 {{now}}

@@ -158,10 +158,13 @@ def caller_block(call: CallContext) -> str:
 
 
 def skill_catalog(expert: ExpertRecord) -> str:
-    """Name + description + read hint, one per line. Never the body."""
+    """Name + description + read hint, one per line. Never the body. Step-gated skills say so."""
     if not expert.skills:
         return "(No skills are configured. Work from the business information and the tools you have.)"
-    return "\n".join(f"- **{s.name}** — {s.description} (read with read_skill: {s.slug})" for s in expert.skills)
+    return "\n".join(
+        f"- **{s.name}** — {s.description} (read with read_skill: {s.slug})" + (" [step-gated: follow its steps in order with skill_step]" if s.execution_mode == "gated" else "")
+        for s in expert.skills
+    )
 
 
 def ticket_types_block(context: TenantContext) -> str:
@@ -172,6 +175,11 @@ def ticket_types_block(context: TenantContext) -> str:
 
 def peers_block(expert: ExpertRecord) -> str:
     return "\n".join(f"- {p}" for p in expert.peers) if expert.peers else ""
+
+
+def _peers_section(peers: str) -> str:
+    """The "Other specialists" section, or nothing when the worker has no one to hand to."""
+    return f"## Other specialists\n\n{peers.strip()}" if peers and peers.strip() else ""
 
 
 def talker_instructions(context: TenantContext, call: CallContext | None = None) -> str:
@@ -191,7 +199,8 @@ def talker_instructions(context: TenantContext, call: CallContext | None = None)
     )
 
 
-def worker_instructions(context: TenantContext, expert: ExpertRecord, call: CallContext | None = None) -> str:
+def worker_instructions(context: TenantContext, expert: ExpertRecord, call: CallContext | None = None, *, peers: str | None = None) -> str:
+    """``peers`` is the specialists block from ``assembly`` (with how to hand over); without it, the expert's own peer lines."""
     return fill(
         load("worker"),
         business_name=context.business.name or context.organization.name,
@@ -200,7 +209,7 @@ def worker_instructions(context: TenantContext, expert: ExpertRecord, call: Call
         ticket_types=ticket_types_block(context),
         caller=caller_block(call) if call else "(Text conversation; no caller line.)",
         skills=skill_catalog(expert),
-        peers=peers_block(expert),
+        peers=_peers_section(peers if peers is not None else peers_block(expert)),
         now=now_block(context),
     )
 
@@ -209,7 +218,7 @@ def post_call_instructions() -> str:
     return load("post-call").strip()
 
 
-def text_instructions(context: TenantContext, expert: ExpertRecord | None) -> str:
+def text_instructions(context: TenantContext, expert: ExpertRecord | None, *, peers: str = "") -> str:
     """The Ask / automation runner: one agent, no caller, may speak to the person directly."""
     persona = (expert.system_prompt if expert else "") or ""
     return fill(
@@ -219,6 +228,7 @@ def text_instructions(context: TenantContext, expert: ExpertRecord | None) -> st
         business=business_block(context),
         skills=skill_catalog(expert) if expert else "(none)",
         ticket_types=ticket_types_block(context),
+        peers=_peers_section(peers),
         now=now_block(context),
     )
 
@@ -242,7 +252,7 @@ def chat_caller_block(caller: CallerInfo | None) -> str:
     return "\n".join(lines)
 
 
-def chat_instructions(context: TenantContext, expert: ExpertRecord | None, caller: CallerInfo | None) -> str:
+def chat_instructions(context: TenantContext, expert: ExpertRecord | None, caller: CallerInfo | None, *, peers: str = "") -> str:
     """The live-chat agent: the phone agent's front-desk voice and the worker's
     tools and rules, in one text agent, talking to a customer."""
     talker = context.talker
@@ -262,6 +272,7 @@ def chat_instructions(context: TenantContext, expert: ExpertRecord | None, calle
         caller=chat_caller_block(caller),
         ticket_types=ticket_types_block(context),
         skills=skill_catalog(expert) if expert else "(none)",
+        peers=_peers_section(peers),
         now=now_block(context),
     )
 

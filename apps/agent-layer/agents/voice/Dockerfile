@@ -44,6 +44,9 @@ ENV PYTHONPATH=/srv/packages/common:/srv/agents/voice
 
 # The VAD and turn-detector weights, baked into the image so a call never
 # waits on a download. Needs every plugin importable, hence after the install.
-RUN python -m veyra_voice download-files
+# The default (audio) turn detector ships inside livekit-local-inference; the
+# text one's plugin is only imported when chosen, so it is selected here to
+# keep its weights in the image for VOICE_TURN_DETECTOR=text.
+RUN VOICE_TURN_DETECTOR=text python -m veyra_voice download-files
 
 CMD ["python", "-m", "veyra_voice", "start"]

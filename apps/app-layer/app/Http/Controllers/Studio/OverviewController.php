@@ -56,6 +56,16 @@ class OverviewController extends Controller
             ->limit(8)
             ->get();
 
+        // Actions marked "Needs approval" that the agent asked to run. Not
+        // windowed: a request waits until someone decides it.
+        $approvals = ToolCall::query()
+            ->where('status', ToolCallStatus::AwaitingApproval)
+            ->with(['action:id,name,kind,is_durable_write', 'expert:id,name', 'call:id,contact_id,conversation_id', 'call.contact:id,name'])
+            ->oldest()
+            ->limit(20)
+            ->get();
+        $approvalCount = ToolCall::query()->where('status', ToolCallStatus::AwaitingApproval)->count();
+
         $failedDelegations = Delegation::query()
             ->where('created_at', '>=', $since)
             ->whereIn('status', ['failed', 'timeout', 'aborted'])
@@ -77,7 +87,22 @@ class OverviewController extends Controller
                 'failed_delegations' => $failedDelegations,
                 'needs_reconciliation' => $reconcile->count(),
                 'agent_tickets_open' => $agentTickets,
+                'awaiting_approval' => $approvalCount,
             ],
+            'approvals' => $approvals->map(fn (ToolCall $t) => [
+                'id' => $t->id,
+                'action' => $t->action?->name ?? $t->action_slug,
+                'kind' => $t->action?->kind->label(),
+                'writes' => (bool) $t->action?->is_durable_write,
+                'missing' => $t->action === null,
+                'expert' => $t->expert?->name,
+                'contact' => $t->call?->contact?->name,
+                'conversation_id' => $t->call?->conversation_id,
+                // What it would do, for the person deciding: the agent's own
+                // arguments, minus the plumbing keys.
+                'arguments' => collect($t->arguments ?? [])->reject(fn ($v, $k) => str_starts_with((string) $k, '_'))->all() ?: new \stdClass,
+                'at' => $t->created_at?->toIso8601String(),
+            ])->all(),
             'reconcile' => $reconcile->map(fn (ToolCall $t) => [
                 'id' => $t->id,
                 'action' => $t->action?->name ?? $t->action_slug,

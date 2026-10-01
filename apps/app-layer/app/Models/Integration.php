@@ -38,4 +38,26 @@ class Integration extends Model
     {
         return $this->status === 'connected';
     }
+
+    /**
+     * The HTTP headers that authenticate to an MCP server, from the encrypted
+     * credentials. Resolved at the moment they are sent (to the agent layer,
+     * which calls the server), never stored anywhere else in the clear.
+     *
+     * @return array<string, string>
+     */
+    public function mcpHeaders(): array
+    {
+        $creds = $this->credentials ?? [];
+
+        return match ($creds['auth_type'] ?? 'none') {
+            'bearer' => ['Authorization' => 'Bearer '.($creds['auth_value'] ?? '')],
+            'header' => (function () use ($creds) {
+                [$k, $v] = array_pad(explode(':', $creds['auth_value'] ?? '', 2), 2, '');
+
+                return trim($k) !== '' ? [trim($k) => trim($v)] : [];
+            })(),
+            default => [],
+        };
+    }
 }

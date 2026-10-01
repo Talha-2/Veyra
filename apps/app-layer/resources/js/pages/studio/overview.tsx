@@ -6,11 +6,14 @@ import {
     Check,
     CheckCircle2,
     ShieldAlert,
+    ShieldCheck,
     Sparkles,
     Split,
     Ticket,
     Timer,
+    X,
 } from 'lucide-react';
+import { Fragment, useState } from 'react';
 
 import { languageLabel, sayList } from '../../components/studio-agent/languages';
 import { StatLink } from '../../components/studio-agent/stat-link';
@@ -31,8 +34,10 @@ interface Props {
         failed_delegations: number;
         needs_reconciliation: number;
         agent_tickets_open: number;
+        awaiting_approval: number;
     };
     reconcile: { id: number; action: string; contact: string | null; conversation_id: number | null; at: string }[];
+    approvals: Approval[];
     setup: {
         agent_named: boolean;
         greeting_set: boolean;
@@ -42,6 +47,19 @@ interface Props {
         skills: number;
         languages: string[];
     };
+}
+
+interface Approval {
+    id: number;
+    action: string;
+    kind: string | null;
+    writes: boolean;
+    missing: boolean;
+    expert: string | null;
+    contact: string | null;
+    conversation_id: number | null;
+    arguments: Record<string, unknown>;
+    at: string;
 }
 
 /** The reconcile query stops at eight; past that the count is a floor. */
@@ -61,7 +79,7 @@ function greeting(): string {
  * handoff broke — and each tile opens where the fix lives. Below it, what a
  * human must check now, what is left to set up, and the way into every area.
  */
-export default function Overview({ window_days, agent_name, health, reconcile, setup }: Props) {
+export default function Overview({ window_days, agent_name, health, reconcile, approvals, setup }: Props) {
     const { auth } = usePage<SharedProps>().props;
     const firstName = auth.user?.name.split(' ')[0];
     const agent = agent_name || 'The agent';
@@ -69,7 +87,7 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
     const overBudget = health.p95_ms != null && health.p95_ms > health.p95_budget_ms;
     const unconfirmed = health.needs_reconciliation;
     const unconfirmedLabel = `${unconfirmed}${unconfirmed >= RECONCILE_LIMIT ? '+' : ''}`;
-    const attention = (unconfirmed > 0 ? 1 : 0) + (overBudget ? 1 : 0) + (health.agent_tickets_open > 3 ? 1 : 0) + (health.failed_delegations > 0 ? 1 : 0);
+    const attention = (unconfirmed > 0 ? 1 : 0) + (overBudget ? 1 : 0) + (health.agent_tickets_open > 3 ? 1 : 0) + (health.failed_delegations > 0 ? 1 : 0) + (health.awaiting_approval > 0 ? 1 : 0);
 
     // `soon`: shown so the step is not a surprise later, but it cannot be done
     // yet, so it neither counts toward setup nor becomes "Continue setup".
@@ -214,6 +232,22 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
                     </div>
                 </Group>
 
+                {/* Actions the agent asked to run that need a person's yes. */}
+                {approvals.length > 0 && (
+                    <Group
+                        id="approvals"
+                        title="Waiting for approval"
+                        description="The agent asked to run these actions, which are set to need approval. Nothing has happened yet. Approve to run one now, exactly as the agent asked, or reject it."
+                        aside={health.awaiting_approval > approvals.length ? <Mono>{approvals.length} of {health.awaiting_approval}</Mono> : undefined}
+                    >
+                        <Card className="border-(--warning-border)">
+                            <List>
+                                {approvals.map((a) => <ApprovalRow key={a.id} approval={a} />)}
+                            </List>
+                        </Card>
+                    </Group>
+                )}
+
                 {/* What a human must check now. */}
                 {reconcile.length > 0 ? (
                     <Group
@@ -320,6 +354,54 @@ export default function Overview({ window_days, agent_name, health, reconcile, s
                 </Group>
             </PageStack>
         </>
+    );
+}
+
+/** One request: what would run, with what, for whom; Approve runs it, Reject records that it never will. */
+function ApprovalRow({ approval: a }: { approval: Approval }) {
+    const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+    const args = Object.entries(a.arguments);
+    const decide = (verb: 'approve' | 'reject') => {
+        if (verb === 'approve' && a.writes && !confirm(`Run “${a.action}” now? It changes something outside Veyra.`)) return;
+        setBusy(verb);
+        router.post(`/studio/approvals/${a.id}/${verb}`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
+    };
+    const who = [a.contact ? `For ${a.contact}` : null, a.expert ? `asked by ${a.expert}` : null].filter(Boolean).join(' · ');
+
+    return (
+        <div className="flex flex-wrap items-start gap-x-3.5 gap-y-3 px-5 py-4">
+            <IconTile tone="warning"><ShieldCheck size={15} strokeWidth={1.9} /></IconTile>
+            <div className="min-w-0 flex-1 basis-60">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-base font-medium text-primary">{a.action}</span>
+                    {a.writes ? <Badge tone="warning">Writes</Badge> : <Badge>Reads</Badge>}
+                    {a.kind && <span className="text-sm text-tertiary">{a.kind}</span>}
+                </div>
+                <div className="mt-0.5 text-sm text-secondary">
+                    {who || 'Requested by the agent'} · <RelativeTime at={a.at} />
+                    {a.conversation_id && <> · <a href={`/desk/inbox/${a.conversation_id}`} className="text-accent-text hover:underline">Open in Desk</a></>}
+                </div>
+                {args.length > 0 && (
+                    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
+                        {args.slice(0, 6).map(([k, v]) => (
+                            <Fragment key={k}>
+                                <dt className="font-mono text-xs leading-5 text-tertiary">{k}</dt>
+                                <dd className="min-w-0 wrap-break-word text-secondary">{typeof v === 'string' ? v : JSON.stringify(v)}</dd>
+                            </Fragment>
+                        ))}
+                    </dl>
+                )}
+                {a.missing && <p className="mt-2 text-sm text-danger">This action no longer exists, so it cannot run. Reject the request.</p>}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+                <button type="button" className="v-btn v-btn--ghost v-btn--sm" disabled={busy !== null} onClick={() => decide('reject')}>
+                    <X size={14} strokeWidth={2} />{busy === 'reject' ? 'Rejecting…' : 'Reject'}
+                </button>
+                <button type="button" className="v-btn v-btn--primary v-btn--sm" disabled={busy !== null || a.missing} onClick={() => decide('approve')}>
+                    <Check size={14} strokeWidth={2} />{busy === 'approve' ? 'Running…' : 'Approve'}
+                </button>
+            </div>
+        </div>
     );
 }
 

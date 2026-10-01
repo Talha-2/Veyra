@@ -49,7 +49,8 @@ def test_expert_tools_map_internal_slugs_and_fill_in_builtins_once():
     assert names[:4] == ["book_appointment", "find_contact", "create_ticket", "sync_crm"], "Studio's names first"
     assert "save_ticket" not in names, "create_ticket already covers the built-in"
     assert "lookup_contact" not in names
-    assert "read_skill" in names and "send_message" in names and "search_knowledge" in names
+    assert "read_skill" in names and "search_knowledge" in names
+    assert "send_message" not in names, "SMS and email are not delivered yet, so the agent is not offered them"
     by_name = {t.name: t for t in tools}
     assert by_name["create_ticket"].handler is BUILTINS["save_ticket"].handler
     assert by_name["book_appointment"].kind == "http" and by_name["book_appointment"].is_durable_write
@@ -66,12 +67,14 @@ async def test_save_ticket_carries_the_call_and_the_idempotency_key_through():
     assert state.tickets[0].reference == "#1"
 
 
-async def test_register_contact_defaults_to_the_calling_number_and_updates_state():
+async def test_register_contact_acts_for_the_calls_conversation_and_updates_state():
     sdk = FakeSdk()
     state = CallState(sdk=sdk, context=call_context())
     result = await BUILTINS["register_contact"].handler({"name": "Tom Byrne"}, state)
     assert result.ok and state.contact.name == "Tom Byrne"
-    assert sdk.contacts[1]["phone"] == "+17735550111"
+    # The app links the call's conversation (and with it the calling number).
+    assert sdk.requests[-1] == ("create_contact", {"name": "Tom Byrne", "phone": None, "email": None, "company": None, "acting_for": 9})
+    assert "now linked" in result.output
 
 
 async def test_read_skill_accepts_the_path_hint_and_reports_missing_skills():
@@ -88,8 +91,9 @@ async def test_find_contact_accepts_studios_single_query_argument():
     state = CallState(sdk=sdk, context=call_context())
     ok = await BUILTINS["lookup_contact"].handler({"query": "tom@example.test"}, state)
     assert ok.ok and sdk.calls[-1] == "lookup_contact"
-    no_number = {**call_context().call.model_dump(by_alias=True), "from": None}
-    anonymous = CallState(sdk=sdk, context=call_context(call=no_number))
+    # A browser session: no number to fall back on, and nobody known yet.
+    no_number = {**call_context().call.model_dump(by_alias=True), "from": "Studio test"}
+    anonymous = CallState(sdk=sdk, context=call_context(call=no_number, caller={"identifier": {"id": 4, "type": "web_session", "value": "Studio test"}, "contact": None}))
     nothing = await BUILTINS["lookup_contact"].handler({}, anonymous)
     assert not nothing.ok and "phone number" in nothing.output
 

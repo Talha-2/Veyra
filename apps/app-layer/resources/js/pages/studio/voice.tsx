@@ -11,8 +11,10 @@ import { Avatar, Badge, EmptyState, Eyebrow, Mono, StatusDot } from '../../compo
 
 interface Voice { id: string; name: string; gender: string; accent: string; style: string; languages: string[]; provider: string; covers: string[]; own: boolean }
 interface Provider { id: string; label: string; configured: boolean; ok: boolean; error: string | null }
+/** The voice a call uses when none is saved — the same one the voice worker is sent. */
+interface DefaultVoice { provider: string; id: string; name: string | null; label: string }
 interface Props {
-    voice_id: string | null; voice_provider: string | null; tts_model: string; languages: string[]; voices: Voice[];
+    voice_id: string | null; voice_provider: string | null; default_voice: DefaultVoice; tts_model: string; languages: string[]; voices: Voice[];
     providers: Provider[]; live: boolean;
     models: { id: string; label: string; latency_ms: number; note: string }[];
     engine_overrides: string[];
@@ -32,8 +34,17 @@ const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2)
  * one sample sentence, cached server-side, so what you hear is what a
  * caller would hear — not a vendor demo clip in a different language.
  */
-export default function VoicePage({ voice_id, voice_provider, tts_model, languages, voices, providers, live, models, engine_overrides }: Props) {
-    const { data, setData, put, processing, isDirty, errors, reset } = useForm({ voice_id: voice_id ?? '', voice_provider: voice_provider ?? (voices[0]?.provider ?? 'curated'), tts_model });
+export default function VoicePage({ voice_id, voice_provider, default_voice, tts_model, languages, voices, providers, live, models, engine_overrides }: Props) {
+    // Nothing saved means the default speaks on calls, so the default is what
+    // the page selects — never an empty choice.
+    const saved = Boolean(voice_id);
+    const { data, setData, put, processing, isDirty, errors, reset } = useForm({
+        voice_id: saved ? (voice_id as string) : default_voice.id,
+        voice_provider: saved ? (voice_provider ?? default_voice.provider) : default_voice.provider,
+        tts_model,
+    });
+    const isDefault = (v: { id: string; provider: string }) => v.id === default_voice.id && v.provider === default_voice.provider;
+    const defaultLabel = `${default_voice.name ?? default_voice.id} (${default_voice.label})`;
     const [filterLang, setFilterLang] = useState<string>('agent');
     const [filterProvider, setFilterProvider] = useState<string>('all');
     const [query, setQuery] = useState('');
@@ -50,7 +61,11 @@ export default function VoicePage({ voice_id, voice_provider, tts_model, languag
 
     const liveProviders = providers.filter((p) => p.ok);
     const current = voices.find((v) => v.id === data.voice_id && v.provider === data.voice_provider) ?? null;
-    const voiceChanged = data.voice_id !== (voice_id ?? '') || (voice_provider != null && data.voice_provider !== voice_provider);
+    const voiceChanged = saved
+        ? data.voice_id !== voice_id || (voice_provider != null && data.voice_provider !== voice_provider)
+        : !isDefault({ id: data.voice_id, provider: data.voice_provider });
+    // On the default because nothing is saved, not because someone picked it.
+    const onDefault = !saved && !voiceChanged;
     const tier = models.find((m) => m.id === data.tts_model);
     const filtered = filterLang !== 'agent' || filterProvider !== 'all' || q !== '';
 
@@ -97,11 +112,15 @@ export default function VoicePage({ voice_id, voice_provider, tts_model, languag
                                 <Eyebrow className="mb-1.5 block">Current voice</Eyebrow>
                                 <div className="flex flex-wrap items-center gap-2.5">
                                     <h2 className="text-2xl font-semibold tracking-tight text-primary">{current.name}</h2>
+                                    {onDefault && <Badge tone="info">Default</Badge>}
                                     {voiceChanged && <Badge tone="warning" dot>Not saved yet</Badge>}
                                 </div>
                                 <p className="mt-1 text-sm text-secondary">
                                     {[current.gender, current.accent, current.style].filter(Boolean).join(' · ')}
                                 </p>
+                                {onDefault && (
+                                    <p className="mt-1 text-sm text-secondary">No voice chosen, so calls use the default: {defaultLabel}. Pick another below to change it.</p>
+                                )}
                                 <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
                                     <Badge tone={current.provider === 'curated' ? 'muted' : 'info'}>{current.provider}</Badge>
                                     {current.languages.map((l) => <Badge key={l} tone={languages.includes(l) ? 'success' : 'muted'}>{languageLabel(l)}</Badge>)}
@@ -116,11 +135,11 @@ export default function VoicePage({ voice_id, voice_provider, tts_model, languag
                             </span>
                             <div className="min-w-0">
                                 <Eyebrow className="mb-1.5 block">Current voice</Eyebrow>
-                                <h2 className="text-xl font-semibold tracking-tight text-primary">{data.voice_id ? 'Saved voice is no longer offered' : 'No voice chosen yet'}</h2>
+                                <h2 className="text-xl font-semibold tracking-tight text-primary">{onDefault ? `Default: ${defaultLabel}` : 'Saved voice is no longer offered'}</h2>
                                 <p className="mt-1 text-sm text-secondary">
-                                    {data.voice_id
-                                        ? `“${data.voice_id}” is not in the catalog any more. Pick another below and save.`
-                                        : `Press play on any voice below to hear it say a line in ${languageLabel(primary)}, then pick one and save.`}
+                                    {onDefault
+                                        ? `No voice chosen, so calls use this default. Press play on any voice below to hear it in ${languageLabel(primary)}, then pick one and save.`
+                                        : `“${data.voice_id}” is not in the catalog any more. Pick another below and save.`}
                                 </p>
                             </div>
                         </div>
@@ -204,6 +223,7 @@ export default function VoicePage({ voice_id, voice_provider, tts_model, languag
                                             <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-4">
                                                 {v.languages.map((l) => <Badge key={l} tone={languages.includes(l) ? 'success' : 'muted'}>{languageLabel(l)}</Badge>)}
                                                 {v.provider !== 'curated' && <Badge tone="info">{v.provider}</Badge>}
+                                                {isDefault(v) && <Badge tone="muted">Default</Badge>}
                                                 {v.own && <Badge tone="accent">Yours</Badge>}
                                             </div>
                                             <GapNote voice={v} languages={languages} compact />

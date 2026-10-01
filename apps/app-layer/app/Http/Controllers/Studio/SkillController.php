@@ -107,7 +107,7 @@ class SkillController extends Controller
 
         $skill = Skill::create([
             ...$validated,
-            'slug' => str($validated['name'])->slug()->value(),
+            'slug' => $this->uniqueSlug($validated['name']),
             'updated_by_id' => $request->user()->getKey(),
         ]);
 
@@ -146,5 +146,20 @@ class SkillController extends Controller
         $skill->delete();
 
         return redirect()->route('studio.skills');
+    }
+
+    /**
+     * A slug no other skill in this organization holds — deleted ones included, since they keep theirs.
+     * Two with the same name used to collide on the unique index and 500.
+     */
+    private function uniqueSlug(string $name): string
+    {
+        $base = str($name)->slug()->value() ?: 'skill';
+        $slug = $base;
+        for ($n = 2; Skill::withTrashed()->where('slug', $slug)->exists(); $n++) {
+            $slug = "{$base}-{$n}";
+        }
+
+        return $slug;
     }
 }

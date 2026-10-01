@@ -34,22 +34,37 @@ from .models import (
     AutomationJob,
     CallContext,
     CallSummary,
+    ContactHistory,
+    ContactLinked,
     ContactLookup,
     ContactRecord,
+    ContactSaved,
+    ConversationWrapUp,
     DelegationOutcome,
     DelegationRecord,
+    HandoffResult,
     HealthStatus,
     KnowledgeResult,
+    LeadSaved,
     MessageRecord,
+    NoteRecord,
+    ReminderRecord,
     SkillDocument,
     SkillStub,
     TenantContext,
+    TicketDetail,
     TicketRecord,
+    TicketUpdate,
     ToolCallRecord,
     ToolCallStart,
 )
 
 CONTRACT = "v1"
+
+# Names the conversation a request acts for. With it the app limits contacts,
+# tickets and calls to that conversation's customer (docs/agent-contract.md,
+# "Acting for a customer"); without it the request is a staff run.
+ACTING_FOR_HEADER = "X-Veyra-Conversation"
 
 ToolCallStatus = Literal["succeeded", "failed", "timeout", "rejected", "awaiting_approval"]
 DelegationStatus = Literal["completed", "failed", "timeout", "aborted"]
@@ -175,48 +190,123 @@ class AppSdk:
     async def search_knowledge(self, query: str, *, limit: int = 8) -> KnowledgeResult:
         return KnowledgeResult.model_validate(await self._get(self._org("/knowledge/search"), params={"q": query, "limit": limit}))
 
-    async def lookup_contact(self, *, phone: str | None = None, email: str | None = None, contact_id: int | None = None) -> ContactLookup:
-        params = {k: v for k, v in {"phone": phone, "email": email, "contact_id": contact_id}.items() if v is not None}
-        return ContactLookup.model_validate(await self._get(self._org("/contacts/lookup"), params=params))
+    async def lookup_contact(
+        self, *, phone: str | None = None, email: str | None = None, contact_id: int | None = None, name: str | None = None,
+        acting_for: int | None = None,
+    ) -> ContactLookup:
+        """Who this is, by phone, email, id or name. ``acting_for`` (a conversation id) masks anyone but that conversation's customer."""
+        params = {k: v for k, v in {"phone": phone, "email": email, "contact_id": contact_id, "name": name}.items() if v is not None}
+        return ContactLookup.model_validate(await self._get(self._org("/contacts/lookup"), params=params, headers=_acting(acting_for)))
 
-    async def recent_calls(self, *, since: str | None = None, contact_id: int | None = None, status: str | None = None, limit: int = 20) -> list[CallSummary]:
+    async def contact_history(self, contact_id: int, *, limit: int = 5, acting_for: int | None = None) -> ContactHistory:
+        """One person across channels: threads with their latest messages, calls, tickets (and notes on staff runs)."""
+        return ContactHistory.model_validate(await self._get(self._org(f"/contacts/{contact_id}/history"), params={"limit": limit}, headers=_acting(acting_for)))
+
+    async def recent_calls(self, *, since: str | None = None, contact_id: int | None = None, status: str | None = None, limit: int = 20, acting_for: int | None = None) -> list[CallSummary]:
         params = {k: v for k, v in {"since": since, "contact_id": contact_id, "status": status, "limit": limit}.items() if v is not None}
-        body = await self._get(self._org("/calls"), params=params)
+        body = await self._get(self._org("/calls"), params=params, headers=_acting(acting_for))
         return [CallSummary.model_validate(c) for c in body.get("calls", [])]
 
-    async def tickets(self, *, contact_id: int | None = None, conversation_id: int | None = None, limit: int = 10) -> list[TicketRecord]:
-        params = {k: v for k, v in {"contact_id": contact_id, "conversation_id": conversation_id, "limit": limit}.items() if v is not None}
-        body = await self._get(self._org("/tickets"), params=params)
+    async def tickets(
+        self, *, contact_id: int | None = None, conversation_id: int | None = None, status: Literal["open", "all"] | None = None, limit: int = 10,
+        acting_for: int | None = None,
+    ) -> list[TicketRecord]:
+        params = {k: v for k, v in {"contact_id": contact_id, "conversation_id": conversation_id, "status": status, "limit": limit}.items() if v is not None}
+        body = await self._get(self._org("/tickets"), params=params, headers=_acting(acting_for))
         return [TicketRecord.model_validate(t) for t in body.get("tickets", [])]
+
+    async def ticket(self, number: int, *, acting_for: int | None = None) -> TicketDetail:
+        """One ticket by the number customers quote. ``NotFound`` when it is not this customer's (or does not exist)."""
+        body = await self._get(self._org(f"/tickets/{number}"), headers=_acting(acting_for))
+        return TicketDetail.model_validate(body["ticket"])
 
     # ── writes ──────────────────────────────────────────────────────────
 
-    async def create_contact(self, *, name: str, phone: str | None = None, email: str | None = None, company: str | None = None, source: str = "call") -> tuple[ContactRecord, bool]:
-        """Returns ``(contact, created)``. ``created`` is False when the identifier already belonged to someone."""
-        body = await self._post(self._org("/contacts"), {"name": name, "phone": phone, "email": email, "company": company, "source": source})
-        return ContactRecord.model_validate(body["contact"]), bool(body.get("created"))
+    async def create_contact(
+        self, *, name: str | None = None, phone: str | None = None, email: str | None = None, company: str | None = None,
+        source: str | None = None, acting_for: int | None = None,
+    ) -> ContactSaved:
+        """Create a contact, or get back the existing one that owns the phone/email (``created`` False). Never a duplicate.
 
-    async def update_contact(self, contact_id: int, **fields: Any) -> ContactRecord:
-        body = await self._patch(self._org(f"/contacts/{contact_id}"), fields)
+        With ``acting_for`` the conversation is linked to the contact either way.
+        """
+        body = await self._post(self._org("/contacts"), {"name": name, "phone": phone, "email": email, "company": company, "source": source}, headers=_acting(acting_for))
+        return ContactSaved.model_validate(body)
+
+    async def update_contact(self, contact_id: int, *, acting_for: int | None = None, **fields: Any) -> ContactRecord:
+        """Correct details. With ``acting_for``, only that conversation's customer (403 ``not_permitted`` otherwise)."""
+        body = await self._patch(self._org(f"/contacts/{contact_id}"), fields, headers=_acting(acting_for))
         return ContactRecord.model_validate(body["contact"])
+
+    async def link_contact(
+        self, conversation_id: int, *, phone: str | None = None, email: str | None = None, contact_id: int | None = None, acting_for: int | None = None,
+    ) -> ContactLinked:
+        """Attach a conversation to the contact whose record has this phone or email (the proof the app requires)."""
+        body = await self._post(self._org(f"/conversations/{conversation_id}/link"), {"phone": phone, "email": email, "contact_id": contact_id}, headers=_acting(acting_for))
+        return ContactLinked.model_validate(body)
+
+    async def add_contact_note(self, contact_id: int, body: str, *, acting_for: int | None = None) -> NoteRecord:
+        result = await self._post(self._org(f"/contacts/{contact_id}/notes"), {"body": body}, headers=_acting(acting_for))
+        return NoteRecord.model_validate(result["note"])
+
+    async def add_conversation_note(self, conversation_id: int, body: str, *, acting_for: int | None = None) -> NoteRecord:
+        result = await self._post(self._org(f"/conversations/{conversation_id}/notes"), {"body": body}, headers=_acting(acting_for))
+        return NoteRecord.model_validate(result["note"])
 
     async def create_ticket(
         self, *, subject: str, body: str, type: str | None = None, priority: str | None = None,
         contact_id: int | None = None, conversation_id: int | None = None, call_id: int | None = None,
-        idempotency_key: str | None = None,
+        idempotency_key: str | None = None, acting_for: int | None = None,
     ) -> tuple[TicketRecord, bool]:
         """The write behind "I've passed this to the team". Returns ``(ticket, created)``.
 
         Always pass ``idempotency_key`` from a live call: a retry after an
         ambiguous timeout then finds the earlier ticket instead of raising a
-        second one for the same sentence.
+        second one for the same sentence. ``ticket.type_note`` says when the
+        type asked for was not one of the business's.
         """
         payload = {
             "subject": subject, "body": body, "type": type, "priority": priority, "contact_id": contact_id,
             "conversation_id": conversation_id, "call_id": call_id, "idempotency_key": idempotency_key,
         }
-        result = await self._post(self._org("/tickets"), payload)
-        return TicketRecord.model_validate(result["ticket"]), bool(result.get("created"))
+        result = await self._post(self._org("/tickets"), payload, headers=_acting(acting_for))
+        return TicketRecord.model_validate({**result["ticket"], "type_note": result.get("type_note")}), bool(result.get("created"))
+
+    async def update_ticket(
+        self, number: int, *, note: str | None = None, status: str | None = None, priority: str | None = None, type: str | None = None,
+        acting_for: int | None = None,
+    ) -> TicketUpdate:
+        """Add to a ticket or move it within the agent's transitions. A refused change is a 422 whose message says why."""
+        body = await self._patch(self._org(f"/tickets/{number}"), {"note": note, "status": status, "priority": priority, "type": type}, headers=_acting(acting_for))
+        return TicketUpdate.model_validate(body)
+
+    async def summarize_conversation(self, conversation_id: int, *, summary: str | None = None, tags: list[str] | None = None, acting_for: int | None = None) -> ConversationWrapUp:
+        body = await self._post(self._org(f"/conversations/{conversation_id}/summary"), {"summary": summary, "tags": tags}, headers=_acting(acting_for))
+        return ConversationWrapUp.model_validate(body)
+
+    async def set_reminder(
+        self, conversation_id: int, *, text: str, due_at: str | None = None, due_in_minutes: int | None = None, teammate: str | None = None,
+        acting_for: int | None = None,
+    ) -> ReminderRecord:
+        payload = {"text": text, "due_at": due_at, "due_in_minutes": due_in_minutes, "teammate": teammate}
+        body = await self._post(self._org(f"/conversations/{conversation_id}/reminders"), payload, headers=_acting(acting_for))
+        return ReminderRecord.model_validate(body["reminder"])
+
+    async def hand_off(
+        self, conversation_id: int, *, reason: str, urgency: str | None = None, teammate: str | None = None, ticket_type: str | None = None,
+        acting_for: int | None = None,
+    ) -> HandoffResult:
+        """Give the conversation to a person: assigned, flagged "Needs attention", notified. Not a live transfer."""
+        payload = {"reason": reason, "urgency": urgency, "teammate": teammate, "ticket_type": ticket_type}
+        body = await self._post(self._org(f"/conversations/{conversation_id}/handoff"), payload, headers=_acting(acting_for))
+        return HandoffResult.model_validate(body)
+
+    async def save_lead(
+        self, *, contact_id: int | None = None, stage: str | None = None, note: str | None = None, value: int | None = None, acting_for: int | None = None,
+    ) -> LeadSaved:
+        """Create-or-advance the contact's lead in the default pipeline. Forward only; never into the last stage."""
+        body = await self._post(self._org("/leads"), {"contact_id": contact_id, "stage": stage, "note": note, "value": value}, headers=_acting(acting_for))
+        return LeadSaved.model_validate(body)
 
     async def send_message(
         self, *, channel: Literal["sms", "email"], body: str, conversation_id: int | None = None, to: str | None = None,
@@ -303,28 +393,31 @@ class AppSdk:
             raise AppSdkError(f"{path} is organization-scoped; bind the client with for_organization() first.", path=path)
         return f"/organizations/{self.organization_id}{path}"
 
-    async def _get(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def _get(self, path: str, *, params: dict[str, Any] | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         # One retry on a transport fault for reads only: reads are safe to repeat.
         for attempt in (1, 2):
             try:
-                return await self._send("GET", path, params=params)
+                return await self._send("GET", path, params=params, headers=headers)
             except Unavailable:
                 if attempt == 2:
                     raise
         raise AssertionError("unreachable")
 
-    async def _post(self, path: str, json: dict[str, Any], *, timeout: float | None = None) -> dict[str, Any]:
-        return await self._send("POST", path, json=_compact(json), timeout=timeout)
+    async def _post(self, path: str, json: dict[str, Any], *, timeout: float | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
+        return await self._send("POST", path, json=_compact(json), timeout=timeout, headers=headers)
 
-    async def _patch(self, path: str, json: dict[str, Any]) -> dict[str, Any]:
-        return await self._send("PATCH", path, json=_compact(json))
+    async def _patch(self, path: str, json: dict[str, Any], *, headers: dict[str, str] | None = None) -> dict[str, Any]:
+        return await self._send("PATCH", path, json=_compact(json), headers=headers)
 
     async def _put(self, path: str, json: dict[str, Any]) -> dict[str, Any]:
         return await self._send("PUT", path, json=_compact(json))
 
-    async def _send(self, method: str, path: str, *, params: dict[str, Any] | None = None, json: dict[str, Any] | None = None, timeout: float | None = None) -> dict[str, Any]:
+    async def _send(
+        self, method: str, path: str, *, params: dict[str, Any] | None = None, json: dict[str, Any] | None = None, timeout: float | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         try:
-            response = await self._client.request(method, path, params=params, json=json, **({"timeout": timeout} if timeout else {}))
+            response = await self._client.request(method, path, params=params, json=json, headers=headers, **({"timeout": timeout} if timeout else {}))
         except httpx.TransportError as e:
             raise Unavailable(f"app layer unreachable: {e}", path=path) from e
 
@@ -346,6 +439,10 @@ class AppSdk:
         if response.status_code >= 500:
             raise Unavailable(message, **kwargs)
         raise AppSdkError(message, **kwargs)
+
+
+def _acting(conversation_id: int | None) -> dict[str, str] | None:
+    return {ACTING_FOR_HEADER: str(int(conversation_id))} if conversation_id else None
 
 
 def _compact(payload: dict[str, Any]) -> dict[str, Any]:

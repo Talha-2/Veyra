@@ -105,6 +105,19 @@ The reminder shows in the thread and in the details pane. When it is past due, i
 
 The ticket is linked to the conversation and its contact. See [Tickets](/docs/desk/tickets).
 
+### When the agent asks for a person
+
+When a customer asks for a person, is upset, or needs something the agent cannot do, the agent hands the conversation to the team. It:
+
+- assigns the conversation to the teammate the customer named, or to the default people of a ticket type, and keeps anyone already assigned;
+- adds the tag **Needs attention**, reopens the conversation and marks it unread;
+- leaves the reason as a note in the thread;
+- notifies the people assigned, or the owners and admins if nobody is assigned.
+
+Select the **Needs attention** tag to see every conversation waiting for a person. Remove the tag when it is handled. The agent does not transfer a call or a chat live; it tells the customer the team will follow up.
+
+The agent can also leave internal notes, a summary note with tags, and reminders for the team on a conversation. They appear in the thread marked as the agent's.
+
 ### Bulk actions
 
 Hover a conversation's picture and tick the box that appears to select it. With conversations selected, you can **Mark as read**, **Star**, **Assign** (or **Unassign everyone**), **Close**, or **Reopen** in the **Closed** view.

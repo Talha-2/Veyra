@@ -146,9 +146,18 @@ async def verify(provider: Provider) -> tuple[bool, str | None]:
 
 async def capabilities(*, check: bool = True) -> dict:
     """What Studio shows in its Models section. With ``check``, each configured key is verified live."""
+    import asyncio
+
+    # Verify every provider at once: one at a time, a cold gateway took longer
+    # than Studio waits, and Studio then showed "no agent layer".
+    listed = list(PROVIDERS.values())
+
+    async def status(p: Provider) -> tuple[bool, str | None]:
+        return (await verify(p)) if (check and p.configured) else (p.configured, None)
+
+    results = await asyncio.gather(*(status(p) for p in listed))
     providers = []
-    for p in PROVIDERS.values():
-        ok, error = (await verify(p)) if (check and p.configured) else (p.configured, None)
+    for p, (ok, error) in zip(listed, results):
         providers.append({
             "id": p.id, "label": p.label, "configured": p.configured and ok, "key_present": p.configured, "error": error,
             "models": [{"ref": f"{p.id}:{m}", "label": label, "role": role} for m, label, role in p.models],

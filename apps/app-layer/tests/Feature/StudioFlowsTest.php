@@ -61,6 +61,26 @@ class StudioFlowsTest extends TestCase
         }
     }
 
+    // ── Names that repeat ───────────────────────────────────────────────
+
+    public function test_a_skill_or_expert_named_like_an_existing_or_deleted_one_gets_its_own_slug(): void
+    {
+        $skill = ['name' => 'Reschedule', 'description' => 'Move a visit.', 'execution_mode' => 'prose'];
+        $this->actingAs($this->owner)->post('/studio/skills', $skill)->assertRedirect();
+        $this->asTenant(fn () => \App\Models\Skill::query()->where('slug', 'reschedule')->sole()->delete());
+        $this->actingAs($this->owner)->post('/studio/skills', $skill)->assertRedirect();
+        $this->actingAs($this->owner)->post('/studio/skills', $skill)->assertRedirect();
+
+        $expert = ['name' => 'Billing', 'description' => 'Invoices.', 'runtime' => 'worker'];
+        $this->actingAs($this->owner)->post('/studio/experts', $expert)->assertRedirect();
+        $this->actingAs($this->owner)->post('/studio/experts', $expert)->assertRedirect();
+
+        $this->asTenant(function () {
+            $this->assertSame(['reschedule', 'reschedule-2', 'reschedule-3'], \App\Models\Skill::withTrashed()->orderBy('id')->pluck('slug')->all());
+            $this->assertSame(['billing', 'billing-2'], \App\Models\Expert::query()->where('slug', 'like', 'billing%')->orderBy('id')->pluck('slug')->all());
+        });
+    }
+
     // ── Automations ─────────────────────────────────────────────────────
 
     public function test_an_automation_is_created_then_configured_with_a_webhook_and_a_schedule(): void

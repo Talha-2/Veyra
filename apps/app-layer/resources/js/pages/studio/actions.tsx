@@ -158,7 +158,7 @@ export default function Actions({ actions, integrations }: { actions: ActionRow[
                                     {mcp.length === 0 ? (
                                         <InlineEmpty icon={<Server size={18} strokeWidth={1.7} />} title="No MCP servers"
                                             action={<button type="button" className="v-btn v-btn--quiet" onClick={() => setAddingMcp(true)}><Plus size={15} strokeWidth={2} />Add MCP server</button>}>
-                                            Add a server's URL and test it once. Its tools then become actions you can grant to an expert.
+                                            Add a server's URL and test it. Its tools become actions you can grant to an expert; test again to refresh them.
                                         </InlineEmpty>
                                     ) : (
                                         <Card>
@@ -202,7 +202,7 @@ export default function Actions({ actions, integrations }: { actions: ActionRow[
                                 <div className="grid gap-x-8 gap-y-5 md:grid-cols-3">
                                     <Legend icon={<RotateCcw size={14} strokeWidth={2} />} name="Repeatable">Calling it twice with the same input is harmless, so a dropped connection is simply retried. Built-in actions always are.</Legend>
                                     <Legend icon={<PenLine size={14} strokeWidth={2} />} name="Writes">It changes something outside. The agent will not hang up while one is in flight.</Legend>
-                                    <Legend icon={<ShieldCheck size={14} strokeWidth={2} />} name="Approval">A person confirms before it runs, so the caller waits for a human.</Legend>
+                                    <Legend icon={<ShieldCheck size={14} strokeWidth={2} />} name="Approval">The agent does not run it: it asks, and a person approves or rejects it on the Overview page. The customer is told it is waiting for review.</Legend>
                                 </div>
                             </Disclosure>
                         </div>
@@ -522,7 +522,7 @@ function HttpActionDialog({ action, onClose }: { action: ActionRow | null; onClo
                     <Toggle checked={data.is_idempotent} onChange={(v) => setData('is_idempotent', v)} label="Repeatable" hint="Calling it twice with the same input is harmless, so a dropped connection is retried automatically." />
                     <Toggle checked={data.is_durable_write} onChange={(v) => setData('is_durable_write', v)} label="Writes" hint="It changes something outside. The agent will not hang up while it is in flight."
                         caution={data.is_durable_write && !data.is_idempotent ? 'A write that is not repeatable is never retried: a timeout leaves its outcome unknown.' : undefined} />
-                    <Toggle checked={data.requires_approval} onChange={(v) => setData('requires_approval', v)} label="Needs approval" hint="A person confirms before it runs; the caller waits." />
+                    <Toggle checked={data.requires_approval} onChange={(v) => setData('requires_approval', v)} label="Needs approval" hint="The agent asks instead of running it; a person approves or rejects it on the Overview page." />
                 </div>
 
                 {action && (

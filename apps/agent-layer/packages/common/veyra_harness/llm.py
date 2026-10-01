@@ -50,6 +50,23 @@ class ChatModel(Protocol):
     async def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Completion: ...
 
 
+# Studio speaks two vocabularies for the same knob: an expert's Low / Medium /
+# High and an automation's Fast / Balanced / Deep. Both reach the provider as
+# OpenAI's ``reasoning_effort``. Anything else (empty, "default") means "let
+# the model decide" and sends nothing.
+_EFFORTS = {
+    "minimal": "minimal", "low": "low", "medium": "medium", "high": "high",
+    "fast": "low", "balanced": "medium", "deep": "high",
+}
+
+
+def reasoning_effort(value: str | None) -> str | None:
+    """Studio's reasoning setting as the provider's ``reasoning_effort``, or None for the model's default."""
+    if not value:
+        return None
+    return _EFFORTS.get(str(value).strip().lower())
+
+
 def tool_call_message(text: str, calls: list[ToolCall]) -> dict[str, Any]:
     """The assistant message that carries tool calls, in OpenAI shape."""
     message: dict[str, Any] = {"role": "assistant", "content": text or None}
@@ -99,6 +116,7 @@ class OpenAIChatModel:
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._reasoning_effort = reasoning_effort
+        self.reasoning_effort = reasoning_effort
 
     @classmethod
     def from_ref(cls, ref: str | None, *, default: str, **kwargs) -> "OpenAIChatModel":
@@ -188,13 +206,23 @@ class OpenAIChatModel:
     # the process: an automation set to "balanced" reasoning must still run on
     # a model that has no reasoning knob (the first live run died on exactly
     # this — gpt-4o-mini refusing `reasoning_effort`).
-    _unsupported: set[str] = set()
+    #
+    # Remembered *per endpoint and model*. It was one set for the process, so
+    # the first non-reasoning model to refuse `reasoning_effort` switched the
+    # setting off for every model after it — Ask and chat silently lost
+    # reasoning effort on the long-lived gateway while a fresh voice process
+    # kept it.
+    _unsupported: dict[tuple[str, str], set[str]] = {}
+
+    @property
+    def _dropped(self) -> set[str]:
+        return OpenAIChatModel._unsupported.setdefault((self.base_url, self.name), set())
 
     async def _create(self, kwargs: dict[str, Any]) -> Any:
         from openai import BadRequestError
 
         for key in list(kwargs):
-            if key in self._unsupported:
+            if key in self._dropped:
                 kwargs.pop(key)
         for _ in range(4):
             try:
@@ -207,7 +235,7 @@ class OpenAIChatModel:
                 dropped = next((k for k in ("reasoning_effort", "stream_options", "temperature", "tool_choice", "max_tokens") if k in kwargs and k in message), None)
                 if dropped is None:
                     raise
-                self._unsupported.add(dropped)
+                self._dropped.add(dropped)
                 kwargs.pop(dropped)
         return await self._client.chat.completions.create(**kwargs)
 
@@ -227,5 +255,20 @@ def _key_for(base_url: str) -> str | None:
     return os.getenv("OPENAI_API_KEY") or os.getenv("XAI_API_KEY")
 
 
+_MAP_KEYS = ("properties", "patternProperties", "$defs", "definitions")
+
+
+def _json_schema(value: Any) -> Any:
+    """PHP encodes an empty map as ``[]``: an action with no parameters (or an
+    MCP tool's empty ``properties``) reached the provider as ``"properties": []``,
+    which is not a schema. Maps that JSON Schema requires are put back."""
+    if isinstance(value, dict):
+        return {k: ({} if k in _MAP_KEYS and v == [] else _json_schema(v)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_schema(v) for v in value]
+    return value
+
+
 def openai_tool_schema(name: str, description: str, input_schema: dict[str, Any]) -> dict[str, Any]:
-    return {"type": "function", "function": {"name": name, "description": description, "parameters": input_schema or {"type": "object", "properties": {}}}}
+    parameters = _json_schema(input_schema) if input_schema else {"type": "object", "properties": {}}
+    return {"type": "function", "function": {"name": name, "description": description, "parameters": parameters}}

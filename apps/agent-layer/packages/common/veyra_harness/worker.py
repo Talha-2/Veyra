@@ -26,6 +26,15 @@ confirms a booking only when that is true.
 
 **Write-in-flight is a fact, not a guess.** The executor counts durable writes
 by their Studio flag; ``hangup_call`` asks it.
+
+**One loop, several experts.** An organization's worker experts are personas
+of this one loop (see ``assembly.build_worker``). It starts as the primary
+expert; ``switch_expert`` swaps the system prompt, the tools and the model to
+another expert's and carries on with the same history. Every tool event says
+which expert ran it.
+
+**Step-gated skills are held to their steps** by a ``SkillGate``: while one is
+open, a final reply is refused and the worker is sent back to the open step.
 """
 
 from __future__ import annotations
@@ -80,6 +89,18 @@ _TOOL_LABELS = {
     "remember": ("Saving to memory", "Saved to memory"),
     "recent_calls": ("Reading recent calls", "Read recent calls"),
     "recent_tickets": ("Reading recent tickets", "Read recent tickets"),
+    "create_contact": ("Saving the contact", "Saved the contact"),
+    "link_contact": ("Linking the contact", "Linked the contact"),
+    "add_note": ("Adding a note", "Added a note"),
+    "contact_history": ("Reading past conversations", "Read past conversations"),
+    "ticket_status": ("Checking the ticket", "Checked the ticket"),
+    "update_ticket": ("Updating the ticket", "Updated the ticket"),
+    "summarize_conversation": ("Summarising the conversation", "Summarised the conversation"),
+    "set_reminder": ("Setting a reminder", "Set a reminder"),
+    "hand_off": ("Passing to the team", "Passed to the team"),
+    "save_lead": ("Saving the lead", "Saved the lead"),
+    "skill_step": ("Checking off a step", "Checked off a step"),
+    "switch_expert": ("Handing to a specialist", "Handed to a specialist"),
 }
 
 
@@ -93,7 +114,10 @@ def tool_label(name: str, done: bool) -> str:
 
 def tool_detail(name: str, args: dict[str, Any]) -> str | None:
     """The one argument worth showing next to a step: the query, the skill, the subject."""
-    for key in ("query", "slug", "subject", "name", "since", "phone", "email"):
+    if name == "skill_step":
+        status = str(args.get("status") or "done")
+        return f"{args.get('skill') or '?'} · step {args.get('step') or '?'} {status}"[:80]
+    for key in ("query", "slug", "subject", "name", "expert", "since", "phone", "email"):
         value = args.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()[:80]
@@ -106,6 +130,21 @@ class FinalizationResult:
     reply: str
     transcript_had_new_turns: bool
     action_names: tuple[str, ...]
+
+
+@dataclass(slots=True)
+class Persona:
+    """One expert as the worker wears it: what it is told, what it may call, what it runs on."""
+
+    slug: str | None
+    name: str
+    instructions: str
+    tools: list[Tool]
+    model: ChatModel
+    description: str = ""
+
+
+SWITCH_TOOL = "switch_expert"
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,13 +161,46 @@ class DelegationOutcome:
 class Worker:
     """Does the caller's work. Reports facts when it stops, or when asked."""
 
-    def __init__(self, *, model: ChatModel, instructions: str, tools: list[Tool], executor: ActionExecutor, state: Any):
-        self._model = model
-        self._tools = {t.name: t for t in tools}
-        self._schemas = [t.schema() for t in tools]
+    def __init__(
+        self, *, executor: ActionExecutor, state: Any,
+        model: ChatModel | None = None, instructions: str | None = None, tools: list[Tool] | None = None,
+        personas: list[Persona] | None = None, gate: Any = None,
+    ):
+        """One persona from ``model``/``instructions``/``tools``, or several from ``personas`` (the first is the primary).
+
+        ``gate`` is a ``SkillGate`` (or anything with ``begin_turn``,
+        ``engaged`` and ``refusal``): it decides whether a final reply may
+        stand while a step-gated skill is open.
+        """
+        if not personas:
+            if model is None:
+                raise ValueError("Worker needs a model, or personas.")
+            personas = [Persona(slug=executor.scope.expert_slug, name=executor.scope.expert_slug or "worker", instructions=instructions or "", tools=list(tools or []), model=model)]
+        if gate is None and any(t.name == "read_skill" for p in personas for t in p.tools):
+            # A host that built its tools by hand (the voice entrypoint) still
+            # gets step-gated skills held to their steps: same skills, same
+            # behaviour, whoever assembled the worker.
+            from .gating import SkillGate
+
+            gate = SkillGate()
+            personas = [Persona(p.slug, p.name, p.instructions, gate.wrap(p.tools), p.model, p.description) for p in personas]
         self._executor = executor
         self._state = state
-        self._history: list[dict[str, Any]] = [{"role": "system", "content": instructions}]
+        self._gate = gate
+        self._personas: dict[str | None, Persona] = {}
+        if len(personas) > 1:
+            switch = self._switch_tool(personas)
+            personas = [Persona(p.slug, p.name, p.instructions, [*[t for t in p.tools if t.name != SWITCH_TOOL], switch], p.model, p.description) for p in personas]
+        for p in personas:
+            self._personas.setdefault(p.slug, p)
+        # Every tool any persona has, for the flags (durable, plumbing) of a
+        # call recorded under an expert the worker has since switched from.
+        self._known: dict[str, Tool] = {}
+        for p in personas:
+            for t in p.tools:
+                self._known.setdefault(t.name, t)
+        self._history: list[dict[str, Any]] = [{"role": "system", "content": ""}]
+        self._activate(personas[0])
 
         self._status = "idle"  # idle | working | waiting | failed
         self._last_digest: tuple[str, int] = ("", -1)
@@ -166,6 +238,59 @@ class Worker:
     @property
     def tokens(self) -> int:
         return self._tokens
+
+    # ── experts ───────────────────────────────────────────────────────────
+
+    @property
+    def expert(self) -> str | None:
+        """The slug of the expert the worker is acting as now."""
+        return self._active.slug
+
+    @property
+    def model_name(self) -> str | None:
+        return getattr(self._model, "name", None)
+
+    @property
+    def experts(self) -> list[str | None]:
+        return list(self._personas)
+
+    def _switch_tool(self, personas: list[Persona]) -> Tool:
+        slugs = [p.slug for p in personas if p.slug]
+        return Tool(
+            name=SWITCH_TOOL, handler=self._switch, plumbing=True, audited=False, timeout_ms=1000,
+            description=(
+                "Hand the task to another specialist when it belongs to their area (see 'Other specialists'). "
+                "You then continue as them, with their instructions, skills and tools. Do not switch for a task you can do."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"expert": {"type": "string", "enum": slugs}, "reason": {"type": "string"}},
+                "required": ["expert"],
+            },
+        )
+
+    def _activate(self, persona: Persona) -> None:
+        self._active = persona
+        self._model = persona.model
+        self._tools = {t.name: t for t in persona.tools}
+        self._schemas = [t.schema() for t in persona.tools]
+        self._history[0] = {"role": "system", "content": persona.instructions}
+        self._executor.scope.expert_slug = persona.slug
+
+    async def _switch(self, args: dict[str, Any], state: Any) -> ToolResult:
+        slug = str(args.get("expert") or "").strip()
+        target = self._personas.get(slug)
+        if target is None:
+            names = ", ".join(s for s in self._personas if s)
+            return ToolResult.failure(f"No specialist {slug!r}. Choose one of: {names}.")
+        if target is self._active:
+            return ToolResult.success({"expert": slug}, text=f"You are already working as {target.name}. Carry on.")
+        logger.info("worker.switch_expert from=%s to=%s reason=%s", self._active.slug, slug, str(args.get("reason") or "")[:120])
+        self._activate(target)
+        return ToolResult.success(
+            {"expert": slug, "name": target.name},
+            text=f"You are now working as {target.name}. Your instructions, skills and tools are now theirs; continue the task with them.",
+        )
 
     def note_reported(self) -> None:
         self._reported_at = time.monotonic()
@@ -216,7 +341,7 @@ class Worker:
         if self._status == "failed":
             return "The request failed. Nothing it was asked to do was completed."
 
-        named = [name for name in self._steps_since_delta if not (self._tools.get(name) and self._tools[name].plumbing)]
+        named = [name for name in self._steps_since_delta if not (self._known.get(name) and self._known[name].plumbing)]
         steps = len(self._steps_since_delta)
         body = "Just started. Nothing yet." if not named else "In progress, not finished. Steps so far, latest last:\n" + "\n".join(f"- {n.replace('_', ' ')}" for n in named)
 
@@ -379,7 +504,9 @@ class Worker:
         try:
             async with self._history_lock:
                 self._status = "working"
-                reply = await asyncio.wait_for(self._loop(final_turn), timeout=MAX_SECONDS)
+                # Not gated: the silent last pass records what is unfinished;
+                # it must not be pushed through a procedure the caller left.
+                reply = await asyncio.wait_for(self._loop(final_turn, gated=False), timeout=MAX_SECONDS)
                 names, outcome = self._finalization_outcome(before)
                 self._status = "waiting"
                 return FinalizationResult(outcome=outcome, reply=reply, transcript_had_new_turns=had_new_turns, action_names=names)
@@ -400,7 +527,7 @@ class Worker:
                 continue
             for tc in item.get("tool_calls") or []:
                 name = tc["function"]["name"]
-                tool = self._tools.get(name)
+                tool = self._known.get(name)
                 if tool and tool.is_durable_write:
                     writes.append((tc["id"], name))
         names = tuple(name for _, name in writes)
@@ -413,17 +540,24 @@ class Worker:
             return names, "action_completed"
         return names, "failed"
 
-    async def _loop(self, transcript: str) -> str:
+    async def _loop(self, transcript: str, *, gated: bool = True) -> str:
         # Resume, don't restart: each user message is one unseen transcript delta.
         self._history.append({"role": "user", "content": transcript})
         self._steps_since_delta = []
         nudges = 0
+        gate = self._gate if gated else None
+        if gate is not None:
+            gate.begin_turn()
 
         for _ in range(MAX_STEPS):
             if getattr(self._state, "was_voicemail", False):
                 logger.info("worker.stopped_voicemail")
                 return ""
-            streaming = self._emit is not None and hasattr(self._model, "complete_stream")
+            # While a step-gated skill is open the reply may be refused, so it
+            # is not streamed: a person must never read an answer the gate
+            # then sends back.
+            held = gate is not None and gate.engaged
+            streaming = self._emit is not None and hasattr(self._model, "complete_stream") and not held
             if streaming:
                 async def on_delta(text: str) -> None:
                     await self._say({"type": "delta", "text": text})
@@ -431,13 +565,18 @@ class Worker:
                 completion = await self._model.complete_stream(self._history, self._schemas, on_delta)  # type: ignore[attr-defined]
             else:
                 completion = await self._model.complete(self._history, self._schemas)
-                if self._emit is not None and completion.text and not completion.tool_calls:
-                    await self._say({"type": "delta", "text": completion.text})
             self._tokens += completion.tokens
 
             if not completion.tool_calls:
                 text = completion.text.strip()
                 if text:
+                    refused = gate.refusal() if gate is not None else None
+                    if refused:
+                        self._history.append({"role": "assistant", "content": text})
+                        self._history.append({"role": "user", "content": refused})
+                        continue
+                    if not streaming and self._emit is not None:
+                        await self._say({"type": "delta", "text": text})
                     self._history.append({"role": "assistant", "content": text})
                     return text
                 if nudges < MAX_EMPTY_RESPONSE_NUDGES:
@@ -455,7 +594,9 @@ class Worker:
     async def _run_calls(self, completion: Completion) -> None:
         """Execute a turn's calls: reads in parallel, writes in the order asked."""
         calls = list(completion.tool_calls)
-        writes = any(self._is_write(c.name) for c in calls)
+        # A switch changes which tools the rest of the batch resolves to, so a
+        # batch with one runs in order, like writes.
+        writes = any(self._is_write(c.name) or c.name == SWITCH_TOOL for c in calls)
         if len(calls) > 1 and not writes:
             results = await asyncio.gather(*(self._execute(c) for c in calls))
             for call, result in zip(calls, results, strict=True):
@@ -471,7 +612,13 @@ class Worker:
         tool = self._tools.get(call.name)
         self._steps_since_delta.append(call.name)
         detail = tool_detail(call.name, call.arguments)
-        await self._say({"type": "tool", "id": call.id, "name": call.name, "status": "running", "label": tool_label(call.name, False), "detail": detail})
+        if call.name == SWITCH_TOOL:
+            target = self._personas.get(str(call.arguments.get("expert") or ""))
+            detail = target.name if target else detail
+        # Which expert ran the step, when there is more than one to choose
+        # from: the person reading the steps sees the routing.
+        by = self._expert_fields()
+        await self._say({"type": "tool", "id": call.id, "name": call.name, "status": "running", "label": tool_label(call.name, False), "detail": detail, **by})
         started = time.perf_counter()
         if tool is None:
             result = ToolResult.failure(f"No tool named {call.name!r}.")
@@ -480,19 +627,26 @@ class Worker:
             if not tool.is_idempotent and tool.audited:
                 args["_idempotency_key"] = self._executor.idempotency_key(tool, call.arguments)
             result = await self._executor.execute(tool, args, self._state)
+        label = tool_label(call.name, True) if result.ok else f"{tool_label(call.name, False)} failed"
+        if call.name == SWITCH_TOOL and result.ok:
+            label, by = f"Handed to {self._active.name}", self._expert_fields()
         await self._say({
             "type": "tool", "id": call.id, "name": call.name, "status": "done" if result.ok else "error",
-            "label": tool_label(call.name, True) if result.ok else f"{tool_label(call.name, False)} failed",
-            "detail": detail, "summary": (result.error or result.output)[:280], "ms": int((time.perf_counter() - started) * 1000),
+            "label": label, "detail": detail, "summary": (result.error or result.output)[:280], "ms": int((time.perf_counter() - started) * 1000), **by,
         })
         return result
+
+    def _expert_fields(self) -> dict[str, Any]:
+        if len(self._personas) < 2:
+            return {}
+        return {"expert": self._active.slug, "expert_name": self._active.name}
 
     def _record(self, call: ToolCall, result: ToolResult) -> None:
         self._history.append(tool_result_message(call, result.output))
         self._tool_ok[call.id] = result.ok
 
     def _is_write(self, name: str) -> bool:
-        tool = self._tools.get(name)
+        tool = self._tools.get(name) or self._known.get(name)
         # Unknown names are treated as writes: guessing "write" wrongly costs a
         # serialized batch; guessing "read" wrongly costs a half-finished record.
         return tool.is_durable_write if tool else True

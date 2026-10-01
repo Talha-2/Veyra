@@ -8,15 +8,17 @@ use App\Http\Resources\V1\ContactResource;
 use App\Models\Activity;
 use App\Models\Contact;
 use App\Models\Identifier;
+use App\Services\Contacts\ContactDirectory;
 use App\Support\PublicApi\ApiError;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class ContactController extends ApiController
 {
+    public function __construct(private readonly ContactDirectory $directory) {}
+
     public function index(Request $request): JsonResponse
     {
         $filters = $this->check($request, [
@@ -75,15 +77,15 @@ class ContactController extends ApiController
         $v = $this->check($request, $this->rules(), [
             'name.required_without_all' => 'Give the contact a name, a phone number or an email address.',
         ]);
-        $attributes = $this->normalize($v);
-        $this->ensureUnique($attributes);
+        $attributes = $this->directory->normalize($v);
+        $this->directory->ensureUnique($attributes);
 
         $contact = DB::transaction(function () use ($attributes, $v) {
             $contact = Contact::create([...collect($attributes)->except('tags')->all(), 'source' => $attributes['source'] ?? 'api']);
             if (isset($v['tags'])) {
                 $contact->syncTags($v['tags']);
             }
-            $this->linkIdentifiers($contact);
+            $this->directory->linkIdentifiers($contact);
             Activity::log($contact, 'created', 'Contact created through the API', actor: 'api');
 
             return $contact;
@@ -95,15 +97,15 @@ class ContactController extends ApiController
     public function update(Request $request, Contact $contact): JsonResponse
     {
         $v = $this->check($request, $this->rules(updating: true));
-        $attributes = $this->normalize($v);
-        $this->ensureUnique($attributes, $contact);
+        $attributes = $this->directory->normalize($v);
+        $this->directory->ensureUnique($attributes, $contact);
 
         DB::transaction(function () use ($contact, $attributes, $v) {
             $contact->update(collect($attributes)->except('tags')->all());
             if (array_key_exists('tags', $v)) {
                 $contact->syncTags($v['tags'] ?? []);
             }
-            $this->linkIdentifiers($contact);
+            $this->directory->linkIdentifiers($contact);
             if ($contact->wasChanged()) {
                 Activity::log($contact, 'updated', 'Details updated through the API: '.implode(', ', array_keys($contact->getChanges())), actor: 'api');
             }
@@ -134,53 +136,5 @@ class ContactController extends ApiController
             'tags' => [...$sometimes, 'nullable', 'array', 'max:20'],
             'tags.*' => ['string', 'max:40'],
         ];
-    }
-
-    private function normalize(array $v): array
-    {
-        if (! empty($v['phone'])) {
-            $v['phone'] = IdentifierType::Phone->normalize($v['phone']);
-        }
-        if (! empty($v['email'])) {
-            $v['email'] = IdentifierType::Email->normalize($v['email']);
-        }
-
-        return $v;
-    }
-
-    /** Phone and email are unique per organization — deleted contacts included, as the database enforces it. */
-    private function ensureUnique(array $attributes, ?Contact $except = null): void
-    {
-        $errors = [];
-        foreach (['phone', 'email'] as $field) {
-            if (empty($attributes[$field])) {
-                continue;
-            }
-            $existing = Contact::withTrashed()->where($field, $attributes[$field])
-                ->when($except, fn ($q) => $q->whereKeyNot($except->id))->first();
-            if ($existing) {
-                $errors[$field] = $existing->trashed()
-                    ? "A deleted contact (id {$existing->id}) still holds this {$field}."
-                    : "Contact {$existing->id} already has this {$field}. Update that one instead.";
-            }
-        }
-
-        if ($errors) {
-            throw ValidationException::withMessages($errors);
-        }
-    }
-
-    /** Attach the contact's phone and email identifiers, so past conversations from them join its history. */
-    private function linkIdentifiers(Contact $contact): void
-    {
-        foreach (['phone' => IdentifierType::Phone, 'email' => IdentifierType::Email] as $field => $type) {
-            if (! $contact->{$field}) {
-                continue;
-            }
-            $identifier = Identifier::resolve($type, $contact->{$field});
-            if ($identifier->contact_id === null) {
-                $identifier->linkTo($contact);
-            }
-        }
     }
 }

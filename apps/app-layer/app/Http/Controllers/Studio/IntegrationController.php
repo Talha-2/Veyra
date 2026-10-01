@@ -8,6 +8,8 @@ use App\Models\Action;
 use App\Models\ActionGroup;
 use App\Models\Integration;
 use App\Models\Organization;
+use App\Services\Agent\AgentGateway;
+use App\Services\Agent\AgentUnavailable;
 use App\Services\Composio\ComposioClient;
 use App\Support\IntegrationCatalog;
 use Illuminate\Http\JsonResponse;
@@ -196,45 +198,88 @@ class IntegrationController extends Controller
     }
 
     /**
-     * Probe an MCP server and cache its tool list as actions.
+     * Connect to an MCP server and mirror its tools as actions.
      *
-     * A real probe is an MCP initialize + tools/list handshake, which the
-     * agent layer owns. Here the reachability check is real and the tool
-     * import is what the contract will fill in.
+     * The handshake (initialize, then tools/list) runs in the agent layer,
+     * which is also what calls the tools later, so a server that passes here
+     * is one the agent can reach. Each tool becomes an action the person can
+     * grant to an expert; testing again refreshes them, keeps the flags the
+     * person set, and removes tools the server no longer offers.
      */
-    public function testMcp(Integration $integration): RedirectResponse
+    public function testMcp(Integration $integration, AgentGateway $gateway): RedirectResponse
     {
         abort_unless($integration->provider === 'mcp', 404);
 
-        $url = $integration->config['url'] ?? '';
+        $config = $integration->config ?? [];
 
         try {
-            $response = Http::timeout(8)->withHeaders($this->mcpHeaders($integration))->get($url);
-            $reachable = $response->status() < 500;
-        } catch (\Throwable $e) {
-            $integration->update(['status' => 'error', 'error' => $e->getMessage()]);
+            $tools = $gateway->mcpTools((string) ($config['url'] ?? ''), (string) ($config['transport'] ?? 'streamable_http'), $integration->mcpHeaders());
+        } catch (AgentUnavailable $e) {
+            $integration->update(['status' => 'error', 'error' => str($e->getMessage())->limit(300)->value()]);
 
-            return back()->with('error', "Could not reach {$integration->label}: {$e->getMessage()}");
+            return back()->with('error', "Could not load tools from {$integration->label}: ".str($e->getMessage())->limit(200));
         }
 
-        $integration->update(['status' => $reachable ? 'connected' : 'error', 'error' => $reachable ? null : "HTTP {$response->status()}", 'connected_at' => now()]);
+        $count = $this->mirrorMcpTools($integration, $tools);
+        $integration->update(['status' => 'connected', 'error' => null, 'connected_at' => now()]);
 
-        return back()->with($reachable ? 'success' : 'error', $reachable ? 'Server reachable. Tools load through the agent layer on first use.' : 'Server returned an error.');
+        return back()->with('success', $count > 0
+            ? "Loaded {$count} ".str('tool')->plural($count)." from {$integration->label}. Grant them to an expert to use them."
+            : "{$integration->label} answered, but it offers no tools.");
     }
 
-    private function mcpHeaders(Integration $integration): array
+    /**
+     * One action per MCP tool, slugged `mcp{integration}_{tool}` so two
+     * servers with a tool of the same name never collide (and within the
+     * 64 characters a model's function name allows). New tools start on;
+     * writes are flagged from the server's own hints, defaulting to "writes"
+     * when it gives none.
+     *
+     * @param  list<array<string, mixed>>  $tools
+     */
+    private function mirrorMcpTools(Integration $integration, array $tools): int
     {
-        $creds = $integration->credentials ?? [];
+        $group = ActionGroup::updateOrCreate(['integration_id' => $integration->id], ['name' => $integration->label, 'description' => "Tools from the MCP server {$integration->label}."]);
 
-        return match ($creds['auth_type'] ?? 'none') {
-            'bearer' => ['Authorization' => 'Bearer '.($creds['auth_value'] ?? '')],
-            'header' => (function () use ($creds) {
-                [$k, $v] = array_pad(explode(':', $creds['auth_value'] ?? '', 2), 2, '');
+        $kept = [];
+        foreach ($tools as $tool) {
+            $slug = substr(preg_replace('/[^a-z0-9_]+/', '_', strtolower("mcp{$integration->id}_{$tool['name']}")), 0, 64);
+            $kept[] = $slug;
+            $attributes = [
+                'integration_id' => $integration->id,
+                'action_group_id' => $group->id,
+                'kind' => ActionKind::Mcp,
+                'name' => str($tool['title'] ?? '' ?: str_replace(['_', '-'], ' ', $tool['name']))->limit(80, '')->ucfirst()->value(),
+                'description' => str($tool['description'] ?? '' ?: "The {$tool['name']} tool on {$integration->label}.")->limit(2000)->value(),
+                'parameters' => is_array($tool['input_schema'] ?? null) ? $tool['input_schema'] : null,
+                // Where it runs. `Action::runtimeConfig` refreshes the URL and
+                // transport from the integration and adds the auth headers
+                // when the tool is shipped; the secret is never stored here.
+                'config' => ['tool' => $tool['name'], 'url' => $integration->config['url'] ?? null, 'transport' => $integration->config['transport'] ?? 'streamable_http'],
+            ];
 
-                return $k ? [trim($k) => trim($v)] : [];
-            })(),
-            default => [],
-        };
+            $existing = Action::query()->where('slug', $slug)->first();
+            if ($existing) {
+                $existing->update($attributes);
+
+                continue;
+            }
+            $readOnly = (bool) ($tool['read_only'] ?? false);
+            Action::create([
+                ...$attributes,
+                'slug' => $slug,
+                'is_durable_write' => ! $readOnly,
+                'is_idempotent' => $readOnly || (bool) ($tool['idempotent'] ?? false),
+                'requires_approval' => false,
+                'timeout_ms' => ActionKind::Mcp->defaultTimeoutMs(),
+                'enabled' => true,
+            ]);
+        }
+
+        // Tools the server stopped offering go, and with them every grant.
+        $integration->actions()->whereNotIn('slug', $kept)->get()->each->delete();
+
+        return count($kept);
     }
 
     // ── Custom HTTP actions ─────────────────────────────────────────────

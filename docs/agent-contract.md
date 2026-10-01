@@ -40,6 +40,18 @@ under that prefix is scoped to it. A record that exists in another tenant is a
 The one exception is `POST /calls/inbound`, which resolves the tenant itself
 from the dialled number, because at that moment the agent knows nothing else.
 
+**Acting for a customer.** A request made during a call or a live chat names
+the conversation it acts for in an `X-Veyra-Conversation: {conversation_id}`
+header (the SDK's `acting_for=`). With it, contacts, tickets and calls are
+limited to that conversation's customer: someone else's record comes back
+masked from a lookup, someone else's ticket is a 404 (the same answer as one
+that does not exist, so ticket numbers cannot be probed), and a write on
+another person is 403 `not_permitted`. A route with a conversation in its path
+must name that same conversation. Without the header the request is a staff
+run (Ask, automations) and sees the whole tenant. An unknown conversation is
+404 `unknown_conversation`. The scope is re-read on every request, so it
+widens the moment the agent registers or links the customer.
+
 **Rate limit.** 1,200 requests/minute per tenant. One live call is many
 requests (transcript pushes, tool-call records, delegations); this is sized
 for that, not for a browser.
@@ -72,13 +84,23 @@ the same call back (200 rather than 201). Unknown `to` → 404 `unknown_number`.
 | `GET /skills` | Skill stubs: slug, name, description, version, execution mode. |
 | `GET /skills/{slug}` | One skill body as markdown (frontmatter + prose), plus `steps` when gated. **Read on demand, never in the prompt.** |
 | `GET /knowledge/search?q=&limit=` | Chunks matching a query, with an excerpt centred on the hit and the full chunk. |
-| `GET /contacts/lookup?phone=\|email=\|contact_id=` | Who this is, with open tickets and recent conversations. `found: false` with an `identifier` means "we have seen this number, not this person". |
-| `POST /contacts` | Create a contact and link its identifiers, bringing anonymous history along. Returns `created: false` and the existing contact if an identifier already belongs to someone. |
-| `PATCH /contacts/{id}` | Correct details on the call. |
-| `GET /tickets?contact_id=\|conversation_id=` | Recent tickets. |
-| `POST /tickets` | Raise a ticket. Numbered, typed, routed to the type's default assignees, logged on the conversation, notified. Takes `idempotency_key`. |
-| `POST /messages` | Queue an outbound SMS/email. 422 `not_permitted` when the identifier is blocked or on DND. Takes `idempotency_key`. |
-| `GET /calls?since=&contact_id=&status=&limit=` | Recent calls with contact, duration and the post-call summary. What a digest automation reads. |
+| `GET /contacts/lookup?phone=\|email=\|contact_id=\|name=` | Who this is, with open tickets and recent conversations. `found: false` with an `identifier` means "we have seen this number, not this person". `name` is a contains-match: one person comes back as `contact`, several as `matches`. A phone said without its country code matches on the last ten digits when that names one person. Acting for a customer: anyone else is `masked: true` (phone and email partly hidden, no tickets or history) with `linked: false`. |
+| `POST /contacts` | `{name?, phone?, email?, company?}` (one of the first three). Create a contact and link its identifiers, bringing anonymous history along. Never a duplicate: `created: false` with `reason` `matched` (the phone/email is someone's), `restored` (a deleted record held it) or `already_linked` (acting for a conversation that already has its customer, and no phone/email was given). Blank `name`/`company` on a matched record are filled, never overwritten. Acting for a customer, the conversation is linked to the contact either way (`conversation_linked`). |
+| `PATCH /contacts/{id}` | `{name?, phone?, email?, company?}`. Acting for a customer: only that customer (403). A phone or email on another record is 422 with a sentence the agent can say. New phone/email identifiers are linked. |
+| `POST /contacts/{id}/notes` | `{body}`. An internal note (author: the agent). Same scope rule as `PATCH`. |
+| `GET /contacts/{id}/history?limit=` | One person across channels: conversations with their last messages, calls with summaries, tickets; internal `notes` on staff runs only. 404 for anyone but the customer when acting for one. |
+| `POST /conversations/{id}/link` | `{phone\|email, contact_id?}`. Attach the conversation to the contact whose record has that phone or email (proof that a name alone does not give). Unowned identifier: linked, history follows (`mode: identifier`). Identifier already someone else's (a shared phone): only this conversation and its calls are attributed (`mode: conversation`). 422 when no record has it. |
+| `POST /conversations/{id}/notes` | `{body}`. An internal note on the thread. |
+| `POST /conversations/{id}/summary` | `{summary?, tags?: [≤5]}`. The summary is a note ("Summary: …"); tags are added (matched case-insensitively to existing ones), never removed. |
+| `POST /conversations/{id}/reminders` | `{text, due_at\|due_in_minutes, teammate?}`. For the named teammate when one matches, else the conversation's first assignee, else unowned. Future and within a year. |
+| `POST /conversations/{id}/handoff` | `{reason, urgency?: normal\|urgent, teammate?, ticket_type?}`. Assigns the conversation (named teammate, else the ticket type's default people; existing assignees kept), tags it **Needs attention**, reopens it, marks it unread, leaves the reason as a note and notifies the assignees, or the owners and admins when there are none. Returns `assigned_to`, `notified`, `teammate_matched`, `teammate_candidates` (an ambiguous name matches nobody). Not a live transfer. |
+| `GET /tickets?contact_id=\|conversation_id=\|status=open\|all&limit=` | Recent tickets. Acting for a customer: only theirs and this conversation's. |
+| `POST /tickets` | Raise a ticket. Numbered, typed (a `type` that is not one of the business's, or none, files it under the first enabled type and says so in `type_note`), routed to the type's default assignees, logged on the conversation, notified. Acting for a customer, the ticket belongs to that conversation and its customer; a `contact_id` for anyone else is 403. Takes `idempotency_key`. |
+| `GET /tickets/{number}` | One ticket by the per-tenant number customers quote ("#12"): status and label, priority, type, assignees, `updated_at`, `last_activity`. |
+| `PATCH /tickets/{number}` | `{note?, status?, priority?, type?}`, the agent's guardrails enforced here (422 with the reason, nothing applied): status `open` only from pending or resolved (never from closed), `pending` from open or in progress, `resolved` only for a ticket the agent raised on the conversation it is acting for; never `closed` or `in_progress`. Priority may be raised; lowered only on the agent's own ticket. `type` only re-types the agent's own ticket. Values equal to the current ones are not changes. A ticket nobody has is routed to its type's team. Assignees are notified of a reopen or a note. Returns `changes` in words. |
+| `POST /leads` | `{contact_id?, stage?, note?, value?}`. Create-or-advance the contact's lead in the default pipeline: one live lead per contact and pipeline, moved forward only, never into the last stage (that is the team's call). Acting for a customer, the contact is the conversation's (403 if there is none yet). |
+| `POST /messages` | Queue an outbound SMS/email. 422 `not_permitted` when the identifier is blocked or on DND. Takes `idempotency_key`. **Not offered to the agent** while SMS and email are not delivered. |
+| `GET /calls?since=&contact_id=&status=&limit=` | Recent calls with contact, duration and the post-call summary. What a digest automation reads. Acting for a customer: only theirs (or this conversation's when they are not identified). |
 | `POST /calls/{call}/events` | `{type: answered\|transferred\|ended\|failed, duration_sec?, recording_url?, summary?, error?, metrics?}` |
 | `PUT /calls/{call}/transcript` | The caller-facing transcript so far, **replaced whole**. |
 | `POST /calls/{call}/delegations` | Open a `delegate()` handoff: `{sequence, transcript_delta, is_finalization?}`. **409 `duplicate_sequence`** if that sequence exists. |
@@ -130,6 +152,7 @@ One round trip on the greeting path, by design. Everything read progressively
   "skills":       [ {"slug", "name", "description", "version", "scope"} ],
   "ticket_types": [ {"id": 1, "name": "Billing", "description": null} ],
   "memory":       [ {"name": "Scheduling rules", "content": "No installs on Fridays."} ],
+  "disabled_actions": ["hand_off"],              // built-in (internal) actions an owner switched off: not offered
 
   "call":   {"id": 42, "conversation_id": 9, "direction": "inbound", "from": "+1773…", "to": "+1312…",
              "room": "…", "provider": "twilio", "provider_sid": "CA…",
@@ -145,7 +168,10 @@ One round trip on the greeting path, by design. Everything read progressively
 }
 ```
 
-`GET /context` is the same object without `call`, `line` and `caller`.
+`GET /context` is the same object without `call`, `line` and `caller`. The
+live-chat bundle (`POST /v1/chat/stream`'s `context`) adds `conversation`,
+`caller`, and `session: {conversation_id, channel}`: the conversation the
+chat's tools act for.
 
 The SDK's `CallContext` requires `organization`, `call`, `line` and `caller`
 with no defaults. A truncated body raises rather than hydrating into a context
@@ -184,8 +210,9 @@ hits a transport fault is retried once. A write is reported to the caller,
 who retries with the same key if that is right, and gets the earlier record
 back if it already landed (`tickets`, `messages`, `tool-calls`).
 
-**Messages are queued, not sent.** `POST /messages` answers `status: queued`.
-The talker says "I'm sending you a text", not "I've texted you".
+**Messages are queued, not sent.** `POST /messages` answers `status: queued`,
+and nothing delivers SMS or email yet, so the agent layer does not offer
+`send_message` to the model at all. The agent says the team will follow up.
 
 **Transcripts are replaced, not appended.** A retried push cannot duplicate a
 turn.

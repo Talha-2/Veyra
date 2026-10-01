@@ -46,5 +46,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Provisioning checks the voice catalog; the suite must never reach a real provider. -->
+        <env name="ELEVENLABS_API_KEY" value=""/>
+        <env name="CARTESIA_API_KEY" value=""/>
     </php>
 </phpunit>

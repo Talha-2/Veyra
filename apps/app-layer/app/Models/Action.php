@@ -97,6 +97,48 @@ class Action extends Model
     }
 
     /**
+     * The full tool spec the agent layer runs this action from: the schema,
+     * the three reliability flags, and the config its executor needs.
+     *
+     * The one definition of that payload. The context bundle, automation runs
+     * and approvals all ship it, so an action behaves the same wherever it is
+     * called from.
+     */
+    public function toToolSpec(): array
+    {
+        return [
+            ...$this->toToolSchema(),
+            'id' => $this->id,
+            'kind' => $this->kind->value,
+            'is_idempotent' => $this->is_idempotent,
+            'is_durable_write' => $this->is_durable_write,
+            'requires_approval' => $this->requires_approval,
+            'timeout_ms' => $this->timeout_ms,
+            'max_retries' => $this->max_retries,
+            'config' => $this->kind->isExternal() ? ($this->runtimeConfig() ?: new \stdClass) : null,
+        ];
+    }
+
+    /**
+     * The config as the executor needs it. An MCP action points at its
+     * server: the URL and transport come from the integration (so editing
+     * the server updates every tool), and the auth headers are resolved from
+     * the integration's encrypted credentials here, at send time.
+     */
+    public function runtimeConfig(): array
+    {
+        $config = $this->config ?? [];
+        if ($this->kind === ActionKind::Mcp && $this->integration) {
+            $server = $this->integration->config ?? [];
+            $config['url'] = $server['url'] ?? ($config['url'] ?? null);
+            $config['transport'] = $server['transport'] ?? ($config['transport'] ?? 'streamable_http');
+            $config['headers'] = $this->integration->mcpHeaders() ?: new \stdClass;
+        }
+
+        return $config;
+    }
+
+    /**
      * Whether a failed attempt may simply be tried again.
      *
      * Note the asymmetry: an idempotent action can always be retried, but a

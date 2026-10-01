@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Studio\ActionController;
 use App\Http\Controllers\Studio\AgentController;
+use App\Http\Controllers\Studio\ApprovalController;
 use App\Http\Controllers\Studio\AskController;
 use App\Http\Controllers\Studio\AutomationController;
 use App\Http\Controllers\Studio\DeveloperController;
@@ -32,6 +33,10 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', OverviewController::class)->name('home');
+
+// Actions marked "Needs approval", decided from the Overview page.
+Route::post('/approvals/{toolCall}/approve', [ApprovalController::class, 'approve'])->middleware('throttle:30,1')->name('approvals.approve');
+Route::post('/approvals/{toolCall}/reject', [ApprovalController::class, 'reject'])->name('approvals.reject');
 
 Route::get('/agent', [AgentController::class, 'index'])->name('agent');
 Route::put('/agent', [AgentController::class, 'update'])->name('agent.update');
@@ -70,7 +75,7 @@ Route::get('/integrations/callback', [IntegrationController::class, 'callback'])
 Route::post('/integrations/{integration}/refresh', [IntegrationController::class, 'refresh'])->name('integrations.refresh');
 Route::delete('/integrations/{integration}', [IntegrationController::class, 'disconnect'])->name('integrations.disconnect');
 Route::post('/integrations/mcp', [IntegrationController::class, 'storeMcp'])->name('integrations.mcp.store');
-Route::post('/integrations/mcp/{integration}/test', [IntegrationController::class, 'testMcp'])->name('integrations.mcp.test');
+Route::post('/integrations/mcp/{integration}/test', [IntegrationController::class, 'testMcp'])->middleware('throttle:20,1')->name('integrations.mcp.test');
 Route::post('/integrations/http', [IntegrationController::class, 'storeHttpAction'])->name('integrations.http.store');
 Route::patch('/integrations/http/{action}', [IntegrationController::class, 'updateHttpAction'])->name('integrations.http.update');
 // SSRF-capable by design; throttled for the same reason the old server did.

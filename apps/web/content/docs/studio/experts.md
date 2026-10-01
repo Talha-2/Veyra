@@ -29,14 +29,27 @@ Every organization starts with two built-in experts:
 
 Built-in experts cannot be deleted. You can edit them, or switch off **Enabled** to take one out of conversations.
 
-## Which experts are used today
+## Which experts are used
 
-- **Voice sessions** use the first enabled talker and the first enabled worker in the list.
-- **Chat** with customers (in [Talk](/docs/studio/talk) and through the [chat API](/docs/api/chat)) uses the first enabled worker, with a chat prompt in place of the talker. In text there is no latency budget, so one agent both answers and acts.
-- **Ask** uses the first enabled Text expert. If there is none, it uses the first enabled worker.
+- **Voice sessions**: the first enabled talker speaks. The first enabled worker does the work.
+- **Chat** with customers (in [Talk](/docs/studio/talk), through the [chat API](/docs/api/chat) and on your website): one agent both answers and acts, with a chat prompt in place of the talker. It starts as the first enabled worker. In text there is no latency budget, so no separate talker is needed.
+- **Ask**: starts as the first enabled Text expert. If there is none, it starts as the first enabled worker.
+- **Try it** on a skill: starts as the worker that has the skill.
+
+"First" means first in the list on **Studio → Experts**. The list marks it **Starts here** (for a worker) or **Speaks** (for a talker) when there is more than one. A second enabled talker is marked **Not used**: only one talker speaks.
+
+### How the agent chooses an expert
+
+When you have more than one worker expert, the agent starts each conversation as the first one. It sees the name and **One-line description** of the others. When a task belongs to another expert, it hands the task over and continues as that expert, with its prompt, skills, tools, model and reasoning effort. It can hand back later in the same conversation.
+
+So the description decides the routing. Say what the expert handles, for example "Invoices, refunds and failed payments." Give each skill to the expert that should use it.
+
+In **Talk**, **Ask** and **Try it**, a handover shows as a step, **Handed to** and the expert's name, and every later step is labelled with the expert that ran it. The tool calls recorded for the conversation name the expert too.
+
+Ask routes between your Text experts in the same way, or between your workers if you have no Text expert.
 
 > [!SOON]
-> Routing between several worker experts in one conversation is coming soon. Today, an extra worker you add is not used while an earlier worker is enabled. To try a replacement worker, give it the skills and tools it needs, then switch off **Enabled** on the old one and test in **Talk**.
+> In voice sessions, the first enabled worker still handles every task: handing over to another worker is coming soon to voice. Chat, Ask and **Try it** route today, so test a new worker there.
 
 ## Create an expert
 
@@ -51,7 +64,9 @@ Open an expert from the list. Press **Save changes** after editing.
 
 ### Identity
 
-**Name**, **One-line description** and **Enabled**. The description is shown to other experts of the same runtime, so keep it short: its length is paid on every turn. A disabled expert is never used; its settings are kept.
+**Name**, **One-line description** and **Enabled**. The description is shown to other experts of the same runtime, and it is how the agent decides to hand a task to this expert. Keep it short and specific: its length is paid on every turn. A disabled expert is never used; its settings are kept.
+
+The side panel's **Role** says how the expert is used right now, for example "Starts each conversation, hands off to others" or "Gets tasks that fit its description".
 
 ### Prompt
 
@@ -62,7 +77,7 @@ The expert's **System prompt**. The page estimates how many tokens it adds to ev
 
 ### Skills
 
-Tick the skills this expert may use. Only each skill's name and description go into the prompt; the full instructions are read when the expert decides a skill is relevant. **Select all** and **Clear** change them all at once. Skills marked **Step-gated** show a badge.
+Tick the skills this expert may use. Only each skill's name and description go into the prompt; the full instructions are read when the expert decides a skill is relevant. **Select all** and **Clear** change them all at once. Skills marked **Step-gated** show a badge; the agent works through their steps in order (see [Skills](/docs/studio/skills#how-a-step-gated-skill-runs)).
 
 ### Tools
 
@@ -70,15 +85,22 @@ Tick the actions this expert may call. Each shows **Reads** or **Writes**. The t
 
 Every worker also has a set of built-in tools, whether or not you tick anything: read a skill, search knowledge, look up a contact, list recent calls and tickets, create or correct a contact, raise a ticket, and save a memory. If you grant a built-in action such as **Create ticket**, the settings you give it on the Integrations page apply.
 
-> [!NOTE]
-> The talker's own tools are fixed: it can search knowledge and hand tasks to the worker. Grant skills and actions to the worker, not the talker.
+### Talker settings
+
+A talker's tools are fixed: it searches knowledge and hands tasks to the worker. So a talker's page has no **Skills**, **Tools** or **Reasoning effort**. Grant skills and actions to a worker. What a talker's page controls:
+
+- **System prompt**: used in voice sessions together with the **Persona** on [Identity](/docs/studio/identity), and in chat as part of the agent's voice.
+- **Model** (under **Advanced**): the talker's model in voice sessions. It replaces the talker model set on **Identity → Models**. Leave it empty (**Identity default**) to use that one.
 
 ### Advanced
 
 - **Model**: a model reference for this expert, written as `provider:model` (for example `openai:gpt-4.1-mini`). Leave it empty (**Runtime default**) to use the worker model set on [Identity](/docs/studio/identity#models).
 - **Reasoning effort**: **Default**, **Low**, **Medium** or **High**. Higher thinks longer before acting: better on hard tasks, slower on every one.
 
-The **Model** override applies to worker and Text experts. **Reasoning effort** is applied to the worker in voice sessions. The talker's model is set on **Identity → Models**, not here.
+A worker's or Text expert's **Model** and **Reasoning effort** apply everywhere that expert works: voice sessions, chat, Ask and **Try it**. When the agent hands a task to another expert, it switches to that expert's model and reasoning effort.
+
+> [!NOTE]
+> Reasoning effort only changes models that have a reasoning setting, such as GPT-OSS on Groq. Other models, such as GPT-4.1 mini, ignore it.
 
 ## Delete an expert
 

@@ -24,7 +24,8 @@ import os
 import time
 from typing import Any
 
-from livekit.agents import AgentSession, JobContext, JobExecutorType, JobProcess, MetricsCollectedEvent, RoomInputOptions, WorkerOptions, cli, metrics
+from livekit.agents import AgentSession, JobContext, JobExecutorType, JobProcess, WorkerOptions, cli
+from livekit.agents.voice import room_io
 from livekit.plugins import silero
 
 # LiveKit plugins register themselves on import and refuse to do so off the
@@ -33,28 +34,30 @@ from livekit.plugins import silero
 # start, not lazily inside the job.
 from livekit.plugins import cartesia, deepgram, openai  # noqa: F401,E402
 
-# The turn detector registers an inference process that holds its model in
-# memory (hundreds of MB), so a low-memory host never imports it.
+# The text turn-detector plugin registers an inference process that holds its
+# model in memory (hundreds of MB), so it is imported only when chosen
+# (VOICE_TURN_DETECTOR=text) and never on a low-memory host. The default audio
+# detector is part of livekit-agents and runs in-process.
 _LOW_MEMORY = os.getenv("VOICE_LOW_MEMORY", "").strip().lower() in {"1", "true", "yes"}
-for _optional in ("livekit.plugins.elevenlabs", "livekit.plugins.azure", "livekit.plugins.noise_cancellation", *(() if _LOW_MEMORY else ("livekit.plugins.turn_detector.multilingual",))):
+_TEXT_TURNS = (os.getenv("VOICE_TURN_DETECTOR") or "").strip().lower() == "text" and not _LOW_MEMORY
+for _optional in ("livekit.plugins.elevenlabs", "livekit.plugins.azure", "livekit.plugins.noise_cancellation", *(("livekit.plugins.turn_detector.multilingual",) if _TEXT_TURNS else ())):
     try:
         __import__(_optional)
     except Exception:  # noqa: BLE001 — optional: the pipeline falls back when one is missing
         pass
 
 from app_sdk import AppSdk, AppSdkError, NotFound
-from veyra_harness.actions import tools_for_expert
-from veyra_harness.executor import ActionExecutor, ExecutionScope
+from veyra_harness.assembly import build_worker
 from veyra_harness.llm import OpenAIChatModel
 from veyra_harness.models import DEFAULT_WORKER
 from veyra_harness.tracing import setup_tracing
-from veyra_harness.prompt import async_options, post_call_instructions, talker_instructions, worker_instructions
+from veyra_harness.prompt import async_options, post_call_instructions, talker_instructions
 from veyra_harness.state import CallState
 from veyra_harness.transcript import transcript_items
-from veyra_harness.worker import Worker
 
 from .front_desk import FrontAgent
-from .pipeline import build_session_kwargs, select_pipeline
+from .latency import TurnLatency, log_line
+from .pipeline import build_session_kwargs, select_pipeline, warm_turn_detector
 
 logger = logging.getLogger("veyra.voice")
 
@@ -72,7 +75,39 @@ def prewarm(proc: JobProcess) -> None:
             set_tracer_provider(provider, metadata={"langfuse.trace.name": "Voice call", "langfuse.trace.tags": ["voice"]})
         except Exception as e:  # noqa: BLE001
             logger.warning("voice.tracing_not_attached %s", e)
+    # Everything a call would otherwise load on its own event loop happens
+    # here, once per process, before the process is offered a job: the VAD
+    # weights, and the turn detector's first huggingface_hub lookup (seen in
+    # production as 150–620 ms loop stalls on every call).
     proc.userdata["vad"] = silero.VAD.load(min_silence_duration=float(os.getenv("VAD_MIN_SILENCE", "0.40")), activation_threshold=float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.55")))
+    warm_turn_detector()
+    share_tls_context()
+
+
+def share_tls_context() -> None:
+    """Build LiveKit's TLS context once per process instead of once per call.
+
+    The plugins share one aiohttp session per job, created lazily by the
+    first plugin that needs it — Deepgram, the moment the caller first
+    speaks — and creating it loads the CA store on the event loop: 0.3–1.3 s
+    measured, landing on the caller's first turn. An SSLContext is safe to
+    reuse, so it is made here and handed to every session after.
+    """
+    try:
+        from livekit.agents.utils import http_context
+
+        build = getattr(http_context, "_create_ssl_context", None)
+        if build is None or getattr(build, "_veyra_shared", False):
+            return
+        context = build()
+
+        def shared() -> Any:
+            return context
+
+        shared._veyra_shared = True  # type: ignore[attr-defined]
+        http_context._create_ssl_context = shared
+    except Exception as e:  # noqa: BLE001 — an optimisation; the per-call path still works
+        logger.warning("voice.tls_share_failed %s", e)
 
 
 def sip_numbers(participant: Any) -> tuple[str, str] | None:
@@ -100,22 +135,41 @@ async def _numbers_for(ctx: JobContext) -> tuple[str, str, str]:
     return "", os.getenv("VEYRA_DEFAULT_LINE", ""), ctx.room.name
 
 
+def _room_name(ctx: JobContext) -> str:
+    """The room's name from the job, which is known before connecting."""
+    job_room = getattr(getattr(ctx, "job", None), "room", None)
+    return getattr(job_room, "name", "") or ctx.room.name
+
+
 async def entrypoint(ctx: JobContext) -> None:
-    await ctx.connect()
     started = time.monotonic()
 
-    sdk = AppSdk(timeout=8.0)
+    # Every HTTP client built here loads a CA bundle synchronously (0.3–1 s
+    # measured, on the loop that will carry the call's audio), so clients are
+    # built in a thread.
+    sdk = await asyncio.to_thread(AppSdk, timeout=8.0)
     # A browser session (Studio Talk) runs in a room the app created and
     # named "web-…"; everything after this lookup is identical to a call.
-    web_session = ctx.room.name.startswith("web-")
+    room_name = _room_name(ctx)
+    web_session = room_name.startswith("web-")
     try:
         if web_session:
-            call_ctx = await sdk.web_call(room=ctx.room.name)
+            # The room name is all the lookup needs, so the app round trip
+            # (Mumbai → Ohio in production, ~0.7–1.1 s) overlaps the room
+            # connection instead of following it.
+            lookup = asyncio.ensure_future(sdk.web_call(room=room_name))
+            try:
+                await ctx.connect()
+            except BaseException:
+                lookup.cancel()
+                raise
+            call_ctx = await lookup
         else:
+            await ctx.connect()
             from_number, to_number, sid = await _numbers_for(ctx)
             call_ctx = await sdk.inbound_call(to=to_number, from_=from_number, provider="livekit", provider_sid=sid, room=ctx.room.name)
     except NotFound:
-        logger.error("voice.unknown_%s room=%s — no organization owns this %s; hanging up", "room" if web_session else "line", ctx.room.name, "session" if web_session else "number")
+        logger.error("voice.unknown_%s room=%s — no organization owns this %s; hanging up", "room" if web_session else "line", room_name, "session" if web_session else "number")
         await sdk.aclose()
         return
     except AppSdkError as e:
@@ -131,22 +185,18 @@ async def entrypoint(ctx: JobContext) -> None:
     for note in spec.notes:
         logger.info("voice.pipeline_note %s", note)
 
-    # The worker: one expert for now, the first worker-runtime one. Peer
-    # routing between several workers is the next slice.
-    expert = call_ctx.workers[0] if call_ctx.workers else None
-    if expert is None:
+    # The worker, assembled the same way as on every other surface: every
+    # enabled worker expert as a persona (switch_expert routes between them),
+    # step-gated skills, each expert's own model and reasoning effort.
+    if not call_ctx.workers:
         logger.warning("voice.no_worker_expert: delegation will fail honestly")
-    tools = tools_for_expert(expert, call_ctx) if expert else []
-    executor = ActionExecutor(app, scope=ExecutionScope(call_id=call_ctx.call.id, expert_slug=expert.slug if expert else None))
-    # Building the client loads the CA bundle synchronously (seconds on a busy
-    # host, measured 6.6 s), so it happens off the loop that carries audio.
-    worker_model = await asyncio.to_thread(
-        OpenAIChatModel.from_ref, spec.worker_model, default=DEFAULT_WORKER, temperature=0.2, max_tokens=2000, reasoning_effort=expert.reasoning_effort if expert else None,
-    )
-    worker = Worker(
-        model=worker_model,
-        instructions=worker_instructions(call_ctx, expert, call_ctx) if expert else "There is no expert configured. Reply that the request cannot be handled.",
-        tools=tools, executor=executor, state=state,
+    # Building the model clients loads the CA bundle synchronously (seconds on
+    # a busy host, measured 6.6 s), so it happens off the loop that carries audio.
+    worker = await asyncio.to_thread(
+        build_worker,
+        surface="voice", context=call_ctx, sdk=app, state=state, call=call_ctx,
+        model_factory=lambda effort, ref: OpenAIChatModel.from_ref(ref, default=DEFAULT_WORKER, temperature=0.2, max_tokens=2000, reasoning_effort=effort),
+        model_override=os.getenv("WORKER_MODEL"),
     )
     agent = FrontAgent(instructions=talker_instructions(call_ctx, call_ctx), worker=worker, state=state, finalization_instructions=post_call_instructions())
 
@@ -162,37 +212,28 @@ async def entrypoint(ctx: JobContext) -> None:
     # The worker's tool steps, live, for a browser that shows them (Studio
     # Talk); a phone has nobody to show them to, and publishing is harmless.
     async def on_tool(event: dict[str, Any]) -> None:
-        publish({k: event.get(k) for k in ("id", "name", "status", "label", "detail", "summary", "ms")}, topic="agent_activity")
+        publish({k: event.get(k) for k in ("id", "name", "status", "label", "detail", "summary", "ms", "expert", "expert_name")}, topic="agent_activity")
 
     worker.observer = on_tool
 
-    session_kwargs = build_session_kwargs(spec, vad=ctx.proc.userdata["vad"])
-    try:
-        session = AgentSession(**session_kwargs, resume_false_interruption=True, false_interruption_timeout=1.0, tool_handling=async_options())  # type: ignore[arg-type]
-    except TypeError:
-        session_kwargs.pop("preemptive_generation", None)
-        session = AgentSession(**session_kwargs)
+    # Plugin clients (the talker LLM's above all) are built off the loop; turn
+    # options go through 1.8's turn_handling, never the deprecated keywords.
+    session_kwargs = await asyncio.to_thread(build_session_kwargs, spec, vad=ctx.proc.userdata["vad"])
+    session = AgentSession(**session_kwargs, tool_handling=async_options())  # type: ignore[arg-type]
 
-    # ── observability: per-turn latency to the room, usage for the summary ──
-    usage = metrics.UsageCollector()
-    turn: dict[str, float] = {}
-    latencies: list[float] = []
+    # ── observability: one latency line per turn, to the log and the room ──
+    # From ChatMessage.metrics (metrics_collected is deprecated in 1.8): the
+    # user item carries end-of-turn and transcript delays, the reply carries
+    # LLM TTFT, TTS TTFB and the measured voice-to-voice gap.
+    latency = TurnLatency()
 
-    @session.on("metrics_collected")
-    def on_metrics(ev: MetricsCollectedEvent) -> None:
-        usage.collect(ev.metrics)
-        m = ev.metrics
-        kind = type(m).__name__
-        if kind == "EOUMetrics":
-            turn["eou_ms"] = round(m.end_of_utterance_delay * 1000, 1)
-        elif kind == "LLMMetrics":
-            turn["llm_ttft_ms"] = round(m.ttft * 1000, 1)
-        elif kind == "TTSMetrics":
-            turn["tts_ttfb_ms"] = round(m.ttfb * 1000, 1)
-            total = turn.get("eou_ms", 0) + turn.get("llm_ttft_ms", 0) + turn.get("tts_ttfb_ms", 0)
-            latencies.append(total)
-            publish({"type": "turn_latency", **turn, "total_ms": round(total, 1)})
-            turn.clear()
+    @session.on("conversation_item_added")
+    def on_item(ev: Any) -> None:
+        logger.debug("voice.item role=%s interrupted=%s metrics=%s", getattr(ev.item, "role", None), getattr(ev.item, "interrupted", None), sorted(getattr(ev.item, "metrics", None) or {}))
+        record = latency.on_item(ev.item)
+        if record is not None:
+            logger.info("voice.turn call=%s %s", call_ctx.call.id, log_line(record))
+            publish({"type": "turn_latency", **record})
 
     # ── transcript pushes: replaced whole, so a retry never duplicates a turn ──
     async def push_transcript() -> None:
@@ -221,10 +262,10 @@ async def entrypoint(ctx: JobContext) -> None:
         except Exception as e:  # noqa: BLE001
             logger.exception("voice.post_call_failed %s", e)
             summary = None
-        p50 = sorted(latencies)[len(latencies) // 2] if latencies else None
-        p95 = sorted(latencies)[int(len(latencies) * 0.95)] if latencies else None
+        v2v = latency.summary()
+        logger.info("voice.latency call=%s p50=%s p95=%s turns=%s", call_ctx.call.id, v2v["p50"], v2v["p95"], v2v["turns"])
         try:
-            await app.call_event(call_ctx.call.id, "ended", duration_sec=duration, summary=summary, metrics={"voice_to_voice": {"p50": p50, "p95": p95, "turns": len(latencies)}, "worker_tokens": worker.tokens})
+            await app.call_event(call_ctx.call.id, "ended", duration_sec=duration, summary=summary, metrics={"voice_to_voice": v2v, "worker_tokens": worker.tokens})
         except AppSdkError as e:
             logger.warning("voice.call_end_report_failed %s", e)
         finally:
@@ -232,7 +273,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(on_shutdown)
 
-    room_input = RoomInputOptions()
+    audio_input = room_io.AudioInputOptions()
     # Noise cancellation earns its CPU on a phone line. A browser already runs
     # echo cancellation and noise suppression on the microphone, and running
     # BVC on top of it in-process blocked the event loop long enough to
@@ -241,11 +282,11 @@ async def entrypoint(ctx: JobContext) -> None:
         try:
             from livekit.plugins import noise_cancellation
 
-            room_input = RoomInputOptions(noise_cancellation=noise_cancellation.BVC())
+            audio_input = room_io.AudioInputOptions(noise_cancellation=noise_cancellation.BVC())
         except Exception:  # noqa: BLE001
             pass
 
-    await session.start(room=ctx.room, agent=agent, room_input_options=room_input)
+    await session.start(room=ctx.room, agent=agent, room_options=room_io.RoomOptions(audio_input=audio_input))
     try:
         await app.call_event(call_ctx.call.id, "answered")
     except AppSdkError:

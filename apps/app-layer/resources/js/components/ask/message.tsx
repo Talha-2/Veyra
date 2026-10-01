@@ -118,6 +118,7 @@ function ToolStep({ step }: { step: ToolPart }) {
                 </span>
                 <span className={running ? 'v-shimmer font-medium' : failed ? 'font-medium text-danger' : 'font-medium text-secondary'}>{step.label ?? step.name}</span>
                 {step.detail && <span className="truncate text-tertiary">{step.detail}</span>}
+                {step.expert_name && step.name !== 'switch_expert' && <span className="shrink-0 rounded-sm bg-surface-sunken px-1.5 text-2xs font-medium text-tertiary" title="The expert that ran this step">{step.expert_name}</span>}
                 {!running && typeof step.ms === 'number' && <span className="shrink-0 text-2xs text-disabled tabular-nums">{step.ms < 1000 ? `${step.ms} ms` : `${(step.ms / 1000).toFixed(1)} s`}</span>}
                 {expandable && <ChevronRight size={13} className={`shrink-0 text-disabled transition-transform group-hover/step:text-tertiary ${open ? 'rotate-90' : ''}`} />}
             </button>

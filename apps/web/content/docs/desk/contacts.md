@@ -9,12 +9,12 @@ A contact is a person the business deals with. Their conversations, calls, ticke
 
 There is no blank "new contact" form on the Contacts page. Contacts are created where the person first appears:
 
-- **By the agent.** During a conversation, the worker can register a caller as a contact once it knows their name. The activity reads "Contact created by the agent during a call". If the phone number or email already belongs to a contact, the agent uses that contact instead of creating a duplicate.
+- **By the agent.** During a conversation, the worker can save the customer as a contact once it knows their name, and links the conversation to them. The activity reads "Contact created by the agent during a call" (or "during a chat"). If the phone number or email already belongs to a contact, the agent uses that contact instead of creating a duplicate.
 - **From a conversation.** When a conversation has no contact yet, open the details pane in the inbox and select **Create contact**. The whole history of that conversation moves to the new contact. See [Inbox and conversations](/docs/desk/inbox#the-details-pane).
 - **From a lead.** Adding a lead for someone new creates the contact too, and so does a CSV import of leads. See [Leads and pipelines](/docs/desk/leads).
 - **Through the API.** `POST /contacts` creates a contact. See the [Contacts reference](/docs/api-reference/contacts).
 
-A chat visitor is linked to an existing contact when your website passes an email or phone number that matches one (see [Chat with your agent](/docs/api/chat)). Otherwise the conversation stays anonymous until the agent or someone on the team creates a contact for it.
+A chat visitor is linked to an existing contact when your website passes an email or phone number that matches one (see [Chat with your agent](/docs/api/chat)). Otherwise the conversation stays anonymous until the agent or someone on the team creates a contact for it. The agent can also link an anonymous conversation to an existing contact, but only when the customer gives the phone number or email on that contact; a name alone is not enough.
 
 ## The contacts list
 
@@ -89,4 +89,4 @@ The stage belongs to the contact. A lead's stage in a pipeline is separate. See 
 
 ## Change a contact's details
 
-In Desk you can change a contact's stage, owner and tags, and add notes. To change the name, email or company, use the API (`PATCH /contacts/{id}`). The agent can also correct a contact's name, email or company during a conversation; that change is recorded in **Activity**.
+In Desk you can change a contact's stage, owner and tags, and add notes. To change the name, email or company, use the API (`PATCH /contacts/{id}`). The agent can also correct a contact's name, phone, email or company during a conversation, but only for the customer it is talking to; that change is recorded in **Activity**. A phone or email that already belongs to another contact is refused, so two records are never silently merged.

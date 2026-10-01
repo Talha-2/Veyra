@@ -43,6 +43,13 @@ The rules in ARCHITECTURE.md §5.4 are enforced, not hoped for:
   a retry cannot send the same segment twice; the app 409s if one does.
 - A voicemail or a dead worker becomes the talker's fallback line, which
   claims nothing.
+- `desk_tools.py` holds the front-desk tools (contacts, tickets, the
+  conversation, leads). On a call or chat every request names the
+  conversation it acts for (`X-Veyra-Conversation`), and the app limits it to
+  that customer; refusals come back as sentences the agent can say. A run
+  without a call scopes its idempotency keys to its own executor, so two chats
+  can never collide. `send_message` is not offered until SMS and email are
+  delivered.
 
 ## Run the tests
 
@@ -154,6 +161,8 @@ from the root `.env` and a SIP trunk pointed at a seeded line.
 | `AGENT_SHARED_SECRET` | Same value as on the app layer. |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | Any OpenAI-compatible endpoint; else `XAI_API_KEY` and Grok. Per-expert `model` in Studio overrides the worker's. |
 | `TALKER_MODEL`, `WORKER_MODEL` | Defaults `grok-3-mini` / `grok-4`. |
+| `VOICE_TURN_DETECTOR` | `audio` (default: LiveKit's local `v1-mini` end-of-turn model, in-process) or `text` (the older multilingual transcript model). |
+| `VOICE_PREEMPTIVE_TTS` | `1` also synthesises the preemptive draft before the turn is confirmed (faster first audio; discarded drafts are billed). Default off. |
 | `GATEWAY_CLAIM_INTERVAL` | Seconds between automation claims; `0` disables the loop. |
 | `LIVEKIT_*`, `DEEPGRAM_API_KEY`, `ELEVEN_API_KEY`, `AZURE_SPEECH_KEY/REGION` | Voice only. Azure is used for Urdu, where ElevenLabs Flash has no voice. |
 
@@ -189,3 +198,21 @@ joining the same trace on a call.
   in the prompt (`peers`) but not in the loop.
 - Outbound calling is a 501.
 - No Langfuse tracing yet; logs only.
+
+## Voice latency
+
+Every reply logs one line, from LiveKit's per-message metrics:
+`voice.turn call=33 turn=2 total=2096ms eou=569 stt=566 llm=890 tts=406`
+(end-of-turn decision, transcript, talker time to first token, TTS time to
+first audio, and the measured voice-to-voice gap). The same record goes to
+the room on the `agent_metrics` topic, and the call's p50/p95 to the app with
+`ended`. Measured on 2026-10-02 (laptop in Pakistan, LiveKit India South,
+OpenAI and ElevenLabs public APIs): a plain turn is ~1.7–2.3 s, and the floor
+is the transcript (~0.5 s) plus OpenAI's first token (~0.7–0.9 s for
+gpt-4o-mini, 4.1-mini and 4.1-nano alike) plus first audio (~0.3–0.5 s). A
+turn that needs the app (knowledge, a delegation) adds a round trip to it.
+
+Nothing on a call blocks the event loop: model weights, the turn detector's
+first load and the TLS context are prepared in `prewarm`; HTTP clients are
+built in threads; turn options use 1.8's `turn_handling` (the deprecated
+keywords cost a ~0.7 s warning lookup per call).
