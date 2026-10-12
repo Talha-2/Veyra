@@ -5,7 +5,7 @@ import { useState, type FormEvent } from 'react';
 import { StageStrip, SwatchInput } from '../../../components/studio-ops/color-swatch';
 import { Field, SaveBar } from '../../../components/studio/form';
 import SettingsShell from '../../../components/studio/settings-shell';
-import Dialog from '../../../components/ui/dialog';
+import Sidebar from '../../../components/ui/sidebar';
 import { DialogActions } from '../../../components/studio-ops/page-parts';
 import { Card } from '../../../components/ui/kit';
 import { Badge, EmptyState, Eyebrow } from '../../../components/ui/primitives';
@@ -30,32 +30,35 @@ export default function PipelineSettings({ pipelines }: { pipelines: Pipeline[] 
             ) : (
                 pipelines.map((p) => <PipelineEditor key={p.id} pipeline={p} />)
             )}
-            <NewPipelineDialog open={creating} onClose={() => setCreating(false)} />
+            <NewPipelineSidebar open={creating} onClose={() => setCreating(false)} />
         </SettingsShell>
     );
 }
 
-function NewPipelineDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function NewPipelineSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const [name, setName] = useState('');
     const [processing, setProcessing] = useState(false);
+    const [error, setError] = useState<string>();
+    const close = () => { if (!processing) onClose(); };
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        if (!name.trim()) return;
-        router.post('/studio/settings/pipelines', { name }, { preserveScroll: true, onStart: () => setProcessing(true), onFinish: () => setProcessing(false), onSuccess: () => { setName(''); onClose(); } });
+        if (processing || !name.trim()) return;
+        setError(undefined);
+        router.post('/studio/settings/pipelines', { name }, { preserveScroll: true, onStart: () => setProcessing(true), onFinish: () => setProcessing(false), onError: (errors) => setError(errors.name), onSuccess: () => { setName(''); onClose(); } });
     };
 
     return (
-        <Dialog open={open} onClose={onClose} title="New pipeline" description="It starts with New, Contacted, Won and Lost. Rename, recolour or reorder them after." width={560}>
-            <form onSubmit={submit}>
-                <Field label="Name">
-                    <input className="v-field" placeholder="Enterprise sales" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <Sidebar open={open} onClose={close} title="New pipeline" description="It starts with New, Contacted, Won and Lost. Rename, recolour or reorder them after." width={560}>
+            <form onSubmit={submit} aria-busy={processing}>
+                <Field label="Name" error={error}>
+                    <input className="v-field" placeholder="Enterprise sales" disabled={processing} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
                 </Field>
                 <DialogActions>
-                    <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
+                    <button type="button" className="v-btn v-btn--ghost" onClick={close} disabled={processing}>Cancel</button>
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || !name.trim()}>{processing ? 'Creating…' : 'Create pipeline'}</button>
                 </DialogActions>
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }
 

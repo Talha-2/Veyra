@@ -10,7 +10,9 @@ Modules:
 - ``llm``       one ``ChatModel`` protocol and an OpenAI-compatible implementation
 - ``tools``     ``Tool``: schema + handler + the three reliability flags
 - ``executor``  record-before-dispatch, idempotency, timeouts, reconciliation
-- ``actions``   the tools an expert gets: internal ones, HTTP ones, skill reads
+- ``actions``   permitted runtime actions: internal, HTTP and skill reads
+- ``core_runtime`` independent taker/worker roles and optional specialist construction
+- ``delegation`` isolated child executions and parent supervision
 - ``worker``    the delegation loop, its private history, progress digest
 - ``prompt``    prompt assembly from the contract's ``TenantContext``
 """

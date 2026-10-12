@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 
@@ -6,9 +6,10 @@ import { runtimeLook } from '../../components/studio-agent/runtime';
 import { EditorWell } from '../../components/studio-capability/editor-well';
 import { SaveBar, Toggle } from '../../components/studio/form';
 import { Disclosure, Fact, PageStack, Panel, SideCard, Stacked, WithSide } from '../../components/studio/space';
-import { IconTile, List, SegmentedControl } from '../../components/ui/kit';
+import { Callout, IconTile, List, SegmentedControl } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, Mono } from '../../components/ui/primitives';
+import StudioLayout from '../../layouts/studio-layout';
 
 interface Props {
     expert: {
@@ -16,13 +17,10 @@ interface Props {
         runtime: string; runtime_label: string; runtime_description: string; latency_critical: boolean;
         model: string | null; reasoning_effort: string | null; is_builtin: boolean; enabled: boolean;
         skill_ids: number[]; action_ids: number[];
-        /** The first enabled expert of its runtime. */
-        primary: boolean;
-        /** Other enabled experts on the same runtime. */
-        siblings: number;
     };
-    all_skills: { id: number; name: string; description: string; gated: boolean }[];
+    all_skills: { id: number; name: string; description: string; gated: boolean; private: boolean }[];
     all_actions: { id: number; name: string; kind: string; durable: boolean }[];
+    retired_private_skills: { id: number; name: string }[];
 }
 
 type Effort = '' | 'low' | 'medium' | 'high';
@@ -40,7 +38,8 @@ const EFFORTS: { value: Effort; label: string }[] = [
  * Advanced. Facts, how its runtime behaves and deleting it sit in the side
  * panel.
  */
-export default function ExpertDetail({ expert, all_skills, all_actions }: Props) {
+export default function ExpertDetail({ expert, all_skills, all_actions, retired_private_skills }: Props) {
+    const deletionError = usePage().props.errors.expert;
     const { data, setData, patch, processing, errors, isDirty, reset } = useForm({
         name: expert.name,
         description: expert.description,
@@ -63,10 +62,9 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
     const setAll = (key: 'skill_ids' | 'action_ids', ids: number[]) => setData(key, ids);
 
     const look = runtimeLook(expert.runtime);
-    // The talker's tools are fixed (answer from knowledge, hand off to the
-    // worker) and it runs through the voice pipeline, which has no reasoning
-    // setting: only its prompt and model take effect, so only those are offered.
+    // Keep historical conversation profiles editable without presenting them as specialists.
     const talker = expert.runtime === 'talker';
+    const legacy = expert.is_builtin || talker;
     // A rough rule of thumb (about four characters a token in English) — good
     // enough to show what a prompt costs on every turn, not a billing figure.
     const promptTokens = Math.ceil(data.system_prompt.length / 4);
@@ -75,7 +73,7 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
     const effortLabel = EFFORTS.find((e) => e.value === effort)?.label ?? 'Default';
 
     const destroy = () => {
-        if (confirm(`Delete “${expert.name}”? It stops handling calls immediately. The skills and actions it used are kept.`)) {
+        if (confirm(`Delete “${expert.name}”? It stops receiving specialist tasks. The skills and actions it used are kept.`)) {
             router.delete(`/studio/experts/${expert.id}`);
         }
     };
@@ -98,6 +96,7 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
             />
 
             <PageStack>
+                {legacy && <Callout tone="info">This is a preserved legacy profile. Its settings remain recoverable; <Link href="/studio/runtime" className="underline">Core runtime</Link> controls the current taker and worker.</Callout>}
                 <WithSide
                     side={
                         <>
@@ -108,58 +107,64 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
                                 {!talker && (
                                     <>
                                         <Fact label="Reasoning">{effortLabel}</Fact>
-                                        <Fact label="Skills">{data.skill_ids.length} of {all_skills.length}</Fact>
+                                        <Fact label="Skills">{all_skills.length} available</Fact>
                                         <Fact label="Tools">{writes > 0 ? `${data.action_ids.length} · ${writes} ${writes === 1 ? 'write' : 'writes'}` : data.action_ids.length}</Fact>
                                     </>
                                 )}
-                                <Fact label="Role">{roleLabel(expert)}</Fact>
+                                <Fact label="Role">{legacy ? 'Preserved legacy profile' : data.enabled ? 'Optional specialist' : 'Disabled specialist'}</Fact>
                                 <Fact label="Slug"><Mono className="break-all">{expert.slug}</Mono></Fact>
                             </SideCard>
 
-                            <SideCard title={<span className="flex items-center gap-2.5"><IconTile tone={look.tone} size={28}><look.icon size={14} strokeWidth={1.9} /></IconTile>How a {expert.runtime} runs</span>}>
-                                <p className="text-sm text-secondary">{expert.runtime_description}</p>
+                            <SideCard title={<span className="flex items-center gap-2.5"><IconTile tone={look.tone} size={28}><look.icon size={14} strokeWidth={1.9} /></IconTile>{legacy ? 'Legacy profile' : 'Specialist execution'}</span>}>
+                                <p className="text-sm leading-relaxed text-secondary">{legacy ? 'These historical settings are preserved for reference. The core taker and worker run independently of expert profiles.' : 'The core worker delegates a task with the context this specialist needs. Its instructions, skill gate and history stay separate from the main conversation.'}</p>
                                 <p className="mt-3 text-sm text-tertiary">
-                                    {expert.latency_critical
-                                        ? 'Latency is the budget here: every word of prompt and every extra tool is paid before the caller hears anything.'
-                                        : 'Quality is the budget here: it works behind the talker, so a slower, stronger model is affordable.'}
+                                    {legacy ? 'Saving this profile does not replace core runtime settings.' : 'Returns results to the core worker. It cannot delegate to another expert.'}
                                 </p>
                             </SideCard>
 
                             <SideCard title="Delete" tone="danger">
                                 <p className="text-sm text-secondary">
                                     {expert.is_builtin
-                                        ? <>Built-in experts cannot be deleted. Turn off <span className="font-medium text-primary">Enabled</span> instead to take it out of calls.</>
-                                        : 'Removes it from every call at once. The skills and actions it used are kept.'}
+                                        ? 'This preserved built-in profile cannot be deleted. Configure current behavior in Core runtime.'
+                                        : 'Removes this specialist. Reassign or share its private skills first. Shared skills and actions are kept.'}
                                 </p>
                                 <button type="button" className="v-btn v-btn--danger mt-4 w-full" onClick={destroy} disabled={expert.is_builtin}>
                                     <Trash2 size={14} strokeWidth={1.9} />
                                     Delete expert
                                 </button>
+                                {deletionError && <div className="mt-4"><Callout tone="warning">{deletionError}</Callout></div>}
                             </SideCard>
+                            {retired_private_skills.length > 0 && <SideCard title="Deleted private skills">
+                                <p className="text-sm leading-relaxed text-secondary">These skills still belong to this expert. Restore them to change their owner or make them shared.</p>
+                                <ul className="mt-4 divide-y divide-border">{retired_private_skills.map(skill => <li key={skill.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                                    <span className="min-w-0 break-words text-sm font-medium text-primary">{skill.name}</span>
+                                    <Link href={`/studio/skills/${skill.id}/restore`} method="post" as="button" className="v-btn v-btn--quiet v-btn--sm">Restore skill</Link>
+                                </li>)}</ul>
+                            </SideCard>}
                         </>
                     }
                 >
-                    <Panel title="Identity" description={talker ? 'How your team tells this talker apart. The talker is not routed to; it is the voice.' : 'The description is how the agent decides to hand a task to this expert, so say what it handles.'}>
+                    <Panel title="Identity" description={legacy ? 'Saved identity from the historical profile.' : 'Describe the specialty so the core worker knows when to delegate a task.'}>
                         <Stacked label="Name" htmlFor="expert-name" error={errors.name}>
                             <input id="expert-name" className="v-field max-w-md" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} />
                         </Stacked>
-                        <Stacked label="One-line description" htmlFor="expert-description" error={errors.description}
-                            hint={talker ? 'For your team. Not sent to the model.' : 'Every other expert’s routing block includes this line, so its length is paid on every turn of every call.'}
+                        <Stacked label="When to delegate" htmlFor="expert-description" error={errors.description}
+                            hint={legacy ? 'Preserved for reference.' : 'The core worker reads this description when choosing a specialist.'}
                             aside={<Mono style={{ color: data.description.length > 140 ? 'var(--warning)' : undefined }}>{data.description.length}/160</Mono>}>
-                            <input id="expert-description" className="v-field" value={data.description} maxLength={160} onChange={(e) => setData('description', e.target.value)} />
+                            <textarea id="expert-description" className="v-field text-base leading-relaxed" rows={3} value={data.description} maxLength={160} onChange={(e) => setData('description', e.target.value)} />
                         </Stacked>
                         <div className="border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
                             <Toggle checked={data.enabled} onChange={(v) => setData('enabled', v)} label="Enabled"
-                                hint="A disabled expert is never routed to. Its settings are kept."
-                                caution={expert.is_builtin && !data.enabled ? 'Disabling a built-in expert removes half of every call. Only do this to test a replacement.' : undefined} />
+                                hint="A disabled specialist cannot receive delegated work or run private skill tests. Its settings are kept."
+                                 />
                         </div>
                     </Panel>
 
                     <Panel
                         title="Prompt"
-                        description={expert.latency_critical
-                            ? 'This expert speaks, on a small fast model. Shorter prompts mean faster first words — keep it to what it needs to hold a conversation.'
-                            : 'This expert never speaks and runs on a larger model. It can afford detail, but the skills carry the procedures; keep the prompt to principles.'}
+                        description={legacy
+                            ? 'Historical instructions remain editable for reference and recovery.'
+                            : 'Instructions for this specialist’s isolated work. Put reusable procedures in shared or owned private skills.'}
                     >
                         <EditorWell
                             value={data.system_prompt}
@@ -168,50 +173,28 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
                             minRows={10}
                             error={errors.system_prompt}
                             trailing={<>About {promptTokens.toLocaleString()} tokens on every turn</>}
-                            placeholder={expert.latency_critical ? 'You are the voice of the business on the phone…' : 'You carry out tasks for the talker…'}
+                            max={20000} placeholder={legacy ? 'Preserved profile instructions…' : 'You handle billing questions delegated by the core worker…'}
                         />
                     </Panel>
 
                     {talker ? (
                         <Panel title="Skills and tools" description="Fixed for the talker.">
                             <p className="text-sm text-secondary">
-                                The talker answers from your knowledge and hands everything else to the worker, so it has no skills or actions of its own.
-                                Grant skills and actions to a <Link href="/studio/experts" className="text-accent-text hover:underline">worker expert</Link>.
+                                This historical conversation profile has no specialist skill or action grants. Configure conversation instructions in <Link href="/studio/runtime" className="text-accent-text hover:underline">Core runtime</Link>.
                             </p>
                         </Panel>
                     ) : (<>
-                    <Panel
-                        flush
-                        title="Skills"
-                        description="Only each skill’s name and description go into the prompt. The body is read when the expert decides it is relevant."
-                        aside={all_skills.length > 0 && (
-                            <>
-                                <Mono>{data.skill_ids.length} of {all_skills.length}</Mono>
-                                <button type="button" className="v-btn v-btn--ghost v-btn--sm" onClick={() => setAll('skill_ids', data.skill_ids.length === all_skills.length ? [] : all_skills.map((s) => s.id))}>
-                                    {data.skill_ids.length === all_skills.length ? 'Clear' : 'Select all'}
-                                </button>
-                            </>
-                        )}
-                    >
-                        {all_skills.length === 0 ? (
-                            <Empty>
-                                No skills yet. A skill is a procedure the expert can follow — <Link href="/studio/skills" className="text-accent-text hover:underline">write the first one</Link>.
-                            </Empty>
-                        ) : (
-                            <Checklist>
-                                {all_skills.map((s) => (
-                                    <CheckRow key={s.id} checked={data.skill_ids.includes(s.id)} onChange={() => toggleId('skill_ids', s.id)}
-                                        title={s.name} subtitle={s.description}
-                                        trailing={s.gated && <Badge tone="info">Step-gated</Badge>} />
-                                ))}
-                            </Checklist>
-                        )}
-                    </Panel>
+                    {['private', 'shared'].map(audience => {
+                        const skills = all_skills.filter(skill => skill.private === (audience === 'private'));
+                        return <Panel key={audience} title={audience === 'private' ? 'Owned private skills' : 'Shared skills'} description={audience === 'private' ? 'Reserved for this expert. Other experts and the core worker cannot read these instructions.' : 'Enabled shared skills are available automatically, with no assignment required.'} aside={audience === 'private' && <Link href="/studio/skills?new=1" className="v-btn v-btn--quiet v-btn--sm">New skill</Link>}>
+                            {skills.length === 0 ? <p className="text-base text-secondary">{audience === 'private' ? 'No private procedures yet. Create a skill and choose this expert as its owner.' : 'No enabled shared skills. Add procedures to the shared library.'}</p> : <ul className="divide-y divide-border">{skills.map(skill => <li key={skill.id}><Link href={`/studio/skills/${skill.id}`} className="block py-5 hover:text-accent-text"><span className="flex flex-wrap items-center gap-3"><span className="text-base font-medium">{skill.name}</span>{skill.gated && <Badge tone="info">Step-gated</Badge>}</span><p className="mt-2 max-w-[72ch] break-words text-base leading-relaxed text-secondary">{skill.description}</p></Link></li>)}</ul>}
+                        </Panel>;
+                    })}
 
                     <Panel
                         flush
-                        title="Tools"
-                        description="The actions this expert may call. Writes are durable: the talker waits for them to finish before hanging up."
+                        title="Permitted actions"
+                        description="Only explicitly granted actions can run. Reading a skill does not grant an action; approvals and customer scoping still apply."
                         aside={all_actions.length > 0 && (
                             <>
                                 <Mono>{data.action_ids.length} of {all_actions.length}</Mono>
@@ -239,17 +222,17 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
 
                     <Disclosure
                         title="Advanced"
-                        summary={talker ? `Model: ${data.model || 'Identity default'}` : `Model: ${data.model || 'runtime default'} · Reasoning: ${effortLabel.toLowerCase()}`}
+                        summary={legacy ? `Preserved model: ${data.model || 'default'}` : `Model: ${data.model || 'core worker default'} · Reasoning: ${effortLabel.toLowerCase()}`}
                         defaultOpen={!!errors.model || !!errors.reasoning_effort}
                     >
                         <p className="text-sm text-secondary">
                             {talker
-                                ? <>Leave it on default to use the talker model set on <Link href="/studio/agent#models" className="text-accent-text hover:underline">Identity → Models</Link>. A model here replaces it in voice sessions.</>
-                                : 'Leave both on default and the runtime decides. Override only when this expert needs something the default cannot do.'}
+                                ? <>This is a preserved model setting. Configure the current taker model in <Link href="/studio/runtime" className="text-accent-text hover:underline">Core runtime</Link>.</>
+                                : 'Leave these blank to inherit the core worker model and reasoning settings. Override them for this specialist when needed.'}
                         </p>
                         <Stacked label="Model" htmlFor="expert-model" error={errors.model}
                             hint={expert.latency_critical ? 'Latency-critical: a bigger model here is heard as a pause. Written as provider:model, for example openai:gpt-4o-mini.' : 'Quality-critical: tool use and long instructions. Written as provider:model, for example openai:gpt-4.1-mini. Used in voice, chat, Ask and skill tests.'}>
-                            <input id="expert-model" className="v-field max-w-md font-mono text-sm" value={data.model} onChange={(e) => setData('model', e.target.value)} placeholder={talker ? 'Identity default' : 'Runtime default'} />
+                            <input id="expert-model" className="v-field max-w-md font-mono text-sm" value={data.model} onChange={(e) => setData('model', e.target.value)} maxLength={120} placeholder={talker ? 'Preserved setting' : 'Core worker default'} />
                         </Stacked>
                         {!talker && (
                             <Stacked label="Reasoning effort" error={errors.reasoning_effort} hint="Higher thinks longer before acting: better on hard tasks, slower on every one. Applies in voice, chat, Ask and skill tests; a model without a reasoning setting ignores it.">
@@ -263,15 +246,6 @@ export default function ExpertDetail({ expert, all_skills, all_actions }: Props)
             <SaveBar processing={processing} dirty={isDirty} onDiscard={() => reset()} />
         </form>
     );
-}
-
-/** How the agent layer uses this expert, in a few words. */
-function roleLabel(expert: Props['expert']): string {
-    if (!expert.enabled) return 'Not used (disabled)';
-    if (expert.runtime === 'talker') return expert.primary ? 'Speaks in voice sessions' : 'Not used: an earlier talker speaks';
-    if (expert.runtime === 'text') return expert.primary ? 'Starts every Ask thread' : 'Ask hands tasks to it';
-    if (!expert.primary) return 'Gets tasks that fit its description';
-    return expert.siblings > 0 ? 'Starts each conversation, hands off to others' : 'Handles every task';
 }
 
 function Empty({ children }: { children: ReactNode }) {
@@ -289,13 +263,15 @@ function Checklist({ children }: { children: ReactNode }) {
 /** A checkable row, 56px or more: the whole row is the hit target. */
 function CheckRow({ checked, onChange, title, subtitle, trailing }: { checked: boolean; onChange: () => void; title: string; subtitle?: string; trailing?: ReactNode }) {
     return (
-        <label className="flex min-h-14 cursor-pointer items-center gap-4 px-7 py-3.5 transition-colors last:rounded-b-lg hover:bg-surface-hover" style={{ background: checked ? 'color-mix(in srgb, var(--accent) 3%, transparent)' : undefined }}>
+        <label className="flex min-h-14 cursor-pointer flex-wrap items-start gap-4 px-7 py-5 transition-colors last:rounded-b-lg hover:bg-surface-hover" style={{ background: checked ? 'color-mix(in srgb, var(--accent) 3%, transparent)' : undefined }}>
             <input type="checkbox" className="shrink-0" checked={checked} onChange={onChange} />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-base font-medium" style={{ color: checked ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{title}</span>
-                {subtitle && <span className="mt-0.5 block truncate text-sm text-tertiary">{subtitle}</span>}
+                <span className="block break-words text-base font-medium" style={{ color: checked ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{title}</span>
+                {subtitle && <span className="mt-1 block break-words text-base leading-relaxed text-secondary">{subtitle}</span>}
             </span>
             {trailing && <span className="flex shrink-0 items-center gap-2">{trailing}</span>}
         </label>
     );
 }
+
+ExpertDetail.layout = (page: ReactNode) => <StudioLayout width="wide">{page}</StudioLayout>;

@@ -6,7 +6,7 @@ import { Field, SaveBar, Toggle } from '../../components/studio/form';
 import { plural } from '../../components/studio-knowledge/format';
 import { DialogActions, PageSection, SettingRow, SettingsGroup, StatRow } from '../../components/studio-ops/page-parts';
 import { COMING_SOON, ComingSoon } from '../../components/ui/coming-soon';
-import Dialog from '../../components/ui/dialog';
+import Sidebar from '../../components/ui/sidebar';
 import { Callout, Card, IconTile, SegmentedControl } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Avatar, Badge, EmptyState, UserText } from '../../components/ui/primitives';
@@ -126,7 +126,7 @@ export default function Telephony({ provider, configured, numbers, credential_ke
             </div>
 
             {editing && (
-                <NumberDialog key={editing.id} n={editing} team={team} languages={languages} defaultLanguage={default_language} onClose={() => setEditing(null)} />
+                <NumberSidebar key={editing.id} n={editing} team={team} languages={languages} defaultLanguage={default_language} onClose={() => setEditing(null)} />
             )}
         </>
     );
@@ -203,7 +203,7 @@ function Choice({ on, onClick, icon, title, hint, soon = false }: { on: boolean;
     );
 }
 
-function NumberDialog({ n, team, languages, defaultLanguage, onClose }: { n: NumberRow; team: Props['team']; languages: Props['languages']; defaultLanguage: string; onClose: () => void }) {
+function NumberSidebar({ n, team, languages, defaultLanguage, onClose }: { n: NumberRow; team: Props['team']; languages: Props['languages']; defaultLanguage: string; onClose: () => void }) {
     const { data, setData, patch, processing, errors } = useForm({
         friendly_name: n.friendly_name ?? '',
         assigned_user_id: n.assigned_user_id,
@@ -211,63 +211,66 @@ function NumberDialog({ n, team, languages, defaultLanguage, onClose }: { n: Num
         sms_autoreply: n.sms_autoreply ?? false,
     });
     const [person, setPerson] = useState(n.assigned_user_id !== null);
-    const submit = (e: FormEvent) => { e.preventDefault(); patch(`/studio/telephony/numbers/${n.id}`, { preserveScroll: true, onSuccess: onClose }); };
+    const close = () => { if (!processing) onClose(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (processing) return; patch(`/studio/telephony/numbers/${n.id}`, { preserveScroll: true, onSuccess: onClose }); };
 
     const effective = data.language || defaultLanguage;
     const lang = languages[effective];
     const caveats = lang?.caveats ?? [];
 
     return (
-        <Dialog open onClose={onClose} title={formatNumber(n.e164)} description="Changes apply from the next call on this line." width={600}>
-            <form onSubmit={submit}>
-                <Field label="Name" hint="Only your team sees this, for example Front desk or Urdu line." error={errors.friendly_name}>
-                    <input className="v-field" value={data.friendly_name} onChange={(e) => setData('friendly_name', e.target.value)} placeholder="Front desk" autoFocus />
-                </Field>
+        <Sidebar open onClose={close} title={formatNumber(n.e164)} description="Changes apply from the next call on this line." width={600}>
+            <form onSubmit={submit} aria-busy={processing}>
+                <fieldset disabled={processing} className="m-0 min-w-0 border-0 p-0">
+                    <Field label="Name" hint="Only your team sees this, for example Front desk or Urdu line." error={errors.friendly_name}>
+                        <input className="v-field" value={data.friendly_name} onChange={(e) => setData('friendly_name', e.target.value)} placeholder="Front desk" autoFocus />
+                    </Field>
 
-                <Field label="Who answers" error={errors.assigned_user_id}>
-                    <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Who answers">
-                        <Choice on={!person} onClick={() => { setPerson(false); setData('assigned_user_id', null); }} icon={<Bot size={15} strokeWidth={2} />} title="The agent" hint="Answers every call itself." />
-                        <Choice on={person} onClick={() => { setPerson(true); if (data.assigned_user_id === null && team[0]) setData('assigned_user_id', team[0].id); }} icon={<UserRound size={15} strokeWidth={2} />} title="A person" hint="The agent screens, then transfers." soon />
-                    </div>
-                    {person && (
-                        <select className="v-field mt-3" value={data.assigned_user_id ?? ''} aria-label="Person who answers" onChange={(e) => setData('assigned_user_id', e.target.value ? Number(e.target.value) : null)}>
-                            {team.length === 0 && <option value="">No one on the team yet</option>}
-                            {team.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                        </select>
-                    )}
-                </Field>
-
-                <Field label="Language" hint="Only languages the agent is configured to speak are listed." error={errors.language}>
-                    {/* Per number, because the STT model for Urdu is monolingual: a
-                        tenant can own an Urdu line and an English one, and they
-                        cannot share a setting. */}
-                    <select className="v-field" value={data.language} onChange={(e) => setData('language', e.target.value)}>
-                        <option value="">Workspace default ({languages[defaultLanguage]?.label ?? defaultLanguage})</option>
-                        {Object.entries(languages).map(([code, l]) => <option key={code} value={code}>{l.label}{l.native && l.native !== l.label ? ` · ${l.native}` : ''}</option>)}
-                    </select>
-                    {caveats.length > 0 ? (
-                        <div className="mt-2.5">
-                            <Callout tone="warning" title={`${lang?.label ?? effective} has reduced support on a phone line`}>
-                                <ul className="mt-1 flex list-disc flex-col gap-1 pl-4">{caveats.map((c) => <li key={c}>{c}</li>)}</ul>
-                            </Callout>
+                    <Field label="Who answers" error={errors.assigned_user_id}>
+                        <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Who answers">
+                            <Choice on={!person} onClick={() => { setPerson(false); setData('assigned_user_id', null); }} icon={<Bot size={15} strokeWidth={2} />} title="The agent" hint="Answers every call itself." />
+                            <Choice on={person} onClick={() => { setPerson(true); if (data.assigned_user_id === null && team[0]) setData('assigned_user_id', team[0].id); }} icon={<UserRound size={15} strokeWidth={2} />} title="A person" hint="The agent screens, then transfers." soon />
                         </div>
-                    ) : lang && (
-                        <p className="mt-1.5 text-sm text-tertiary">Full support: recognition that follows callers across languages, low-latency voice, and end-of-thought turn detection.</p>
+                        {person && (
+                            <select className="v-field mt-3" value={data.assigned_user_id ?? ''} aria-label="Person who answers" onChange={(e) => setData('assigned_user_id', e.target.value ? Number(e.target.value) : null)}>
+                                {team.length === 0 && <option value="">No one on the team yet</option>}
+                                {team.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                            </select>
+                        )}
+                    </Field>
+
+                    <Field label="Language" hint="Only languages the agent is configured to speak are listed." error={errors.language}>
+                        {/* Per number, because the STT model for Urdu is monolingual: a
+                            tenant can own an Urdu line and an English one, and they
+                            cannot share a setting. */}
+                        <select className="v-field" value={data.language} onChange={(e) => setData('language', e.target.value)}>
+                            <option value="">Workspace default ({languages[defaultLanguage]?.label ?? defaultLanguage})</option>
+                            {Object.entries(languages).map(([code, l]) => <option key={code} value={code}>{l.label}{l.native && l.native !== l.label ? ` · ${l.native}` : ''}</option>)}
+                        </select>
+                        {caveats.length > 0 ? (
+                            <div className="mt-2.5">
+                                <Callout tone="warning" title={`${lang?.label ?? effective} has reduced support on a phone line`}>
+                                    <ul className="mt-1 flex list-disc flex-col gap-1 pl-4">{caveats.map((c) => <li key={c}>{c}</li>)}</ul>
+                                </Callout>
+                            </div>
+                        ) : lang && (
+                            <p className="mt-1.5 text-sm text-tertiary">Full support: recognition that follows callers across languages, low-latency voice, and end-of-thought turn detection.</p>
+                        )}
+                    </Field>
+
+                    {n.capabilities.sms && (
+                        <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--separator)' }}>
+                            <Toggle checked={data.sms_autoreply} onChange={(v) => setData('sms_autoreply', v)} label="Reply to texts automatically" hint="Incoming text messages to this number get an automatic reply." soon />
+                        </div>
                     )}
-                </Field>
 
-                {n.capabilities.sms && (
-                    <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--separator)' }}>
-                        <Toggle checked={data.sms_autoreply} onChange={(v) => setData('sms_autoreply', v)} label="Reply to texts automatically" hint="Incoming text messages to this number get an automatic reply." soon />
-                    </div>
-                )}
-
+                </fieldset>
                 <DialogActions>
-                    <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
+                    <button type="button" className="v-btn v-btn--ghost" onClick={close} disabled={processing}>Cancel</button>
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || (person && data.assigned_user_id === null)}>{processing ? 'Saving…' : 'Save'}</button>
                 </DialogActions>
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }
 

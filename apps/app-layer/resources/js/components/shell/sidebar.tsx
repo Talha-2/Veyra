@@ -15,31 +15,31 @@ import { NAV, isActive } from './nav';
  *
  * `rail` collapses it to icons, for screens (the inbox) that need the width.
  */
-export default function Sidebar({ product, rail = false }: { product: SurfaceKey; rail?: boolean }) {
+export default function Sidebar({ product, rail = false, expandable = false }: { product: SurfaceKey; rail?: boolean; expandable?: boolean }) {
     const { url } = usePage<SharedProps>();
     const groups = NAV[product];
 
     return (
-        <aside className={`flex h-full shrink-0 flex-col ${rail ? 'w-[64px] items-center' : 'w-[248px]'}`} style={{ background: 'var(--sidebar)', borderRight: '1px solid var(--border)' }} aria-label={`Veyra ${product === 'studio' ? 'Studio' : 'Desk'}`}>
-            <div className={rail ? 'pt-3' : 'px-3 pt-3'}>
-                <ProductSwitcher product={product} rail={rail} />
+        <aside className={`flex h-full shrink-0 flex-col ${expandable ? 'w-[248px]' : rail ? 'w-[64px] items-center' : 'w-[248px]'}`} style={{ background: 'var(--sidebar)', borderRight: '1px solid var(--border)' }} aria-label={`Veyra ${product === 'studio' ? 'Studio' : 'Desk'}`}>
+            <div className={`${rail && !expandable ? 'pt-3' : 'px-3 pt-3'} ${expandable ? 'h-[60px] shrink-0' : ''}`}>
+                <ProductSwitcher product={product} rail={rail && !expandable} escapeContainer={expandable} />
             </div>
 
-            <div className={rail ? 'pt-2' : 'px-3 pt-2'}>
+            <div className={`${rail && !expandable ? 'pt-2' : 'px-3 pt-2'} ${expandable ? 'h-11 shrink-0' : ''}`}>
                 <button type="button" onClick={() => window.dispatchEvent(new Event('veyra:palette'))}
-                    className={`flex items-center gap-2 rounded-lg text-sm text-tertiary transition-colors hover:text-secondary ${rail ? 'size-9 justify-center' : 'h-8 w-full px-2.5'}`}
+                    className={`flex items-center gap-2 rounded-lg text-sm text-tertiary transition-colors hover:text-secondary ${expandable ? 'h-8 w-full px-[13px]' : rail ? 'size-9 justify-center' : 'h-8 w-full px-2.5'}`}
                     style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xs)' }} aria-label="Search">
                     <Search size={14} strokeWidth={2} />
-                    {!rail && <><span className="flex-1 text-left">Search</span><Kbd>⌘K</Kbd></>}
+                    {(!rail || expandable) && <><span className="desk-navigation-label flex-1 text-left" aria-hidden={expandable && rail ? true : undefined}>Search</span><span className="desk-navigation-label"><Kbd>⌘K</Kbd></span></>}
                 </button>
             </div>
 
-            <nav className={`min-h-0 flex-1 overflow-y-auto ${rail ? 'flex flex-col items-center gap-1 py-3' : 'px-3 py-3'}`}>
+            <nav className={`min-h-0 flex-1 overflow-y-auto ${expandable ? 'flex w-full flex-col gap-1 px-3.5 py-3' : rail ? 'flex flex-col items-center gap-1 py-3' : 'px-3 py-3'}`}>
                 {groups.map((group, gi) => (
-                    <div key={gi} className={rail ? 'flex flex-col items-center gap-1' : 'mb-5 last:mb-0'}>
-                        {group.heading && !rail && <div className="v-eyebrow mb-1.5 px-2.5">{group.heading}</div>}
-                        {rail && gi > 0 && <div className="my-1 h-px w-6" style={{ background: 'var(--separator)' }} />}
-                        <div className={rail ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-px'}>
+                    <div key={gi} className={expandable ? 'flex flex-col gap-1' : rail ? 'flex flex-col items-center gap-1' : 'mb-5 last:mb-0'}>
+                        {group.heading && !rail && !expandable && <div className="v-eyebrow mb-1.5 px-2.5">{group.heading}</div>}
+                        {(rail || expandable) && gi > 0 && <div className="my-1 h-px w-6 self-center" style={{ background: 'var(--separator)' }} />}
+                        <div className={expandable ? 'flex flex-col gap-1' : rail ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-px'}>
                             {group.items.map((item) => {
                                 const active = isActive(item, url);
                                 const Icon = item.icon;
@@ -47,15 +47,15 @@ export default function Sidebar({ product, rail = false }: { product: SurfaceKey
                                     <Link key={item.href} href={item.href} prefetch aria-current={active ? 'page' : undefined}
                                         aria-label={rail ? (item.soon ? `${item.label} (coming soon)` : item.label) : undefined}
                                         title={rail ? (item.soon ? `${item.label} · Coming soon` : item.label) : undefined}
-                                        className={`group flex items-center rounded-lg transition-colors ${rail ? 'size-9 justify-center' : 'h-8 gap-2.5 px-2.5 text-sm font-medium'}`}
+                                        className={`group flex items-center rounded-lg transition-colors ${expandable ? 'h-9 gap-3 px-[9px] text-sm font-medium' : rail ? 'size-9 justify-center' : 'h-8 gap-2.5 px-2.5 text-sm font-medium'}`}
                                         style={{
                                             background: active ? 'var(--surface)' : undefined,
                                             color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                                             boxShadow: active ? 'var(--shadow-card)' : undefined,
                                         }}>
-                                        <Icon size={rail ? 18 : 16} strokeWidth={active ? 2.1 : 1.8} style={{ color: active ? 'var(--accent)' : undefined }} className={active ? '' : 'opacity-80 group-hover:opacity-100'} />
-                                        {!rail && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
-                                        {!rail && item.soon && <ComingSoon compact />}
+                                        <Icon size={rail || expandable ? 18 : 16} strokeWidth={active ? 2.1 : 1.8} style={{ color: active ? 'var(--accent)' : undefined }} className={`shrink-0 ${active ? '' : 'opacity-80 group-hover:opacity-100'}`} />
+                                        {(!rail || expandable) && <span className="desk-navigation-label min-w-0 flex-1 truncate" aria-hidden={expandable && rail ? true : undefined}>{item.label}</span>}
+                                        {(!rail || expandable) && item.soon && <span className="desk-navigation-label"><ComingSoon compact /></span>}
                                     </Link>
                                 );
                             })}
@@ -64,8 +64,8 @@ export default function Sidebar({ product, rail = false }: { product: SurfaceKey
                 ))}
             </nav>
 
-            <div className={rail ? 'pb-3' : 'p-3'} style={{ borderTop: rail ? undefined : '1px solid var(--separator)' }}>
-                <AccountMenu rail={rail} product={product} />
+            <div className={rail && !expandable ? 'pb-3' : 'p-3'} style={{ borderTop: rail && !expandable ? undefined : '1px solid var(--separator)' }}>
+                <AccountMenu rail={rail && !expandable} product={product} escapeContainer={expandable} />
             </div>
         </aside>
     );
@@ -84,22 +84,22 @@ export function VeyraMark({ size = 28 }: { size?: number }) {
     );
 }
 
-function ProductSwitcher({ product, rail }: { product: SurfaceKey; rail: boolean }) {
+export function ProductSwitcher({ product, rail, escapeContainer = false }: { product: SurfaceKey; rail: boolean; escapeContainer?: boolean }) {
     const { surfaces, tenant, organizations } = usePage<SharedProps>().props;
     const current = surfaces.find((s) => s.key === product);
 
     return (
-        <Menu width={272} trigger={(open, toggle) => (
-            <button type="button" onClick={() => { toggle(); if (!organizations) router.reload({ only: ['organizations'] }); }} aria-expanded={open} aria-haspopup="menu"
+        <Menu width={272} escapeContainer={escapeContainer} trigger={(open, toggle) => (
+            <button type="button" onClick={() => { toggle(); if (!organizations) router.reload({ only: ['organizations'] }); }} aria-label="Products and organizations" aria-expanded={open} aria-haspopup="menu"
                 className={`flex items-center gap-2.5 rounded-xl transition-colors hover:bg-surface-hover ${rail ? 'size-10 justify-center' : 'w-full px-1.5 py-1.5'}`} style={{ background: open ? 'var(--surface-hover)' : undefined }}>
                 <VeyraMark size={rail ? 30 : 30} />
                 {!rail && (
                     <>
-                        <span className="min-w-0 flex-1 text-left">
+                        <span className="desk-navigation-label min-w-0 flex-1 text-left">
                             <span className="block truncate text-sm font-semibold text-primary">{current?.label ?? 'Veyra'}</span>
                             <span className="block truncate text-xs text-tertiary">{tenant?.current.name}</span>
                         </span>
-                        <ChevronsUpDown size={14} className="shrink-0 text-tertiary" />
+                        <ChevronsUpDown size={14} className="desk-navigation-label shrink-0 text-tertiary" />
                     </>
                 )}
             </button>
@@ -143,7 +143,7 @@ function applyTheme(choice: ThemeChoice) {
     }
 }
 
-function AccountMenu({ rail, product }: { rail: boolean; product: SurfaceKey }) {
+export function AccountMenu({ rail, product, escapeContainer = false, side = 'top' }: { rail: boolean; product: SurfaceKey; escapeContainer?: boolean; side?: 'top' | 'bottom' }) {
     const { auth, surfaces } = usePage<SharedProps>().props;
     const [theme, setTheme] = useState<ThemeChoice>('system');
 
@@ -157,12 +157,12 @@ function AccountMenu({ rail, product }: { rail: boolean; product: SurfaceKey }) 
     const hasStudio = surfaces.some((s) => s.key === 'studio');
 
     return (
-        <Menu side="top" width={248} trigger={(open, toggle) => (
+        <Menu side={side} width={248} escapeContainer={escapeContainer} trigger={(open, toggle) => (
             <button type="button" onClick={toggle} aria-expanded={open} aria-label="Account"
                 className={`flex items-center gap-2.5 rounded-xl transition-colors hover:bg-surface-hover ${rail ? 'size-10 justify-center' : 'w-full px-1.5 py-1.5'}`} style={{ background: open ? 'var(--surface-hover)' : undefined }}>
                 <Avatar initials={initials} name={name} size={28} />
                 {!rail && (
-                    <span className="min-w-0 flex-1 text-left">
+                    <span className="desk-navigation-label min-w-0 flex-1 text-left">
                         <span className="block truncate text-sm font-medium text-primary">{name}</span>
                         <span className="block truncate text-xs text-tertiary">{auth.user!.email}</span>
                     </span>

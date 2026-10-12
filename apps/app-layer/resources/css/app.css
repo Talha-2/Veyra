@@ -526,3 +526,151 @@ code:not(pre code) {
     .v-prose th, .v-prose td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
     .v-prose th { background: var(--surface-sunken); font-weight: 600; }
 }
+
+/* Full-height task panels preserve the list or schedule underneath. */
+.v-task-sidebar {
+    position: fixed;
+    inset: 0 0 0 auto;
+    margin: 0;
+    height: 100dvh;
+    max-height: none;
+    max-width: 100vw;
+    padding: 0;
+    border: 0;
+    background: var(--surface-raised);
+    color: var(--text-primary);
+    box-shadow: -12px 0 48px rgba(0, 0, 0, .12);
+    animation: task-sidebar-enter 220ms cubic-bezier(.16, 1, .3, 1);
+}
+.v-task-sidebar::backdrop { background: rgba(0, 0, 0, .24); }
+@keyframes task-sidebar-enter { from { transform: translateX(24px); opacity: .7; } to { transform: translateX(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .v-task-sidebar { animation: none; } }
+
+/* Provider calendar: time is a shared vertical axis across the schedule. */
+.hc-calendar-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding:18px 0; border-top:1px solid var(--separator); }
+.hc-view-switch { display:flex; padding:3px; background:var(--surface-sunken); border-radius:10px; }
+.hc-view-switch button { padding:7px 11px; font-size:12px; border-radius:7px; color:var(--text-secondary); }
+.hc-view-switch button[aria-pressed=true] { background:var(--surface); color:var(--text-primary); font-weight:600; }
+.hc-calendar-scroll { overflow:auto; max-height:75vh; border:1px solid var(--separator); border-radius:12px; scrollbar-color:var(--separator) transparent; }
+.hc-time-grid { display:grid; background:var(--surface); }
+.hc-day-heading { position:sticky; top:0; z-index:5; padding:12px 8px; text-align:center; border-bottom:1px solid var(--separator); background:var(--surface); }
+.hc-time-column { position:relative; border-left:1px solid var(--separator); background:var(--surface-sunken); }
+.hc-time-cell { position:absolute; left:0; width:100%; border-top:1px solid var(--separator); text-align:left; }
+.hc-time-cell:not(:disabled):hover { background:var(--accent-subtle); }
+.hc-time-cell:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; z-index:4; }
+.hc-working-window { position:absolute; left:0; right:0; background:var(--surface); pointer-events:none; border-top:1px solid var(--separator); border-bottom:1px solid var(--separator); }
+.hc-working-window span { display:block; padding:3px 5px; font-size:10px; color:var(--text-secondary); }
+.hc-time-block { position:absolute; left:0; right:0; background:var(--surface-hover); border:1px dashed var(--text-tertiary); pointer-events:none; opacity:.85; }
+.hc-time-block span { display:block; padding:5px; font-size:11px; color:var(--text-secondary); }
+.hc-calendar-event { position:absolute; overflow:hidden; border-radius:6px; padding:3px 6px; text-align:left; font-size:11px; line-height:16px; z-index:2; transition:filter 150ms ease; }
+.hc-calendar-event:hover,.hc-month-event:hover { filter:brightness(.96); }
+.hc-status-booked { background:var(--accent-subtle); color:var(--accent); border:1px solid var(--accent); }
+.hc-status-checked_in { background:#e5f0fc; color:#234d80; border:1px solid #91b1d8; }
+.hc-status-completed { background:#e8f3eb; color:#275737; border:1px solid #94bba0; }
+.hc-status-cancelled,.hc-status-no_show { background:var(--surface-hover); color:var(--text-secondary); border:1px dashed var(--text-tertiary); }
+.hc-status-cancelled { text-decoration:line-through; }
+.hc-now-line { position:absolute; left:0; right:0; z-index:3; border-top:2px solid #bd3d38; pointer-events:none; }
+.hc-now-line::before { content:''; position:absolute; width:7px; height:7px; border-radius:50%; left:-4px; top:-4px; background:#bd3d38; }
+.hc-legend { display:inline-flex; align-items:center; gap:5px; }
+.hc-legend::before { content:''; width:9px; height:9px; border-radius:2px; border:1px solid var(--separator); }
+.hc-legend-working::before { background:var(--surface); }
+.hc-legend-booked::before { background:var(--accent-subtle); border-color:var(--accent); }
+.hc-legend-checked::before { background:#e5f0fc; border-color:#91b1d8; }
+.hc-legend-blocked::before { background:var(--surface-hover); border-style:dashed; border-color:var(--text-tertiary); }
+.hc-month-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); min-width:840px; background:var(--surface); }
+.hc-month-heading { position:sticky; top:0; background:var(--surface); z-index:2; padding:12px; text-align:center; font-size:12px; color:var(--text-secondary); border-bottom:1px solid var(--separator); }
+.hc-month-day { min-height:150px; padding:8px; border-right:1px solid var(--separator); border-bottom:1px solid var(--separator); }
+.hc-month-date { display:flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; font-size:13px; }
+.hc-month-date:hover { background:var(--surface-hover); }
+.hc-today-date { background:var(--accent); color:var(--surface); font-weight:600; }
+.hc-outside-month { background:var(--surface-sunken); }
+.hc-month-event { display:flex; width:100%; align-items:center; gap:5px; padding:4px; border-radius:5px; font-size:10px; text-align:left; }
+@media (max-width:640px) { .hc-calendar-toolbar { gap:12px; } .hc-calendar-toolbar h2 { width:100%; margin:6px 0 0; font-size:16px; } .hc-calendar-scroll { max-height:65vh; } }
+.hc-time-axis { position:sticky; left:0; z-index:4; background:var(--surface); }
+.hc-day-heading:first-child { left:0; z-index:6; }
+.hc-time-cell { z-index:1; }
+.hc-working-window { z-index:0; }
+.hc-time-block { z-index:1; }
+.hc-status-booked { color:#873610; }
+[data-theme=dark] .hc-status-booked { color:#ffb38b; }
+.hc-status-booked { background:#fdf1eb; }
+.hc-status-cancelled,.hc-status-no_show { background:#f2f2f2; }
+[data-theme=dark] .hc-status-booked { background:#2b1913; }
+[data-theme=dark] .hc-status-cancelled,[data-theme=dark] .hc-status-no_show { background:#171717; }
+
+/* Internal staff messaging follows the Desk's quiet, divided-row workspace. */
+.staff-chat { display:grid; grid-template-columns:280px minmax(0,1fr); height: min(780px, calc(100dvh - 240px)); min-height:540px; border:1px solid var(--separator); border-radius:12px; overflow:hidden; background:var(--surface); }
+.staff-chat-list { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--separator); background:var(--surface-sunken); }
+.staff-chat-room { display:flex; align-items:center; gap:10px; width:100%; padding:13px 10px; border-radius:8px; text-align:left; }
+.staff-chat-room:hover { background:var(--surface-hover); }
+.staff-chat-room-selected { background:var(--surface); }
+.staff-chat-avatar { display:flex; width:34px; height:34px; flex-shrink:0; align-items:center; justify-content:center; background:var(--surface-sunken); border-radius:9px; color:var(--text-secondary); font-size:11px; font-weight:600; }
+.staff-chat-unread { border-radius:7px; padding:3px 6px; background:var(--text-primary); color:var(--surface); font-size:10px; font-weight:600; }
+.staff-chat-thread { display:flex; flex-direction:column; min-width:0; min-height:0; }
+.staff-chat-thread-header { display:flex; align-items:center; gap:12px; padding:18px 22px; border-bottom:1px solid var(--separator); }
+.staff-chat-history { flex:1; min-height:0; overflow:auto; padding:0 24px 20px; scrollbar-color:var(--separator) transparent; }
+.staff-chat-message { display:flex; align-items:flex-start; gap:12px; padding:12px 0; }
+.staff-chat-composer { padding:16px 22px; border-top:1px solid var(--separator); }
+@media (max-width:767px) { .staff-chat { display:flex; min-height:520px; height:calc(100dvh - 190px); } .staff-chat-list { flex:1; border-right:0; } .staff-chat-thread { display:none; flex:1; } .staff-chat-has-selection .staff-chat-list { display:none; } .staff-chat-has-selection .staff-chat-thread { display:flex; } .staff-chat-history { padding:0 16px 16px; } .staff-chat-thread-header,.staff-chat-composer { padding:14px; } }
+@media (max-width:767px) { .staff-chat { height:calc(100dvh - 300px); min-height:480px; } .staff-chat-thread-header p { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } }
+
+/* Calendar and team conversations are full-height workspaces, with their own scroll. */
+.desk-workspace { height:100%; display:flex; flex-direction:column; overflow:hidden; }
+.desk-workspace-header { padding:18px 24px; border-bottom:1px solid var(--separator); flex-shrink:0; }
+.desk-workspace-header header { margin:0; }
+.desk-workspace-header h1 { font-size:24px; }
+.desk-workspace-header header p { font-size:14px; }
+.desk-workspace-body { flex:1; min-height:0; display:flex; flex-direction:column; }
+.calendar-workspace .desk-workspace-body { padding:16px 20px 12px; }
+.calendar-workspace-content { display:flex; flex-direction:column; flex:1; min-height:0; }
+.calendar-workspace-content > div:not(.hc-calendar-scroll) { flex-shrink:0; }
+.calendar-workspace-content > .hc-calendar-scroll { flex:1; min-height:0; max-height:none; }
+.calendar-workspace .hc-calendar-toolbar { padding:12px 0; }
+.calendar-workspace .hc-calendar-event { font-size:14px; line-height:18px; padding:6px 8px; }
+.calendar-workspace .hc-time-axis span { font-size:12px; }
+.calendar-workspace .hc-working-window span,.calendar-workspace .hc-time-block span { font-size:12px; padding:5px 8px; }
+.calendar-workspace .hc-month-event { font-size:12px; }
+.calendar-workspace .hc-month-day { min-height:160px; }
+.chat-workspace .staff-chat { height:100%; min-height:0; flex:1; border:0; border-radius:0; grid-template-columns:300px minmax(0,1fr); }
+.chat-workspace .staff-chat-history { padding:4px 32px 24px; }
+.chat-workspace .staff-chat-message p { font-size:15px; line-height:26px; }
+.chat-workspace .staff-chat-message { padding:14px 0; }
+.chat-workspace .staff-chat-thread-header { padding:18px 28px; }
+.chat-workspace .staff-chat-thread-header h2 { font-size:18px; }
+.chat-workspace .staff-chat-composer { padding:16px 28px; }
+.chat-workspace .staff-chat-composer textarea { font-size:15px; line-height:24px; }
+@media (max-width:767px) { .desk-workspace-header { padding:12px 16px; } .desk-workspace-header header p { display:none; } .desk-workspace-header h1 { font-size:21px; } .calendar-workspace .desk-workspace-body { padding:10px; } .calendar-workspace .hc-calendar-toolbar { gap:8px; padding:8px 0; } .calendar-workspace .hc-day-heading { padding:8px; } .calendar-workspace-content > p:last-child { display:none; } .chat-workspace .staff-chat { min-height:0; height:100%; } .chat-workspace .staff-chat-history { padding:0 16px 16px; } .chat-workspace .staff-chat-composer,.chat-workspace .staff-chat-thread-header { padding:12px 16px; } }
+@media print { body:has(.prescription-print) { background:white; } body:has(.prescription-print) aside,body:has(.prescription-print) nav,body:has(.prescription-print) button,body:has(.prescription-print) [role=dialog],body:has(.prescription-print) header { display:none !important; } .prescription-print { display:block; color:black; padding:24px; } body:has(.prescription-print) main { width:100%; } }
+.calendar-workspace .hc-calendar-event { font-size:13px; line-height:15px; padding:4px 6px; }
+@media (max-width:767px) { .calendar-workspace #calendar-provider,.calendar-workspace .calendar-zone,.calendar-workspace #calendar-date { display:none; } .calendar-workspace .desk-workspace-header h1 { margin-right:0; } .calendar-workspace .hc-calendar-toolbar h2 { width:auto; margin:0 0 0 8px; } .calendar-workspace .hc-calendar-toolbar { gap:10px; } .calendar-workspace .hc-calendar-toolbar > div:last-child { width:100%; } .calendar-workspace .hc-legend { font-size:11px; } }
+
+/* Reveal Desk navigation over the fixed icon rail without moving page content. */
+.desk-navigation-reveal {
+    width: 248px;
+    clip-path: inset(0 184px 0 0);
+    transition: clip-path 200ms cubic-bezier(.16, 1, .3, 1), box-shadow 200ms ease;
+}
+.desk-navigation-reveal[data-desk-navigation="expanded"] {
+    clip-path: inset(0 -24px 0 0);
+}
+.desk-navigation-reveal .desk-navigation-label {
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 120ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+.desk-navigation-reveal[data-desk-navigation="expanded"] .desk-navigation-label {
+    opacity: 1;
+    transform: translateX(0);
+}
+@media (prefers-reduced-motion: reduce) {
+    .desk-navigation-reveal { transition: none; }
+    .desk-navigation-reveal .desk-navigation-label { transition: none; transform: none; }
+}
+
+/* Clinical work reads as one page of sections, rather than oversized boxes. */
+.desk-record-section:not(.border-danger) {
+    background: transparent;
+    border-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+}

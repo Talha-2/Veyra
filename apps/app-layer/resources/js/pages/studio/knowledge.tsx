@@ -7,7 +7,7 @@ import { Field } from '../../components/studio/form';
 import { ACCEPT_ATTR, DropOverlay, isAccepted, useWindowFileDrop } from '../../components/studio-knowledge/file-drop';
 import { formatBytes, plural, searchTerms, splitHits } from '../../components/studio-knowledge/format';
 import { DialogActions, PageSection } from '../../components/studio-ops/page-parts';
-import Dialog from '../../components/ui/dialog';
+import Sidebar from '../../components/ui/sidebar';
 import { Callout, Card, IconTile, Meter, SearchField } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, EmptyState, RelativeTime, UserText, type Tone } from '../../components/ui/primitives';
@@ -358,10 +358,10 @@ export default function Knowledge({ folder, breadcrumbs, folders, all_folders, d
 
             <DropOverlay visible={dragging} destination={here} />
 
-            <WriteDialog open={dialog === 'doc'} onClose={() => setDialog(null)} folderId={folder?.id ?? null} here={here} />
-            <UploadDialog open={dialog === 'upload'} onClose={() => setDialog(null)} folderId={folder?.id ?? null} here={here} />
-            <ScrapeDialog open={dialog === 'scrape'} onClose={() => setDialog(null)} folderId={folder?.id ?? null} here={here} />
-            <FolderDialog open={dialog === 'folder'} onClose={() => setDialog(null)} parentId={folder?.id ?? null} here={here} />
+            <WriteSidebar open={dialog === 'doc'} onClose={() => setDialog(null)} folderId={folder?.id ?? null} here={here} />
+            <UploadSidebar open={dialog === 'upload'} onClose={() => setDialog(null)} folderId={folder?.id ?? null} here={here} />
+            <ScrapeSidebar open={dialog === 'scrape'} onClose={() => setDialog(null)} folderId={folder?.id ?? null} here={here} />
+            <FolderSidebar open={dialog === 'folder'} onClose={() => setDialog(null)} parentId={folder?.id ?? null} here={here} />
         </>
     );
 }
@@ -482,7 +482,7 @@ function SelectionBar({ count, folders, currentFolderId, onMove, onDelete, onCle
 function Footer({ onClose, processing, label, disabled = false }: { onClose: () => void; processing: boolean; label: string; disabled?: boolean }) {
     return (
         <DialogActions>
-            <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
+            <button type="button" className="v-btn v-btn--ghost" onClick={onClose} disabled={processing}>Cancel</button>
             <button type="submit" className="v-btn v-btn--primary" disabled={processing || disabled}>{processing ? 'Working…' : label}</button>
         </DialogActions>
     );
@@ -491,35 +491,40 @@ function Footer({ onClose, processing, label, disabled = false }: { onClose: () 
 /** The writing surface: 15px at 1.6, the same measure as the document editor. */
 const WRITING: CSSProperties = { lineHeight: 1.6 };
 
-function WriteDialog({ open, onClose, folderId, here }: { open: boolean; onClose: () => void; folderId: number | null; here: string }) {
+function WriteSidebar({ open, onClose, folderId, here }: { open: boolean; onClose: () => void; folderId: number | null; here: string }) {
     const { data, setData, post, processing, errors, reset } = useForm({ name: '', content: '', folder_id: folderId });
-    const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/knowledge/documents', { onSuccess: () => { reset(); onClose(); } }); };
+    const close = () => { if (!processing) onClose(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (processing) return; post('/studio/knowledge/documents', { onSuccess: () => { reset(); onClose(); } }); };
     const words = data.content.trim() ? data.content.trim().split(/\s+/).length : 0;
 
     return (
-        <Dialog open={open} onClose={onClose} title="Write a document" description={`Saved to ${here} and searchable by the agent as soon as you create it.`} width={760}>
-            <form onSubmit={submit}>
-                <Field label="Title" error={errors.name}>
-                    <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Service area and call-out fees" autoFocus dir="auto" />
-                </Field>
-                <Field label="Content" error={errors.content} hint="Write it the way you would explain it to a new hire. Keep one topic per paragraph: paragraphs are what the agent retrieves.">
-                    <textarea className="v-field h-auto px-4 py-3.5 text-md" style={WRITING} rows={14} value={data.content} onChange={(e) => setData('content', e.target.value)} dir="auto" placeholder="Plain text or Markdown." />
-                </Field>
+        <Sidebar open={open} onClose={close} title="Write a document" description={`Saved to ${here} and searchable by the agent as soon as you create it.`} width={760}>
+            <form onSubmit={submit} aria-busy={processing}>
+                <fieldset disabled={processing} className="m-0 min-w-0 border-0 p-0">
+                    <Field label="Title" error={errors.name}>
+                        <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Service area and call-out fees" autoFocus dir="auto" />
+                    </Field>
+                    <Field label="Content" error={errors.content} hint="Write it the way you would explain it to a new hire. Keep one topic per paragraph: paragraphs are what the agent retrieves.">
+                        <textarea className="v-field h-auto px-4 py-3.5 text-md" style={WRITING} rows={14} value={data.content} onChange={(e) => setData('content', e.target.value)} dir="auto" placeholder="Plain text or Markdown." />
+                    </Field>
+                </fieldset>
                 <DialogActions start={<span className="text-xs text-tertiary tabular-nums">{plural(words, 'word')}</span>}>
-                    <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
+                    <button type="button" className="v-btn v-btn--ghost" onClick={close} disabled={processing}>Cancel</button>
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.name.trim() || !data.content.trim()}>{processing ? 'Working…' : 'Create'}</button>
                 </DialogActions>
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }
 
-function UploadDialog({ open, onClose, folderId, here }: { open: boolean; onClose: () => void; folderId: number | null; here: string }) {
+function UploadSidebar({ open, onClose, folderId, here }: { open: boolean; onClose: () => void; folderId: number | null; here: string }) {
     const { data, setData, post, processing, errors, reset } = useForm<{ files: File[]; folder_id: number | null }>({ files: [], folder_id: folderId });
     const [over, setOver] = useState(false);
     const input = useRef<HTMLInputElement>(null);
-    const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/knowledge/upload', { forceFormData: true, onSuccess: () => { reset(); onClose(); } }); };
+    const close = () => { if (!processing) onClose(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (processing) return; post('/studio/knowledge/upload', { forceFormData: true, onSuccess: () => { reset(); onClose(); } }); };
     const add = (files: File[]) => {
+        if (processing) return;
         const accepted = files.filter(isAccepted);
         if (accepted.length < files.length) toast(`${plural(files.length - accepted.length, 'file')} skipped: that type cannot be indexed.`, 'warning');
         setData('files', [...data.files, ...accepted].slice(0, 20));
@@ -528,71 +533,79 @@ function UploadDialog({ open, onClose, folderId, here }: { open: boolean; onClos
     const fileError = Object.entries(errors as Record<string, string>).find(([k]) => k.startsWith('files'))?.[1];
 
     return (
-        <Dialog open={open} onClose={onClose} title="Upload files" description={`Into ${here}. Text, Markdown, CSV and HTML are searchable immediately; PDF and Word show as processing until their text is extracted.`} width={600}>
-            <form onSubmit={submit}>
-                <button
-                    type="button"
-                    onClick={() => input.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setOver(true); }}
-                    onDragLeave={() => setOver(false)}
-                    onDrop={onDrop}
-                    className="flex w-full flex-col items-center rounded-lg px-6 py-10 text-center transition-colors"
-                    style={{ border: `1.5px dashed ${over ? 'var(--accent)' : 'var(--border-strong)'}`, background: over ? 'var(--accent-subtle)' : 'var(--surface-sunken)' }}
-                >
-                    <UploadCloud size={26} strokeWidth={1.6} className="mb-3 text-tertiary" />
-                    <span className="text-base font-medium text-primary">Drop files here, or choose</span>
-                    <span className="mt-1 text-xs text-tertiary">TXT, MD, CSV, HTML, PDF, DOCX · up to 20 files, 20 MB each</span>
-                </button>
-                <input ref={input} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
+        <Sidebar open={open} onClose={close} title="Upload files" description={`Into ${here}. Text, Markdown, CSV and HTML are searchable immediately; PDF and Word show as processing until their text is extracted.`} width={600}>
+            <form onSubmit={submit} aria-busy={processing}>
+                <fieldset disabled={processing} className="m-0 min-w-0 border-0 p-0">
+                    <button
+                        type="button"
+                        onClick={() => input.current?.click()}
+                        onDragOver={(e) => { e.preventDefault(); if (!processing) setOver(true); }}
+                        onDragLeave={() => setOver(false)}
+                        onDrop={onDrop}
+                        className="flex w-full flex-col items-center rounded-lg px-6 py-10 text-center transition-colors"
+                        style={{ border: `1.5px dashed ${over ? 'var(--accent)' : 'var(--border-strong)'}`, background: over ? 'var(--accent-subtle)' : 'var(--surface-sunken)' }}
+                    >
+                        <UploadCloud size={26} strokeWidth={1.6} className="mb-3 text-tertiary" />
+                        <span className="text-base font-medium text-primary">Drop files here, or choose</span>
+                        <span className="mt-1 text-xs text-tertiary">TXT, MD, CSV, HTML, PDF, DOCX · up to 20 files, 20 MB each</span>
+                    </button>
+                    <input ref={input} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
 
-                {data.files.length > 0 && (
-                    <ul className="mt-4 divide-y rounded-md" style={{ border: '1px solid var(--border)', ['--tw-divide-color' as string]: 'var(--separator)' }}>
-                        {data.files.map((f, i) => (
-                            <li key={`${f.name}-${i}`} className="flex min-h-12 items-center gap-3 px-4 py-2">
-                                <FileText size={15} strokeWidth={1.8} className="shrink-0 text-tertiary" />
-                                <span className="min-w-0 flex-1 truncate text-sm text-primary">{f.name}</span>
-                                <span className="text-xs text-tertiary tabular-nums">{formatBytes(f.size)}</span>
-                                <button type="button" className="v-btn v-btn--ghost v-btn--icon size-7" aria-label={`Remove ${f.name}`} onClick={() => setData('files', data.files.filter((_, j) => j !== i))}><X size={13} strokeWidth={2} /></button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-                {fileError && <p className="mt-2 text-sm text-danger">{fileError}</p>}
-                {data.files.length > 0 && <p className="mt-2.5 text-xs text-tertiary tabular-nums">{plural(data.files.length, 'file')} · {formatBytes(data.files.reduce((a, f) => a + f.size, 0))}</p>}
-                <Footer onClose={onClose} processing={processing} label={data.files.length ? `Upload ${plural(data.files.length, 'file')}` : 'Upload'} disabled={data.files.length === 0} />
+                    {data.files.length > 0 && (
+                        <ul className="mt-4 divide-y rounded-md" style={{ border: '1px solid var(--border)', ['--tw-divide-color' as string]: 'var(--separator)' }}>
+                            {data.files.map((f, i) => (
+                                <li key={`${f.name}-${i}`} className="flex min-h-12 items-center gap-3 px-4 py-2">
+                                    <FileText size={15} strokeWidth={1.8} className="shrink-0 text-tertiary" />
+                                    <span className="min-w-0 flex-1 truncate text-sm text-primary">{f.name}</span>
+                                    <span className="text-xs text-tertiary tabular-nums">{formatBytes(f.size)}</span>
+                                    <button type="button" className="v-btn v-btn--ghost v-btn--icon size-7" aria-label={`Remove ${f.name}`} onClick={() => setData('files', data.files.filter((_, j) => j !== i))}><X size={13} strokeWidth={2} /></button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {fileError && <p className="mt-2 text-sm text-danger">{fileError}</p>}
+                    {data.files.length > 0 && <p className="mt-2.5 text-xs text-tertiary tabular-nums">{plural(data.files.length, 'file')} · {formatBytes(data.files.reduce((a, f) => a + f.size, 0))}</p>}
+                </fieldset>
+                <Footer onClose={close} processing={processing} label={data.files.length ? `Upload ${plural(data.files.length, 'file')}` : 'Upload'} disabled={data.files.length === 0} />
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }
 
-function ScrapeDialog({ open, onClose, folderId, here }: { open: boolean; onClose: () => void; folderId: number | null; here: string }) {
+function ScrapeSidebar({ open, onClose, folderId, here }: { open: boolean; onClose: () => void; folderId: number | null; here: string }) {
     const { data, setData, post, processing, errors, reset } = useForm({ url: '', folder_id: folderId });
-    const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/knowledge/scrape', { onSuccess: () => { reset(); onClose(); } }); };
+    const close = () => { if (!processing) onClose(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (processing) return; post('/studio/knowledge/scrape', { onSuccess: () => { reset(); onClose(); } }); };
 
     return (
-        <Dialog open={open} onClose={onClose} title="Import a web page" description={`Fetched once and its text indexed into ${here}. One page only: links are not followed, and later changes to the page are not picked up.`} width={580}>
-            <form onSubmit={submit}>
-                <Field label="URL" error={errors.url} hint="Navigation, headers and footers are stripped; the page title becomes the document name.">
-                    <input className="v-field" type="url" value={data.url} onChange={(e) => setData('url', e.target.value)} placeholder="https://northwind.example/services" autoFocus />
-                </Field>
-                <Footer onClose={onClose} processing={processing} label="Import" disabled={!data.url.trim()} />
+        <Sidebar open={open} onClose={close} title="Import a web page" description={`Fetched once and its text indexed into ${here}. One page only: links are not followed, and later changes to the page are not picked up.`} width={580}>
+            <form onSubmit={submit} aria-busy={processing}>
+                <fieldset disabled={processing} className="m-0 min-w-0 border-0 p-0">
+                    <Field label="URL" error={errors.url} hint="Navigation, headers and footers are stripped; the page title becomes the document name.">
+                        <input className="v-field" type="url" value={data.url} onChange={(e) => setData('url', e.target.value)} placeholder="https://northwind.example/services" autoFocus />
+                    </Field>
+                </fieldset>
+                <Footer onClose={close} processing={processing} label="Import" disabled={!data.url.trim()} />
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }
 
-function FolderDialog({ open, onClose, parentId, here }: { open: boolean; onClose: () => void; parentId: number | null; here: string }) {
+function FolderSidebar({ open, onClose, parentId, here }: { open: boolean; onClose: () => void; parentId: number | null; here: string }) {
     const { data, setData, post, processing, errors, reset } = useForm({ name: '', parent_id: parentId });
-    const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/knowledge/folders', { onSuccess: () => { reset(); onClose(); } }); };
+    const close = () => { if (!processing) onClose(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (processing) return; post('/studio/knowledge/folders', { onSuccess: () => { reset(); onClose(); } }); };
 
     return (
-        <Dialog open={open} onClose={onClose} title="New folder" description={`Inside ${here}. Folders organise things for you; the agent searches every folder.`} width={560}>
-            <form onSubmit={submit}>
-                <Field label="Name" error={errors.name}>
-                    <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Pricing" autoFocus />
-                </Field>
-                <Footer onClose={onClose} processing={processing} label="Create folder" disabled={!data.name.trim()} />
+        <Sidebar open={open} onClose={close} title="New folder" description={`Inside ${here}. Folders organise things for you; the agent searches every folder.`} width={560}>
+            <form onSubmit={submit} aria-busy={processing}>
+                <fieldset disabled={processing} className="m-0 min-w-0 border-0 p-0">
+                    <Field label="Name" error={errors.name}>
+                        <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Pricing" autoFocus />
+                    </Field>
+                </fieldset>
+                <Footer onClose={close} processing={processing} label="Create folder" disabled={!data.name.trim()} />
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }

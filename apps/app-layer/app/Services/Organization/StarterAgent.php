@@ -3,7 +3,6 @@
 namespace App\Services\Organization;
 
 use App\Enums\ActionKind;
-use App\Enums\AgentRuntime;
 use App\Models\Action;
 use App\Models\AgentConfig;
 use App\Models\BusinessProfile;
@@ -11,17 +10,15 @@ use App\Models\Expert;
 use App\Models\Organization;
 use App\Models\Pipeline;
 use App\Models\TicketType;
+use App\Services\Agent\CoreRuntimeConfig;
 use App\Services\Voice\VoiceCatalog;
 
 /**
  * A working agent for a brand-new organization.
  *
- * Without it a new organization had no experts at all: a call or a Studio
- * Talk session connected, and the front desk had no worker behind it to look
- * anything up or raise a ticket. This gives every organization the same two
- * halves a call needs (front desk + operations), the built-in actions that
- * need no connected app, a ticket type and a sales pipeline. Everything is
- * editable in Studio afterwards; nothing is created twice.
+ * Initializes the independent core runtime, internal action catalog, a ticket
+ * type and a sales pipeline. Optional specialists are authored separately.
+ * Existing owner settings and historical Expert records remain recoverable.
  *
  * Runs with the organization as the current tenant.
  */
@@ -54,19 +51,8 @@ class StarterAgent
         }
         BusinessProfile::query()->firstOrCreate([], ['name' => $organization->name, 'timezone' => $organization->timezone]);
 
-        if (Expert::query()->exists()) {
-            return;
-        }
-
-        $this->expert('front-desk', 'Front desk', AgentRuntime::Talker, 0,
-            'Holds the conversation and answers what it can.',
-            "You own every word the customer hears.\n\nAnswer business questions from the business information and the knowledge base (search it for anything specific). Delegate anything that must be done: booked, written, changed or submitted. Never promise a ticket, booking or callback that a completed action has not confirmed.");
-
-        $worker = $this->expert('operations', 'Operations', AgentRuntime::Worker, 1,
-            'Runs lookups, bookings and tickets.',
-            "You do the work. You never speak to the customer.\n\nUse the conversation, the customer's record and the knowledge base before asking for anything. When you need the customer to supply something, say exactly what. Perform the action before reporting that it happened.");
-
-        $this->syncInternalActions($worker, grant: true);
+        $this->syncInternalActions();
+        app(CoreRuntimeConfig::class)->initialize($config);
 
         TicketType::query()->firstOrCreate(['name' => 'General'], ['color' => '#4dcafa', 'description' => 'Anything that needs a person to follow up.', 'position' => 0, 'enabled' => true]);
 
@@ -169,7 +155,7 @@ class StarterAgent
     /**
      * Bring the organization's built-in actions up to the catalog, without
      * undoing anything its owner chose: missing actions are created (and
-     * granted to the worker when `$grant` or when the action is new), rows
+     * granted only to an explicitly supplied worker), rows
      * still carrying stock text are upgraded, and edited, disabled or
      * ungranted rows are left exactly as they are. Safe to repeat.
      *
@@ -177,7 +163,6 @@ class StarterAgent
      */
     public function syncInternalActions(?Expert $worker = null, bool $grant = false): array
     {
-        $worker ??= Expert::query()->where('runtime', AgentRuntime::Worker)->orderByDesc('is_builtin')->orderBy('position')->orderBy('id')->first();
         $report = ['created' => [], 'upgraded' => [], 'granted' => []];
 
         foreach (self::catalog() as $slug => [$name, $description, $properties, $required, $idempotent, $durable, $granted]) {
@@ -210,13 +195,5 @@ class StarterAgent
         }
 
         return $report;
-    }
-
-    private function expert(string $slug, string $name, AgentRuntime $runtime, int $position, string $description, string $prompt): Expert
-    {
-        $expert = new Expert(['slug' => $slug, 'name' => $name, 'description' => $description, 'system_prompt' => $prompt, 'runtime' => $runtime, 'position' => $position, 'enabled' => true]);
-        $expert->forceFill(['is_builtin' => true])->save();
-
-        return $expert;
     }
 }

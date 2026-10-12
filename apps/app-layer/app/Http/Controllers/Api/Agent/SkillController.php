@@ -19,7 +19,7 @@ class SkillController extends Controller
     public function index(Organization $organization): JsonResponse
     {
         return response()->json([
-            'skills' => Skill::query()->enabled()->orderBy('name')->get()
+            'skills' => Skill::query()->enabled()->shared()->orderBy('name')->get()
                 ->map(fn (Skill $s) => ['slug' => $s->slug, 'name' => $s->name, 'description' => $s->description, 'version' => $s->version, 'scope' => $s->scope, 'execution_mode' => $s->execution_mode->value])
                 ->all(),
         ]);
@@ -27,7 +27,7 @@ class SkillController extends Controller
 
     public function show(Organization $organization, Skill $skill): JsonResponse
     {
-        abort_unless($skill->enabled, 404);
+        abort_unless($skill->enabled && $skill->private_expert_id === null, 404);
 
         return response()->json([
             'slug' => $skill->slug,

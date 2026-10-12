@@ -12,6 +12,7 @@ use App\Models\AgentThread;
 use App\Models\Automation;
 use App\Models\AutomationRun;
 use App\Models\Call;
+use App\Models\CallTranscript;
 use App\Models\Contact;
 use App\Models\Conversation;
 use App\Models\Delegation;
@@ -26,6 +27,7 @@ use App\Models\TicketType;
 use App\Models\ToolCall;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -82,7 +84,7 @@ class AgentApiTest extends TestCase
         return "/api/agent/v1/organizations/{$this->organization->id}{$path}";
     }
 
-    private function inbound(string $from = '+17735550111', string $sid = 'CA1'): \Illuminate\Testing\TestResponse
+    private function inbound(string $from = '+17735550111', string $sid = 'CA1'): TestResponse
     {
         return $this->agent()->postJson('/api/agent/v1/calls/inbound', [
             'to' => '+1 (312) 555-0142', 'from' => $from, 'provider' => 'twilio', 'provider_sid' => $sid, 'room' => 'room-1',
@@ -122,10 +124,10 @@ class AgentApiTest extends TestCase
             ->assertJsonPath('line.e164', '+13125550142')
             ->assertJsonPath('caller.contact', null)
             ->assertJsonPath('caller.identifier.value', '+17735550111')
-            ->assertJsonCount(2, 'experts');
+            ->assertJsonCount(1, 'experts')->assertJsonPath('architecture', 'skills-first');
 
-        $worker = collect($response->json('experts'))->firstWhere('slug', 'scheduling');
-        $talker = collect($response->json('experts'))->firstWhere('slug', 'front');
+        $worker = $this->agent()->getJson($this->org('/experts/scheduling/execution'))->assertOk()->json('expert');
+        $talker = $response->json('core.taker');
         $this->assertSame('worker', $worker['runtime']);
         $this->assertSame('reschedule', $worker['skills'][0]['slug']);
         $this->assertSame('book_appointment', $worker['tools'][0]['name']);
@@ -205,7 +207,7 @@ class AgentApiTest extends TestCase
         $this->agent()->postJson($this->org("/calls/{$callId}/events"), ['type' => 'ended', 'duration_sec' => 214, 'summary' => 'Asked to reschedule.', 'metrics' => ['tokens' => 1200]])->assertOk();
 
         $call = Call::withoutGlobalScopes()->find($callId);
-        $transcript = \App\Models\CallTranscript::withoutGlobalScopes()->where('call_id', $callId)->firstOrFail();
+        $transcript = CallTranscript::withoutGlobalScopes()->where('call_id', $callId)->firstOrFail();
         $this->assertSame('completed', $call->status);
         $this->assertSame(214, $call->duration_sec);
         $this->assertCount(3, $transcript->items);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\Organization;
+use App\Models\PatientPortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +30,10 @@ class AuthenticatedSessionController extends Controller
         // serve it until something noticed.
         Organization::forget();
 
-        return redirect()->intended(route('home'));
+        $patientOnly = ! $request->user()->organizations()->exists()
+            && PatientPortalAccess::where('user_id', $request->user()->id)->exists();
+
+        return redirect()->intended(route($patientOnly ? 'portal.index' : 'home'));
     }
 
     public function destroy(Request $request): RedirectResponse

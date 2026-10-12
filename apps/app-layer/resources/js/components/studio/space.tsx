@@ -5,18 +5,18 @@ import type { ReactNode } from 'react';
  * Studio's roomy layout vocabulary (DESIGN.md › "Space and scrolling").
  *
  * `studio/form` holds the controls; this file holds the space around them:
- * 48px between page sections, 24px between cards, 28px inside a card, 20px
+ * 32px between page sections, 24px between cards, 24px inside a card, 20px
  * between fields, labels above fields, and two columns only when the main
  * column can still be at least 640px wide.
  */
 
-/** The page body under a PageHeader: 40px below the header, 48px between sections. */
+/** A compact page rhythm with clear separation between independent tasks. */
 export function PageStack({ children, className = '' }: { children: ReactNode; className?: string }) {
-    return <div className={`flex flex-col gap-12 pt-3 ${className}`}>{children}</div>;
+    return <div className={`flex min-w-0 flex-col gap-8 pt-3 ${className}`}>{children}</div>;
 }
 
 /**
- * A page section drawn as one card: title row, then a body with 28px of
+ * A page section drawn as one card: title row, then a body with 24px of
  * padding and 20px between fields. `flush` hands the body edge to edge to a
  * list or table.
  */
@@ -40,17 +40,17 @@ export function Panel({
     tone?: 'danger';
 }) {
     return (
-        <section id={id} className={`v-panel scroll-mt-10 ${className}`} style={tone === 'danger' ? { borderColor: 'var(--danger-border)' } : undefined}>
+        <section id={id} className={`v-panel min-w-0 w-full self-start scroll-mt-10 ${className}`} style={tone === 'danger' ? { borderColor: 'var(--danger-border)' } : undefined}>
             {title && (
-                <header className={`flex items-start justify-between gap-6 px-7 pt-7 ${flush ? 'pb-5' : 'pb-6'}`}>
-                    <div className="min-w-0">
+                <header className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-3 px-5 pt-5 sm:px-6 sm:pt-6 ${flush ? 'pb-4' : 'pb-5'}`}>
+                    <div className="min-w-0 flex-1 basis-48">
                         <h2 className="text-lg font-semibold tracking-tight text-primary">{title}</h2>
                         {description && <p className="mt-1.5 max-w-[64ch] text-sm text-secondary">{description}</p>}
                     </div>
-                    {aside && <div className="flex shrink-0 items-center gap-2 pt-0.5">{aside}</div>}
+                    {aside && <div className="flex max-w-full flex-wrap items-center gap-2 pt-0.5">{aside}</div>}
                 </header>
             )}
-            <div className={flush ? '' : `flex flex-col gap-5 px-7 pb-7 ${title ? '' : 'pt-7'}`}>{children}</div>
+            <div className={flush ? '' : `flex min-w-0 flex-col gap-5 px-5 pb-5 sm:px-6 sm:pb-6 ${title ? '' : 'pt-5 sm:pt-6'}`}>{children}</div>
         </section>
     );
 }
@@ -118,8 +118,8 @@ export function Disclosure({ title, summary, children, defaultOpen = false, inse
 export function WithSide({ children, side, sticky = false }: { children: ReactNode; side: ReactNode; sticky?: boolean }) {
     return (
         <div className="@container">
-            <div className="grid items-start gap-12 @min-[1040px]:grid-cols-[minmax(0,1fr)_360px] @min-[1040px]:gap-8">
-                <div className="flex min-w-0 flex-col gap-12">{children}</div>
+            <div className="grid items-start gap-8 @min-[1040px]:grid-cols-[minmax(0,1fr)_360px] @min-[1040px]:gap-6">
+                <div className="flex min-w-0 flex-col gap-8">{children}</div>
                 <aside className={`flex min-w-0 flex-col gap-6 ${sticky ? '@min-[1040px]:sticky @min-[1040px]:top-10' : ''}`}>{side}</aside>
             </div>
         </div>

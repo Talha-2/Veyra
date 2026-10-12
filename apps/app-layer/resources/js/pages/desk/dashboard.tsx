@@ -1,448 +1,65 @@
-import { Head, Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, ArrowRight, Bot, CalendarClock, Inbox, MessagesSquare, Phone, Target, Ticket as TicketIcon, ThumbsDown, ThumbsUp, TrendingUp, Users } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-
-import { ChannelIcon, Delta, SplitBar } from '../../components/desk-pages/bits';
-import { firstName, greeting, humanize, initialsOf } from '../../components/desk-pages/format';
-import { DeskPage, MetricTile, Panel, PanelBody, PanelFooter, PanelHeader, PanelRow, PanelRows, PanelTabs, WithSidePanel } from '../../components/desk-pages/layout';
-import { Callout, IconTile, Meter } from '../../components/ui/kit';
-import { PageHeader, Segmented } from '../../components/ui/page';
-import { Avatar, Badge, EmptyState, Eyebrow, Mono, RelativeTime, UserText, type Tone } from '../../components/ui/primitives';
-import Sparkline from '../../components/ui/sparkline';
-import type { SharedProps } from '../../types';
-
-interface Pair { value: number; previous: number; delta_pct: number | null }
-interface Props {
-    window_days: number;
-    topline: {
-        ai_handled: Pair; support_volume: Pair; leads: Pair;
-        most_active_number: { number: string; calls: number } | null;
-    };
-    support: {
-        new_contacts: Pair; new_conversations: Pair; tickets_created: Pair;
-        open_tickets: number; unassigned_conversations: number;
-        ticket_pipeline: Record<string, number>; by_priority: Record<string, number>;
-    };
-    ai: {
-        conversations_agent_only: number; conversations_team_touched: number;
-        calls_answered: number; calls_transferred: number; call_minutes: number;
-        tickets_raised_by_agent: number; contacts_in_ai_conversations: number;
-        actions_needing_review: number; feedback: { up: number; down: number };
-    };
-    channels: { channel: string; label: string; conversations: number }[];
-    volume_trend: { date: string; contacts: number; conversations: number; tickets: number; calls?: number; leads?: number }[];
-    needs_you?: {
-        counts: { assigned: number; unread: number; overdue: number; tickets: number };
-        conversations: { id: number; title: string; initials: string; company: string | null; channel: string; unread: number; preview: string | null; last_message_at: string | null }[];
-        tickets: { id: number; reference: string; subject: string; status_label: string; status_tone: Tone; priority_label: string; priority_tone: Tone; created_by_agent: boolean; at: string | null }[];
-        overdue: { key: string; kind: 'reminder' | 'lead'; title: string; subtitle: string | null; href: string | null; due_at: string | null }[];
-    };
-    agent_activity?: { id: number; type: string; description: string; subject: string | null; href: string | null; at: string | null }[];
-    workload?: { id: number; name: string; role: string; open_conversations: number; open_tickets: number; is_you: boolean }[];
-}
-
-const EMPTY_NEEDS: NonNullable<Props['needs_you']> = { counts: { assigned: 0, unread: 0, overdue: 0, tickets: 0 }, conversations: [], tickets: [], overdue: [] };
-
-/**
- * The operator's morning view. It answers, in order: what is mine, what did
- * the agent do while I was away, and who on the team can take the next one.
- *
- * The AI figures stay the honest version: only what is countable. Z360 shows
- * "value delivered" and "time saved"; those need a cost model nobody has
- * agreed, and PRODUCT.md forbids invented figures.
- */
-export default function Dashboard({ window_days, topline, support, ai, channels, volume_trend, needs_you = EMPTY_NEEDS, agent_activity = [], workload = [] }: Props) {
-    const { auth } = usePage<SharedProps>().props;
-    const total = ai.conversations_agent_only + ai.conversations_team_touched;
-    const aiShare = total ? Math.round((ai.conversations_agent_only / total) * 100) : 0;
-    const series = (key: 'contacts' | 'conversations' | 'tickets' | 'calls' | 'leads') => volume_trend.map((d) => d[key] ?? 0);
-    const period = `last ${window_days} days`;
-
-    const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-    const mineSummary = needs_you.counts.assigned === 0 && needs_you.counts.overdue === 0
-        ? 'Nothing is waiting on you. The team queue is below.'
-        : [
-            needs_you.counts.assigned > 0 && `${needs_you.counts.assigned} conversation${needs_you.counts.assigned === 1 ? '' : 's'} assigned to you`,
-            needs_you.counts.unread > 0 && `${needs_you.counts.unread} unread`,
-            needs_you.counts.overdue > 0 && `${needs_you.counts.overdue} overdue`,
-        ].filter(Boolean).join(', ') + '.';
-
-    return (
-        <>
-            <Head title="Dashboard" />
-
-            <DeskPage header={
-                <PageHeader
-                    eyebrow={today}
-                    title={`${greeting()}${auth.user ? `, ${firstName(auth.user.name)}` : ''}`}
-                    description={mineSummary}
-                    actions={
-                        <Segmented className="" current={String(window_days)} hrefFor={(k) => `/desk/dashboard?days=${k}`}
-                            options={[{ key: '7', label: '7 days' }, { key: '14', label: '14 days' }, { key: '30', label: '30 days' }]} />
-                    }
-                />
-            }>
-                {ai.actions_needing_review > 0 && (
-                    <Callout tone="danger" icon={<AlertTriangle size={16} strokeWidth={2} />}
-                        title={`${ai.actions_needing_review} agent action${ai.actions_needing_review === 1 ? '' : 's'} need${ai.actions_needing_review === 1 ? 's' : ''} a human to check`}
-                        action={<Link href="/desk/calls?view=review" className="v-btn v-btn--quiet v-btn--sm">Review calls</Link>}>
-                        An action that changes something outside timed out, so nobody knows whether it happened. Check the other system before calling the customer back.
-                    </Callout>
-                )}
-
-                {/* The numbers, each with its shape over the window. */}
-                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-                    <MetricTile label="Conversations" icon={<MessagesSquare size={15} strokeWidth={1.8} />} value={topline.support_volume.value}
-                        trend={<Delta pct={topline.support_volume.delta_pct} />}
-                        aside={<Sparkline points={series('conversations')} color="var(--chart-1)" width={76} height={28} label="Conversations per day" />}
-                        hint={`${topline.support_volume.previous} in the ${window_days} days before`} />
-                    <MetricTile label="Agent handled alone" icon={<Bot size={15} strokeWidth={1.8} />} value={topline.ai_handled.value}
-                        trend={<Delta pct={topline.ai_handled.delta_pct} />}
-                        hint={
-                            <div className="flex items-center gap-3">
-                                <span className="shrink-0 tabular-nums">{aiShare}% of all</span>
-                                <span className="min-w-0 flex-1"><Meter value={aiShare} label="Share handled by the agent alone" /></span>
-                            </div>
-                        } />
-                    <MetricTile label="Calls answered" icon={<Phone size={15} strokeWidth={1.8} />} value={ai.calls_answered}
-                        aside={<Sparkline points={series('calls')} color="var(--chart-2)" width={76} height={28} label="Calls per day" />}
-                        hint={`${ai.call_minutes.toLocaleString()} min on the phone`} />
-                    <MetricTile label="New leads" icon={<TrendingUp size={15} strokeWidth={1.8} />} value={topline.leads.value}
-                        trend={<Delta pct={topline.leads.delta_pct} />}
-                        aside={<Sparkline points={series('leads')} color="var(--chart-3)" width={76} height={28} label="Leads per day" />}
-                        hint={`${topline.leads.previous} in the ${window_days} days before`} />
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
+import { ArrowUpRight, CalendarDays, RefreshCw } from 'lucide-react';
+import { DeskPage } from '../../components/desk-pages/layout';
+import { PageHeader } from '../../components/ui/page';
+import { Badge, EmptyState } from '../../components/ui/primitives';
+import Sidebar from '../../components/ui/sidebar';
+import { timeInZone } from '../../components/healthcare/appointment-form';
+import { DashboardVisuals, type DashboardVisualsData } from '../../components/healthcare/dashboard-visuals';
+import { dateTimeInZone, visitStageLabels, type VisitStage, type WorklistVisit } from '../../types/clinic-worklist';
+type Filters = { date: string; provider_id: string; location_id: string; search: string; stage: string };
+type Confirmation = { visit: WorklistVisit; status: 'completed' | 'cancelled' | 'no_show' };
+type Props = {
+    clinic_date: string; today_date: string; timezone: string; as_of: string; filters: Filters;
+    providers: { id: number; name: string; active: boolean }[]; locations: { id: number; name: string; timezone: string; active: boolean }[];
+    counts: Record<VisitStage, number> & { total: number; patients: number; providers: number };
+    appointments: { data: WorklistVisit[]; prev_page_url: string | null; next_page_url: string | null; from: number | null; to: number | null; total: number; current_page: number; last_page: number };
+    can_access_clinical: boolean; messages_waiting: number;
+    visuals: DashboardVisualsData;
+    attention: null | { unsigned_count: number; unsigned_visits: { id: number; patient_id: number; patient_name: string; mrn: string; occurred_at: string }[]; pending_results_count: number };
+};
+export default function Today({ clinic_date, today_date, timezone, as_of, filters, providers, locations, counts, appointments, can_access_clinical, messages_waiting, attention, visuals }: Props) {
+    const [query, setQuery] = useState(filters);
+    const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    useEffect(() => setQuery(filters), [filters]);
+    const date = new Date(clinic_date + 'T12:00:00Z').toLocaleDateString(undefined, { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    const options = { preserveScroll: true, onStart: () => setBusy(true), onFinish: () => setBusy(false), onSuccess: () => { setConfirmation(null); setError(''); }, onError: (errors: Record<string, string>) => setError(Object.values(errors).join(' ') || 'Unable to update this visit. Refresh and try again.') };
+    function refresh() { if (!busy) { setConfirmation(null); router.reload(options); } }
+    function transition(visit: WorklistVisit, status: string) { if (!busy) { setError(''); router.post('/desk/appointments/' + visit.id + '/status', { status, expected_status: visit.status }, options); } }
+    function openConsultation(visit: WorklistVisit) { if (!busy) { setError(''); router.post('/desk/patients/' + visit.patient.id + '/encounters', { appointment_id: visit.id, expected_status: visit.status }, options); } }
+    const actionLabel = confirmation?.status === 'completed' ? 'Check out visit' : confirmation?.status === 'cancelled' ? 'Cancel appointment' : 'Record no-show';
+    return <><Head title="Clinic worklist" /><DeskPage width="wide" header={<PageHeader title={clinic_date === today_date ? 'Today at the clinic' : 'Clinic worklist'} description={date + ' · Clinic day in ' + timezone} actions={<><button disabled={busy} className="v-btn v-btn--secondary" onClick={refresh}><RefreshCw size={16} />{busy ? 'Updating…' : 'Refresh'}</button><Link className="v-btn v-btn--primary" href={'/desk/calendar?date=' + clinic_date}>Open calendar<ArrowUpRight size={16} /></Link></>} />}>
+        <section aria-label="Find visits"><form onSubmit={event => { event.preventDefault(); if (!busy) router.get('/desk/dashboard', query, { ...options, preserveState: true }); }}>
+            <fieldset disabled={busy} className="grid items-end gap-4 sm:grid-cols-2 xl:grid-cols-6">
+                <label className="text-base text-secondary">Clinic date<input required type="date" className="v-field mt-2 w-full" value={query.date} onChange={e => setQuery({ ...query, date: e.target.value })} /></label>
+                <label className="text-base text-secondary">Provider<select className="v-field mt-2 w-full" value={query.provider_id} onChange={e => setQuery({ ...query, provider_id: e.target.value })}><option value="">All providers</option>{providers.map(p => <option key={p.id} value={p.id}>{p.name}{!p.active ? ' (inactive)' : ''}</option>)}</select></label>
+                <label className="text-base text-secondary">Location<select className="v-field mt-2 w-full" value={query.location_id} onChange={e => setQuery({ ...query, location_id: e.target.value })}><option value="">All locations</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}{!l.active ? ' (inactive)' : ''}</option>)}</select></label>
+                <label className="text-base text-secondary">Visit stage<select className="v-field mt-2 w-full" value={query.stage} onChange={e => setQuery({ ...query, stage: e.target.value })}><option value="active">Active visits</option><option value="all">All stages</option>{Object.entries(visitStageLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+                <label className="text-base text-secondary">Find patient<input type="search" className="v-field mt-2 w-full" placeholder="Name, MRN or phone" value={query.search} onChange={e => setQuery({ ...query, search: e.target.value })} /></label>
+                <button className="v-btn v-btn--primary">Apply filters</button>
+            </fieldset></form></section>
+        <DashboardVisuals visuals={visuals} counts={counts} clinicDate={clinic_date} timezone={timezone} />
+        <section id="visit-worklist" className="scroll-mt-6" aria-labelledby="worklist-heading" aria-busy={busy}><div className="mb-6 flex flex-wrap items-baseline justify-between gap-3"><h2 id="worklist-heading" className="text-xl font-semibold">Visit worklist</h2><p className="text-base text-secondary">Updated {dateTimeInZone(as_of, timezone)} · {timezone}</p></div>
+            {error && <div role="alert" className="mb-6 space-y-3"><p className="text-base text-danger">{error}</p><p className="text-base text-secondary">Another team member may have moved this visit. Refresh to review its current state.</p><button disabled={busy} className="v-btn v-btn--secondary" onClick={refresh}>Refresh worklist</button></div>}
+            {appointments.data.length ? <ol className="divide-y divide-border border-y border-border">{appointments.data.map(a => <li key={a.id} className="grid gap-5 py-7 sm:grid-cols-2 2xl:grid-cols-[140px_minmax(220px,1fr)_minmax(210px,1fr)_minmax(260px,1fr)]">
+                <div className="text-base font-medium tabular-nums">{dateTimeInZone(a.starts_at, a.timezone)}<p className="mt-1">to {timeInZone(a.ends_at, a.timezone)}</p><p className="mt-2 text-sm font-normal text-secondary">{a.timezone}</p></div>
+                <div className="min-w-0"><Link href={'/desk/patients/' + a.patient.id} className="text-lg font-semibold hover:underline">{a.patient.name}</Link><p className="mt-1 text-base text-secondary">{a.patient.mrn}{a.patient.status !== 'active' ? ' · Archived patient' : ''}</p><p className="mt-3 text-base">{a.provider} · {a.service}</p><p className="mt-1 text-base text-secondary">{a.location}</p></div>
+                <div><Badge tone={a.visit_stage === 'completed' ? 'success' : ['cancelled', 'no_show'].includes(a.visit_stage) ? 'muted' : 'info'}>{visitStageLabels[a.visit_stage]}</Badge><dl className="mt-3 space-y-2 text-base"><div><dt className="inline text-secondary">Arrival: </dt><dd className="inline">{a.checked_in_at ? dateTimeInZone(a.checked_in_at, a.timezone) : 'Not recorded'}</dd></div><div><dt className="inline text-secondary">Started: </dt><dd className="inline">{a.consultation_started_at ? dateTimeInZone(a.consultation_started_at, a.timezone) : 'Not recorded'}</dd></div>{a.status === 'checked_in' && <div><dt className="inline text-secondary">{a.visit_stage === 'waiting' ? 'Waiting: ' : 'Wait before consultation: '}</dt><dd className="inline">{a.waiting_minutes == null ? 'Unknown · arrival time not recorded' : a.waiting_minutes + ' min'}</dd></div>}{a.completed_at && <div><dt className="inline text-secondary">Checked out: </dt><dd className="inline">{dateTimeInZone(a.completed_at, a.timezone)}</dd></div>}</dl></div>
+                <div className="flex flex-wrap content-start items-start gap-3">
+                    {a.status === 'booked' && <button disabled={busy} className="v-btn v-btn--primary" onClick={() => transition(a, 'checked_in')}>Check in</button>}
+                    {can_access_clinical && a.can_start && a.encounter?.status !== 'signed' && <button disabled={busy} className={'v-btn ' + (a.status === 'checked_in' ? 'v-btn--primary' : 'v-btn--secondary')} onClick={() => openConsultation(a)}>{a.status === 'booked' ? 'Prepare visit' : a.consultation_started_at ? 'Resume consultation' : 'Begin consultation'}</button>}
+                    {can_access_clinical && a.encounter && <Link className="v-btn v-btn--secondary" href={'/desk/encounters/' + a.encounter.id}>{a.encounter.status === 'signed' ? 'View signed note' : 'Open draft note'}</Link>}
+                    {a.status === 'checked_in' && <button disabled={busy} className="v-btn v-btn--secondary" onClick={() => { setError(''); setConfirmation({ visit: a, status: 'completed' }); }}>Check out</button>}
+                    {a.status === 'booked' && <button disabled={busy} className="v-btn v-btn--ghost" onClick={() => { setError(''); setConfirmation({ visit: a, status: 'no_show' }); }}>No-show</button>}
+                    {['booked', 'checked_in'].includes(a.status) && <button disabled={busy} className="v-btn v-btn--ghost" onClick={() => { setError(''); setConfirmation({ visit: a, status: 'cancelled' }); }}>Cancel</button>}
+                    {a.status === 'booked' && a.can_start && <p className="w-full text-sm text-secondary">Preparation opens a draft. Begin consultation after check-in to record the start time.</p>}
                 </div>
-
-                {/* The work column carries what needs doing and the team's load; the
-                    agent's own report runs beside it, so neither side is left
-                    half-empty the way a short "Needs you" beside a tall report was. */}
-                <WithSidePanel
-                    main={<>
-                        <NeedsYou data={needs_you} unassigned={support.unassigned_conversations} />
-                        <div className="grid items-start gap-6 lg:grid-cols-2">
-                            <WorkloadCard members={workload} />
-                            <TicketHealth support={support} trend={series('tickets')} windowDays={window_days} />
-                        </div>
-                        <ChannelsCard channels={channels} support={support} trend={series('contacts')} busiest={topline.most_active_number} period={period} />
-                    </>}
-                    side={<AgentCard ai={ai} aiShare={aiShare} period={period} activity={agent_activity} />} />
-            </DeskPage>
-        </>
-    );
-}
-
-// ── needs you ─────────────────────────────────────────────────────────────
-
-type NeedsTab = 'conversations' | 'tickets' | 'overdue';
-
-function NeedsYou({ data, unassigned }: { data: NonNullable<Props['needs_you']>; unassigned: number }) {
-    const first: NeedsTab = data.counts.overdue > 0 ? 'overdue' : data.conversations.length > 0 ? 'conversations' : data.tickets.length > 0 ? 'tickets' : 'conversations';
-    const [tab, setTab] = useState<NeedsTab>(first);
-
-    return (
-        <Panel>
-            <PanelHeader
-                title="Needs you"
-                description="Assigned to you, waiting on a reply, or past its time."
-                border={false}
-                actions={
-                    <>
-                        {data.counts.unread > 0 && <Badge tone="accent" dot>{data.counts.unread} unread</Badge>}
-                        <Link href="/desk/inbox?view=mine" className="v-btn v-btn--quiet v-btn--sm">My inbox</Link>
-                    </>
-                }
-            />
-            <PanelTabs<NeedsTab>
-                value={tab}
-                onChange={setTab}
-                options={[
-                    { value: 'conversations', label: 'Conversations', count: data.counts.assigned },
-                    { value: 'tickets', label: 'Tickets', count: data.counts.tickets },
-                    { value: 'overdue', label: data.counts.overdue > 0 ? <span className="text-danger">Overdue</span> : 'Overdue', count: data.counts.overdue },
-                ]}
-            />
-
-            {tab === 'conversations' && (
-                data.conversations.length === 0
-                    ? <EmptyState icon={<Inbox size={20} strokeWidth={1.8} />} title="No conversations assigned to you">Take one from the unassigned queue, or wait for the agent to hand one over.</EmptyState>
-                    : (
-                        <PanelRows>
-                            {data.conversations.map((c) => (
-                                <PanelRow key={c.id} href={`/desk/inbox/${c.id}`}
-                                    leading={<ContactMark name={c.title} initials={c.initials} channel={c.channel} />}
-                                    title={<span className="flex items-center gap-2"><span className={`truncate ${c.unread > 0 ? 'font-semibold' : ''}`}><UserText>{c.title}</UserText></span>{c.company && <span className="truncate text-sm font-normal text-tertiary">{c.company}</span>}</span>}
-                                    subtitle={c.preview ? <UserText>{c.preview}</UserText> : <span className="text-tertiary">No messages yet</span>}
-                                    trailing={
-                                        <span className="flex flex-col items-end gap-1">
-                                            <RelativeTime at={c.last_message_at} />
-                                            {c.unread > 0 ? <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-2xs font-semibold tabular-nums" style={{ background: 'var(--accent)', color: 'var(--text-on-accent)' }}>{c.unread}</span> : <span className="h-[18px]" />}
-                                        </span>
-                                    }
-                                />
-                            ))}
-                        </PanelRows>
-                    )
-            )}
-
-            {tab === 'tickets' && (
-                data.tickets.length === 0
-                    ? <EmptyState icon={<TicketIcon size={20} strokeWidth={1.8} />} title="No open tickets on your plate">Tickets assigned to you land here, most urgent first.</EmptyState>
-                    : (
-                        <PanelRows>
-                            {data.tickets.map((t) => (
-                                <PanelRow key={t.id} href={`/desk/tickets/${t.id}`}
-                                    leading={<IconTile tone={t.priority_tone}><TicketIcon size={15} strokeWidth={1.8} /></IconTile>}
-                                    title={<UserText>{t.subject}</UserText>}
-                                    subtitle={<span className="flex items-center gap-1.5"><Mono>{t.reference}</Mono>{t.created_by_agent && <span className="inline-flex items-center gap-1 text-xs text-tertiary"><Bot size={12} strokeWidth={2} /> raised by the agent</span>}</span>}
-                                    trailing={<><Badge tone={t.status_tone}>{t.status_label}</Badge><Badge tone={t.priority_tone} dot>{t.priority_label}</Badge></>}
-                                />
-                            ))}
-                        </PanelRows>
-                    )
-            )}
-
-            {tab === 'overdue' && (
-                data.overdue.length === 0
-                    ? <EmptyState icon={<CalendarClock size={20} strokeWidth={1.8} />} title="Nothing overdue">Reminders you set and lead follow-ups past their date show up here.</EmptyState>
-                    : (
-                        <PanelRows>
-                            {data.overdue.map((o) => (
-                                <PanelRow key={o.key} href={o.href ?? undefined}
-                                    leading={<IconTile tone="danger">{o.kind === 'lead' ? <Target size={15} strokeWidth={1.8} /> : <CalendarClock size={15} strokeWidth={1.8} />}</IconTile>}
-                                    title={<UserText>{o.title}</UserText>}
-                                    subtitle={o.subtitle ? <UserText>{o.subtitle}</UserText> : (o.kind === 'lead' ? 'Lead follow-up' : 'Reminder')}
-                                    trailing={<span className="flex flex-col items-end gap-0.5"><span className="text-2xs font-medium text-danger">Due</span><RelativeTime at={o.due_at} /></span>}
-                                />
-                            ))}
-                        </PanelRows>
-                    )
-            )}
-
-            {unassigned > 0 && (
-                <PanelFooter>
-                    <span className="flex flex-1 items-center gap-2.5 text-sm text-secondary">
-                        <span className="size-2 rounded-full" style={{ background: 'var(--warning-fill)' }} aria-hidden="true" />
-                        <span><span className="font-semibold text-primary tabular-nums">{unassigned}</span> conversation{unassigned === 1 ? ' is' : 's are'} waiting with nobody on {unassigned === 1 ? 'it' : 'them'}.</span>
-                    </span>
-                    <Link href="/desk/inbox?view=unassigned" className="v-btn v-btn--ghost v-btn--sm">Open the queue <ArrowRight size={14} strokeWidth={2} /></Link>
-                </PanelFooter>
-            )}
-        </Panel>
-    );
-}
-
-function ContactMark({ name, initials, channel }: { name: string; initials: string; channel: string }) {
-    return (
-        <span className="relative shrink-0">
-            <Avatar name={name} initials={initials} size={36} />
-            <span className="absolute -right-1 -bottom-1 flex size-[18px] items-center justify-center rounded-full text-secondary" style={{ background: 'var(--surface)', boxShadow: '0 0 0 1px var(--border)' }}>
-                <ChannelIcon channel={channel} size={10} />
-            </span>
-        </span>
-    );
-}
-
-// ── the agent ─────────────────────────────────────────────────────────────
-
-function AgentCard({ ai, aiShare, period, activity }: { ai: Props['ai']; aiShare: number; period: string; activity: NonNullable<Props['agent_activity']> }) {
-    const facts: { n: number; label: string; tone?: Tone }[] = [
-        { n: ai.calls_transferred, label: 'Handed to a person' },
-        { n: ai.tickets_raised_by_agent, label: 'Tickets raised' },
-        { n: ai.contacts_in_ai_conversations, label: 'People spoken with' },
-        { n: ai.actions_needing_review, label: 'Need review', tone: ai.actions_needing_review > 0 ? 'danger' : undefined },
-    ];
-
-    return (
-        <Panel>
-            <PanelHeader icon={<Bot size={17} strokeWidth={1.8} />} title="What the agent did" description={`Across the ${period}.`} />
-            <PanelBody>
-                <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-3xl font-semibold tracking-tight text-primary tabular-nums">{aiShare}%</span>
-                    <span className="text-right text-xs text-tertiary">of conversations handled alone</span>
-                </div>
-                <div className="mt-3">
-                    <SplitBar parts={[
-                        { value: ai.conversations_agent_only, color: 'var(--accent)', label: 'Agent alone' },
-                        { value: ai.conversations_team_touched, color: 'var(--border-strong)', label: 'Team replied' },
-                    ]} />
-                </div>
-                <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tertiary">
-                    <Legend color="var(--accent)">{ai.conversations_agent_only} agent alone</Legend>
-                    <Legend color="var(--border-strong)">{ai.conversations_team_touched} team replied</Legend>
-                </div>
-
-                <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-5">
-                    {facts.map((f) => (
-                        <div key={f.label}>
-                            <div className="text-xl font-semibold tracking-tight tabular-nums" style={{ color: f.tone === 'danger' ? 'var(--danger)' : 'var(--text-primary)' }}>{f.n.toLocaleString()}</div>
-                            <div className="mt-0.5 text-xs text-tertiary">{f.label}</div>
-                        </div>
-                    ))}
-                </div>
-            </PanelBody>
-
-            <div style={{ borderTop: '1px solid var(--separator)' }}>
-                <div className="flex items-center justify-between px-7 pt-5 pb-2">
-                    <Eyebrow>Latest actions</Eyebrow>
-                    <Link href="/desk/calls" className="text-xs font-medium text-accent-text">All calls</Link>
-                </div>
-                {activity.length === 0 ? (
-                    <p className="px-7 pb-6 text-sm text-tertiary">Nothing yet. Actions the agent takes, like raising a ticket or updating a contact, are listed here.</p>
-                ) : (
-                    <ol className="px-7 pb-4">
-                        {activity.map((a, i) => {
-                            const body = (
-                                <>
-                                    <span className="relative flex w-3 shrink-0 justify-center pt-1.5">
-                                        <span className="relative z-10 size-2 rounded-full" style={{ background: 'var(--accent)', boxShadow: '0 0 0 3px var(--surface)' }} />
-                                        {i < activity.length - 1 && <span className="absolute top-3 bottom-[-14px] w-px" style={{ background: 'var(--separator)' }} aria-hidden="true" />}
-                                    </span>
-                                    <span className="min-w-0 flex-1">
-                                        <span className="block text-sm text-primary"><UserText>{a.description}</UserText></span>
-                                        <span className="mt-0.5 flex items-center gap-1.5 text-xs text-tertiary">
-                                            {a.subject && <span className="truncate"><UserText>{a.subject}</UserText></span>}
-                                            {a.subject && <span aria-hidden="true">·</span>}
-                                            <RelativeTime at={a.at} />
-                                        </span>
-                                    </span>
-                                </>
-                            );
-                            return (
-                                <li key={a.id}>
-                                    {a.href
-                                        ? <Link href={a.href} className="-mx-2 flex gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-surface-hover">{body}</Link>
-                                        : <div className="flex gap-3 py-2.5">{body}</div>}
-                                </li>
-                            );
-                        })}
-                    </ol>
-                )}
-            </div>
-
-            <PanelFooter>
-                <span className="flex-1 text-xs text-tertiary">Team feedback on agent replies</span>
-                <Badge tone="success"><ThumbsUp size={11} strokeWidth={2} /> {ai.feedback.up}</Badge>
-                <Badge tone={ai.feedback.down > 0 ? 'danger' : 'muted'}><ThumbsDown size={11} strokeWidth={2} /> {ai.feedback.down}</Badge>
-            </PanelFooter>
-        </Panel>
-    );
-}
-
-function Legend({ color, children }: { color: string; children: ReactNode }) {
-    return <span className="inline-flex items-center gap-1.5 tabular-nums"><span className="size-2 rounded-full" style={{ background: color }} aria-hidden="true" />{children}</span>;
-}
-
-// ── the team and the queues ───────────────────────────────────────────────
-
-function WorkloadCard({ members }: { members: NonNullable<Props['workload']> }) {
-    const max = Math.max(1, ...members.map((m) => m.open_conversations + m.open_tickets));
-
-    return (
-        <Panel>
-            <PanelHeader icon={<Users size={17} strokeWidth={1.8} />} title="Team workload" description="Open conversations and tickets per person."
-                actions={<Link href="/desk/team" className="v-btn v-btn--ghost v-btn--sm">Team</Link>} />
-            {members.length === 0 ? (
-                <p className="px-7 py-6 text-sm text-tertiary">No one on the team yet.</p>
-            ) : (
-                <ul className="px-7 py-4">
-                    {members.slice(0, 7).map((m) => {
-                        const load = m.open_conversations + m.open_tickets;
-                        return (
-                            <li key={m.id} className="flex items-center gap-3.5 py-2.5">
-                                <Avatar name={m.name} initials={initialsOf(m.name)} size={32} />
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-baseline justify-between gap-2">
-                                        <span className="truncate text-sm font-medium text-primary"><UserText>{m.name}</UserText>{m.is_you && <span className="ml-1.5 text-xs font-normal text-tertiary">you</span>}</span>
-                                        <span className="shrink-0 text-xs text-tertiary tabular-nums" title="Open conversations · open tickets">{m.open_conversations} · {m.open_tickets}</span>
-                                    </div>
-                                    <div className="mt-2"><Meter value={(load / max) * 100} tone={load === max && load > 0 && members.length > 1 ? 'warning' : 'accent'} label={`${m.name}: ${load} open`} /></div>
-                                </div>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-        </Panel>
-    );
-}
-
-const PRIORITY_ORDER: { key: string; tone: Tone }[] = [
-    { key: 'urgent', tone: 'danger' }, { key: 'high', tone: 'warning' }, { key: 'normal', tone: 'info' }, { key: 'low', tone: 'muted' },
-];
-
-function TicketHealth({ support, trend, windowDays }: { support: Props['support']; trend: number[]; windowDays: number }) {
-    const rows: [string, number, Tone][] = [
-        ['Open', support.ticket_pipeline.open ?? 0, 'info'],
-        ['In progress', support.ticket_pipeline.in_progress ?? 0, 'accent'],
-        ['Pending', support.ticket_pipeline.pending ?? 0, 'warning'],
-    ];
-    const max = Math.max(1, ...rows.map(([, n]) => n));
-
-    return (
-        <Panel>
-            <PanelHeader icon={<TicketIcon size={17} strokeWidth={1.8} />} title="Tickets" description="Everything not yet resolved, by where it stands."
-                actions={<Link href="/desk/tickets" className="v-btn v-btn--ghost v-btn--sm">Tickets</Link>} />
-            <PanelBody>
-                <div className="flex items-end justify-between gap-4">
-                    <div>
-                        <div className="text-3xl font-semibold tracking-tight text-primary tabular-nums">{support.open_tickets}</div>
-                        <div className="text-xs text-tertiary">unresolved</div>
-                    </div>
-                    <div className="text-right">
-                        <div className="flex items-center justify-end gap-1.5 text-sm text-secondary"><span className="font-semibold text-primary tabular-nums">{support.tickets_created.value}</span> created <Delta pct={support.tickets_created.delta_pct} invert /></div>
-                        <div className="mt-1 flex justify-end"><Sparkline points={trend} color="var(--chart-3)" width={112} height={26} label={`Tickets created per day, last ${windowDays} days`} /></div>
-                    </div>
-                </div>
-
-                <div className="mt-6 flex flex-col gap-4">
-                    {rows.map(([label, n, tone]) => (
-                        <div key={label}>
-                            <div className="mb-2 flex justify-between text-sm"><span className="text-secondary">{label}</span><span className="font-medium text-primary tabular-nums">{n}</span></div>
-                            <Meter value={(n / max) * 100} tone={tone} label={`${label}: ${n}`} />
-                        </div>
-                    ))}
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-1.5">
-                    {PRIORITY_ORDER.filter((p) => (support.by_priority[p.key] ?? 0) > 0).map((p) => (
-                        <Badge key={p.key} tone={p.tone} dot>{support.by_priority[p.key]} {humanize(p.key).toLowerCase()}</Badge>
-                    ))}
-                </div>
-            </PanelBody>
-        </Panel>
-    );
-}
-
-function ChannelsCard({ channels, support, trend, busiest, period }: { channels: Props['channels']; support: Props['support']; trend: number[]; busiest: Props['topline']['most_active_number']; period: string }) {
-    const max = Math.max(1, ...channels.map((c) => c.conversations));
-    const sorted = [...channels].sort((a, b) => b.conversations - a.conversations);
-
-    return (
-        <Panel>
-            <PanelHeader icon={<MessagesSquare size={17} strokeWidth={1.8} />} title="Channels" description={`Where conversations started, ${period}.`} />
-            <PanelBody>
-                <div className="flex flex-col gap-4">
-                    {sorted.map((c) => (
-                        <div key={c.channel} className="flex items-center gap-3.5">
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded-md text-secondary" style={{ background: 'var(--surface-sunken)' }}><ChannelIcon channel={c.channel} size={14} /></span>
-                            <div className="min-w-0 flex-1">
-                                <div className="mb-1.5 flex justify-between text-sm"><span className="text-secondary">{c.label}</span><span className="font-medium text-primary tabular-nums">{c.conversations}</span></div>
-                                <Meter value={(c.conversations / max) * 100} tone="info" label={`${c.label}: ${c.conversations}`} />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                <div className="mt-6 flex items-end justify-between gap-3 pt-5" style={{ borderTop: '1px solid var(--separator)' }}>
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-sm text-secondary"><span className="font-semibold text-primary tabular-nums">{support.new_contacts.value}</span> new contacts <Delta pct={support.new_contacts.delta_pct} /></div>
-                        <div className="mt-0.5 text-xs text-tertiary">
-                            {busiest ? <>Busiest line <Mono>{busiest.number}</Mono> · {busiest.calls} calls</> : 'No calls in this window.'}
-                        </div>
-                    </div>
-                    <Sparkline points={trend} color="var(--chart-1)" width={96} height={26} label="New contacts per day" />
-                </div>
-            </PanelBody>
-        </Panel>
-    );
+            </li>)}</ol> : <EmptyState icon={<CalendarDays size={24} />} title="No visits match these filters">Change the date or stage, clear your search, or book from the calendar.</EmptyState>}
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4"><p className="text-base text-secondary">{appointments.total ? `${appointments.from}–${appointments.to} of ${appointments.total} matching visits · Page ${appointments.current_page} of ${appointments.last_page}` : '0 matching visits'}</p><div className="flex gap-3">{appointments.prev_page_url && <button disabled={busy} className="v-btn v-btn--secondary" onClick={() => router.visit(appointments.prev_page_url!, options)}>Previous</button>}{appointments.next_page_url && <button disabled={busy} className="v-btn v-btn--secondary" onClick={() => router.visit(appointments.next_page_url!, options)}>Next</button>}</div></div>
+        </section>
+        <div className="grid gap-8 border-t border-border pt-7 lg:grid-cols-2"><section><h2 className="text-lg font-semibold">Patient communication</h2><p className="mt-3 text-base text-secondary">{messages_waiting} open conversations · {counts.patients} active patients · {counts.providers} active providers</p><Link className="v-btn v-btn--secondary mt-4" href="/desk/inbox">Open patient inbox</Link></section>{can_access_clinical && attention && <section><h2 className="text-lg font-semibold">Your clinical follow-up</h2><p className="mt-3 text-base text-secondary">{attention.unsigned_count} unsigned visits · {attention.pending_results_count} results awaiting review</p><ul className="mt-3 space-y-3">{attention.unsigned_visits.map(e => <li key={e.id}><Link className="text-base hover:underline" href={'/desk/encounters/' + e.id}>{e.patient_name} · {e.mrn} · {dateTimeInZone(e.occurred_at, timezone)}</Link></li>)}</ul><div className="mt-4 flex gap-4"><Link className="v-btn v-btn--secondary" href="/desk/labs">Review labs</Link><Link className="v-btn v-btn--secondary" href="/desk/images">Review imaging</Link></div></section>}</div>
+    </DeskPage><Sidebar open={Boolean(confirmation)} onClose={() => { if (!busy) setConfirmation(null); }} title={actionLabel} description={confirmation?.visit.patient.name} width={560}>{confirmation && <><p className="text-base">{confirmation.visit.service} · {dateTimeInZone(confirmation.visit.starts_at, confirmation.visit.timezone)} · {confirmation.visit.timezone}</p><p className="mt-4 text-base text-secondary">{confirmation.status === 'completed' ? 'Record departure and finish this appointment. Clinical notes are not signed by checkout; any unsigned consultation remains available for the clinician to finish.' : confirmation.status === 'cancelled' ? 'Release the appointment slot. This appointment remains in the patient’s visit history.' : 'Record that the patient did not attend this scheduled visit.'}</p>{error && <div role="alert" className="mt-5"><p className="text-base text-danger">{error}</p><button disabled={busy} className="v-btn v-btn--secondary mt-3" onClick={refresh}>Refresh worklist</button></div>}<fieldset disabled={busy} className="mt-7 flex flex-wrap gap-3"><button className="v-btn v-btn--primary" onClick={() => transition(confirmation.visit, confirmation.status)}>{busy ? 'Saving…' : actionLabel}</button><button className="v-btn v-btn--secondary" onClick={() => setConfirmation(null)}>Keep visit as is</button></fieldset></>}</Sidebar></>;
 }

@@ -19,7 +19,7 @@ from typing import Any
 from app_sdk import AppSdk, AppSdkError
 from app_sdk.models import AutomationJob, TenantContext, ToolSpec
 from veyra_harness.assembly import build_worker, tool_from_spec, tools_from_specs  # noqa: F401 — tools_from_specs re-exported
-from veyra_harness.executor import ActionExecutor
+from veyra_harness.executor import ActionExecutor, ExecutionScope
 from veyra_harness.llm import ChatModel, OpenAIChatModel, reasoning_effort
 from veyra_harness.state import RunState
 from veyra_harness.worker import Worker
@@ -187,18 +187,26 @@ class TextRunner:
                 logger.error("runner.automation_report_failed run=%s error=%s", job.id, report)
             return ""
 
-    async def test_skill(self, organization_id: int, slug: str, scenario: str) -> dict[str, Any]:
+    async def test_skill(self, organization_id: int, slug: str, scenario: str, *, expert: str | None = None) -> dict[str, Any]:
         """Run a skill against a written scenario: the Studio 'try it' button. Writes are simulated."""
         app = self._sdk.for_organization(organization_id)
         context = await app.context()
-        state = RunState(sdk=app, context=context, dry_run=True)
-        worker = build_worker(surface="skill_test", context=context, sdk=app, state=state, model_factory=self._model_factory, skill_slug=slug, dry_run=True)
+        if expert is not None:
+            from veyra_harness.core_runtime import build_expert_runtime
+
+            worker = await build_expert_runtime(context=context, sdk=app, expert_slug=expert, model_factory=self._model_factory, skill_slug=slug, dry_run=True)
+        else:
+            # The core path must fail closed on private, disabled or deleted
+            # skills before a model is created or any action can be attempted.
+            await app.skill(slug)
+            state = RunState(sdk=app, context=context, dry_run=True)
+            worker = build_worker(surface="skill_test", context=context, sdk=app, state=state, model_factory=self._model_factory, skill_slug=slug, dry_run=True)
         worker.claim()
         outcome = await worker.delegate(f"Human: {scenario}")
         steps = [m["function"]["name"] for h in worker.history if h.get("role") == "assistant" for m in (h.get("tool_calls") or [])]
         return {"reply": outcome.reply, "failed": outcome.failed, "steps": steps, "tokens": worker.tokens, "expert": worker.expert}
 
-    async def execute_tool(self, organization_id: int, spec: ToolSpec, arguments: dict[str, Any]) -> dict[str, Any]:
+    async def execute_tool(self, organization_id: int, spec: ToolSpec, arguments: dict[str, Any], *, tool_call_id: int | None = None, execution_context: dict[str, Any] | None = None) -> dict[str, Any]:
         """Run one action a person approved in Studio, once, and say what happened.
 
         The app holds the approval request (the tool-call row) and closes it
@@ -209,7 +217,10 @@ class TextRunner:
             return {"ok": False, "status": "failed", "error": f"{spec.name} is not an action this agent layer can run.", "output": "", "duration_ms": 0}
         app = self._sdk.for_organization(organization_id)
         context = await app.context()
-        result, duration_ms = await ActionExecutor(app).run_approved(tool, arguments, RunState(sdk=app, context=context))
+        origin = execution_context or {}
+        scope = ExecutionScope(call_id=origin.get("call_id"), delegation_id=origin.get("delegation_id"), approval_id=tool_call_id)
+        extra = {"conversation_id": origin["conversation_id"]} if origin.get("conversation_id") else {}
+        result, duration_ms = await ActionExecutor(app, scope=scope).run_approved(tool, arguments, RunState(sdk=app, context=context, extra=extra))
         status = "succeeded" if result.ok else ("timeout" if result.error == "timeout" else "failed")
         data = result.data if isinstance(result.data, (dict, list)) or result.data is None else {"value": str(result.data)}
         return {"ok": result.ok, "status": status, "output": result.output[:4000], "result": data, "error": result.error, "duration_ms": duration_ms}

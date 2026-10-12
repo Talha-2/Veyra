@@ -118,11 +118,11 @@ export default function Overview({ window_days, agent_name, health, reconcile, a
             soon: true,
         },
         {
-            key: 'experts',
-            done: setup.experts >= 2,
-            title: 'Talker and worker',
-            detail: setup.experts >= 2 ? `${plural(setup.experts, 'expert')} enabled` : 'Every call needs one talker and one worker enabled',
-            href: '/studio/experts',
+            key: 'runtime',
+            done: true,
+            title: 'Core taker and worker',
+            detail: 'Core conversation and shared skills work without experts',
+            href: '/studio/runtime',
         },
         {
             key: 'skills',
@@ -187,7 +187,7 @@ export default function Overview({ window_days, agent_name, health, reconcile, a
                 {/* Health: the four ways the agent fails a customer. */}
                 <Group title="Is the agent behaving?" description="Each number opens the place where it is fixed.">
                     <div className="@container">
-                        <div className="grid gap-6 @min-[560px]:grid-cols-2 @min-[1000px]:grid-cols-4">
+                        <div className="grid items-start gap-4 @min-[560px]:grid-cols-2 @min-[1000px]:grid-cols-4">
                             <StatLink
                                 href="/studio/agent#timing"
                                 label="Response time, p95"
@@ -332,7 +332,7 @@ export default function Overview({ window_days, agent_name, health, reconcile, a
                         {completed.length > 0 && (
                             <div className="px-6 pt-2 pb-4" style={{ borderTop: '1px solid var(--separator)' }}>
                                 <Disclosure inset title={`${completed.length} ${completed.length === 1 ? 'step' : 'steps'} done`} defaultOpen={outstanding === 0}>
-                                    <ul className="-mx-3 -mt-2 flex flex-col">
+                                    <ul className="-mx-3 -mt-2 grid items-start gap-x-6 md:grid-cols-2">
                                         {completed.map((s) => (
                                             <li key={s.key}>
                                                 <Link href={s.href} className="flex min-h-13 items-center gap-3.5 rounded-md px-3 py-2 transition-colors hover:bg-surface-hover">

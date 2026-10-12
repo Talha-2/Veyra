@@ -6,7 +6,7 @@ import { SwatchInput } from '../../../components/studio-ops/color-swatch';
 import { Field } from '../../../components/studio/form';
 import SettingsShell from '../../../components/studio/settings-shell';
 import AssigneePicker from '../../../components/ui/assignee-picker';
-import Dialog from '../../../components/ui/dialog';
+import Sidebar from '../../../components/ui/sidebar';
 import { DialogActions, PanelHeader } from '../../../components/studio-ops/page-parts';
 import { Card, Switch } from '../../../components/ui/kit';
 import { Avatar, Badge, EmptyState } from '../../../components/ui/primitives';
@@ -79,43 +79,48 @@ export default function TicketTypeSettings({ types, team }: { types: Type[]; tea
                     </>
                 )}
             </Card>
-            {editing && <TypeDialog type={editing === 'new' ? null : editing} team={team} onClose={() => setEditing(null)} />}
+            {editing && <TypeSidebar type={editing === 'new' ? null : editing} team={team} onClose={() => setEditing(null)} />}
         </SettingsShell>
     );
 }
 
-function TypeDialog({ type, team, onClose }: { type: Type | null; team: Member[]; onClose: () => void }) {
+function TypeSidebar({ type, team, onClose }: { type: Type | null; team: Member[]; onClose: () => void }) {
     const { data, setData, post, patch, processing, errors } = useForm({ name: type?.name ?? '', color: type?.color ?? '#4dcafa', description: type?.description ?? '', default_assignee_ids: type?.default_assignee_ids ?? [] });
-    const submit = (e: FormEvent) => { e.preventDefault(); type ? patch(`/studio/settings/ticket-types/${type.id}`, { onSuccess: onClose }) : post('/studio/settings/ticket-types', { onSuccess: onClose }); };
+    const [deleting, setDeleting] = useState(false);
+    const busy = processing || deleting;
+    const close = () => { if (!busy) onClose(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (busy) return; type ? patch(`/studio/settings/ticket-types/${type.id}`, { onSuccess: onClose }) : post('/studio/settings/ticket-types', { onSuccess: onClose }); };
     const deletable = type && type.tickets_count === 0;
 
     return (
-        <Dialog open onClose={onClose} title={type ? `Edit ${type.name}` : 'New ticket type'} description="The colour marks the type everywhere a ticket appears in Desk." width={600}>
-            <form onSubmit={submit}>
-                <div className="mb-6 flex items-center gap-3.5 rounded-lg px-4 py-4" style={{ background: 'var(--surface-sunken)' }}>
-                    <TypeTile color={data.color} size={36} />
-                    <div className="min-w-0">
-                        <div className="truncate text-base font-medium text-primary">{data.name.trim() || 'Untitled type'}</div>
-                        <div className="truncate text-sm text-secondary">{data.description.trim() || 'Preview of how it appears in lists'}</div>
+        <Sidebar open onClose={close} title={type ? `Edit ${type.name}` : 'New ticket type'} description="The colour marks the type everywhere a ticket appears in Desk." width={600}>
+            <form onSubmit={submit} aria-busy={busy}>
+                <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">
+                    <div className="mb-6 flex items-center gap-3.5 rounded-lg px-4 py-4" style={{ background: 'var(--surface-sunken)' }}>
+                        <TypeTile color={data.color} size={36} />
+                        <div className="min-w-0">
+                            <div className="truncate text-base font-medium text-primary">{data.name.trim() || 'Untitled type'}</div>
+                            <div className="truncate text-sm text-secondary">{data.description.trim() || 'Preview of how it appears in lists'}</div>
+                        </div>
                     </div>
-                </div>
-                <Field label="Name" error={errors.name}>
-                    <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Billing" autoFocus />
-                </Field>
-                <Field label="Colour" error={errors.color}>
-                    <SwatchInput value={data.color} onChange={(c) => setData('color', c)} label="Type colour" withHex size={34} />
-                </Field>
-                <Field label="Description" hint="One line saying what belongs here. People pick a type from this." error={errors.description}>
-                    <input className="v-field" value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder="Invoices, refunds and payment questions" />
-                </Field>
-                <Field label="Default assignees" hint="New tickets of this type, including ones the agent raises, go to these people.">
-                    <AssigneePicker team={team} value={data.default_assignee_ids} onChange={(ids) => setData('default_assignee_ids', ids)} />
-                </Field>
+                    <Field label="Name" error={errors.name}>
+                        <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Billing" autoFocus />
+                    </Field>
+                    <Field label="Colour" error={errors.color}>
+                        <SwatchInput value={data.color} onChange={(c) => setData('color', c)} label="Type colour" withHex size={34} />
+                    </Field>
+                    <Field label="Description" hint="One line saying what belongs here. People pick a type from this." error={errors.description}>
+                        <input className="v-field" value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder="Invoices, refunds and payment questions" />
+                    </Field>
+                    <Field label="Default assignees" hint="New tickets of this type, including ones the agent raises, go to these people.">
+                        <AssigneePicker team={team} value={data.default_assignee_ids} onChange={(ids) => setData('default_assignee_ids', ids)} />
+                    </Field>
+                </fieldset>
                 <DialogActions
                     start={
                         <>
                             {deletable && (
-                                <button type="button" className="v-btn v-btn--danger" onClick={() => confirm(`Delete "${type.name}"? This cannot be undone.`) && router.delete(`/studio/settings/ticket-types/${type.id}`, { onSuccess: onClose })}>
+                                <button type="button" className="v-btn v-btn--danger" disabled={busy} onClick={() => !busy && confirm(`Delete "${type.name}"? This cannot be undone.`) && router.delete(`/studio/settings/ticket-types/${type.id}`, { onStart: () => setDeleting(true), onFinish: () => setDeleting(false), onSuccess: onClose })}>
                                     <Trash2 size={14} strokeWidth={2} />Delete
                                 </button>
                             )}
@@ -123,10 +128,10 @@ function TypeDialog({ type, team, onClose }: { type: Type | null; team: Member[]
                         </>
                     }
                 >
-                    <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
-                    <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.name.trim()}>{processing ? 'Saving…' : type ? 'Save' : 'Create type'}</button>
+                    <button type="button" className="v-btn v-btn--ghost" onClick={close} disabled={busy}>Cancel</button>
+                    <button type="submit" className="v-btn v-btn--primary" disabled={busy || !data.name.trim()}>{processing ? 'Saving…' : type ? 'Save' : 'Create type'}</button>
                 </DialogActions>
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }

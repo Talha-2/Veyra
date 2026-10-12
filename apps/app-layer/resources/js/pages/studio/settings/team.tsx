@@ -6,7 +6,7 @@ import { RowMenu } from '../../../components/studio-ops/row-menu';
 import { Field } from '../../../components/studio/form';
 import SettingsShell from '../../../components/studio/settings-shell';
 import { MenuItem, MenuSeparator } from '../../../components/shell/menu';
-import Dialog from '../../../components/ui/dialog';
+import Sidebar from '../../../components/ui/sidebar';
 import { DialogActions, PanelHeader } from '../../../components/studio-ops/page-parts';
 import { COMING_SOON, ComingSoon } from '../../../components/ui/coming-soon';
 import { Callout, Card, IconTile, List } from '../../../components/ui/kit';
@@ -105,7 +105,7 @@ export default function TeamSettings({ members, invitations, roles, surface_opti
                 )}
             </Card>
 
-            <InviteDialog open={inviting} onClose={() => setInviting(false)} roles={roles} surfaces={surfaces} />
+            <InviteSidebar open={inviting} onClose={() => setInviting(false)} roles={roles} surfaces={surfaces} />
         </SettingsShell>
     );
 }
@@ -201,54 +201,56 @@ function MemberRow({ member: m, isMe, canManage, roles, surfaces, surfaceLabel, 
     );
 }
 
-function InviteDialog({ open, onClose, roles, surfaces }: { open: boolean; onClose: () => void; roles: Props['roles']; surfaces: Props['surface_options'] }) {
+function InviteSidebar({ open, onClose, roles, surfaces }: { open: boolean; onClose: () => void; roles: Props['roles']; surfaces: Props['surface_options'] }) {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({ email: '', role: 'member', surfaces: ['desk'] as string[] });
-    const close = () => { clearErrors(); onClose(); };
-    const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/settings/team/invite', { onSuccess: () => { reset(); onClose(); } }); };
+    const close = () => { if (processing) return; clearErrors(); onClose(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (processing) return; post('/studio/settings/team/invite', { onSuccess: () => { reset(); onClose(); } }); };
     const toggle = (v: string) => setData('surfaces', data.surfaces.includes(v) ? data.surfaces.filter((x) => x !== v) : [...data.surfaces, v]);
 
     return (
-        <Dialog open={open} onClose={close} title="Invite someone" description="They get a link to join this organization with the role and access you choose here." width={600}>
-            <form onSubmit={submit}>
-                <Field label="Email" error={errors.email}>
-                    <input className="v-field" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} placeholder="name@company.com" autoFocus />
-                </Field>
-                <Field label="Role" hint="Choosing a role presets what they can open; adjust below." error={errors.role}>
-                    <select className="v-field" value={data.role} onChange={(e) => { const r = roles.find((x) => x.value === e.target.value); setData({ ...data, role: e.target.value, surfaces: r?.default_surfaces ?? data.surfaces }); }}>
-                        {roles.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
-                </Field>
-                <Field label="Can open" error={errors.surfaces}>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        {surfaces.map((s) => {
-                            const on = data.surfaces.includes(s.value);
-                            return (
-                                <button
-                                    key={s.value}
-                                    type="button"
-                                    role="checkbox"
-                                    aria-checked={on}
-                                    onClick={() => toggle(s.value)}
-                                    className="flex items-start gap-3 rounded-lg p-4 text-left transition-colors"
-                                    style={{ background: on ? 'var(--accent-subtle)' : 'var(--surface)', boxShadow: `inset 0 0 0 1px ${on ? 'var(--border-accent)' : 'var(--border-strong)'}` }}
-                                >
-                                    <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[5px]" style={{ background: on ? 'var(--accent)' : 'transparent', boxShadow: on ? 'none' : 'inset 0 0 0 1.5px var(--border-strong)', color: 'var(--text-on-accent)' }}>
-                                        {on && <Check size={11} strokeWidth={3} />}
-                                    </span>
-                                    <span className="min-w-0">
-                                        <span className="block text-base font-medium text-primary">{s.label}</span>
-                                        <span className="mt-0.5 block text-sm text-secondary">{s.tagline}</span>
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </Field>
+        <Sidebar open={open} onClose={close} title="Invite someone" description="They get a link to join this organization with the role and access you choose here." width={600}>
+            <form onSubmit={submit} aria-busy={processing}>
+                <fieldset disabled={processing} className="m-0 min-w-0 border-0 p-0">
+                    <Field label="Email" error={errors.email}>
+                        <input className="v-field" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} placeholder="name@company.com" autoFocus />
+                    </Field>
+                    <Field label="Role" hint="Choosing a role presets what they can open; adjust below." error={errors.role}>
+                        <select className="v-field" value={data.role} onChange={(e) => { const r = roles.find((x) => x.value === e.target.value); setData({ ...data, role: e.target.value, surfaces: r?.default_surfaces ?? data.surfaces }); }}>
+                            {roles.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                        </select>
+                    </Field>
+                    <Field label="Can open" error={errors.surfaces}>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {surfaces.map((s) => {
+                                const on = data.surfaces.includes(s.value);
+                                return (
+                                    <button
+                                        key={s.value}
+                                        type="button"
+                                        role="checkbox"
+                                        aria-checked={on}
+                                        onClick={() => toggle(s.value)}
+                                        className="flex items-start gap-3 rounded-lg p-4 text-left transition-colors"
+                                        style={{ background: on ? 'var(--accent-subtle)' : 'var(--surface)', boxShadow: `inset 0 0 0 1px ${on ? 'var(--border-accent)' : 'var(--border-strong)'}` }}
+                                    >
+                                        <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[5px]" style={{ background: on ? 'var(--accent)' : 'transparent', boxShadow: on ? 'none' : 'inset 0 0 0 1.5px var(--border-strong)', color: 'var(--text-on-accent)' }}>
+                                            {on && <Check size={11} strokeWidth={3} />}
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="block text-base font-medium text-primary">{s.label}</span>
+                                            <span className="mt-0.5 block text-sm text-secondary">{s.tagline}</span>
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </Field>
+                </fieldset>
                 <DialogActions>
-                    <button type="button" className="v-btn v-btn--ghost" onClick={close}>Cancel</button>
+                    <button type="button" className="v-btn v-btn--ghost" onClick={close} disabled={processing}>Cancel</button>
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.email || data.surfaces.length === 0}>{processing ? 'Sending…' : 'Send invitation'}</button>
                 </DialogActions>
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }

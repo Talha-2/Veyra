@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * from becoming a double booking.
  */
 #[Fillable([
-    'action_id', 'call_id', 'delegation_id', 'expert_id', 'action_slug', 'kind',
+    'action_id', 'call_id', 'conversation_id', 'delegation_id', 'expert_id', 'action_slug', 'kind',
     'arguments', 'result', 'status', 'error', 'attempt', 'duration_ms', 'idempotency_key',
 ])]
 class ToolCall extends Model

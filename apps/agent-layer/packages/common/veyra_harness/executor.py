@@ -54,6 +54,9 @@ class ExecutionScope:
     # A simulation drives the agent with a made-up caller against real tools:
     # reads run, writes are answered without happening.
     dry_run: bool = False
+    conversation_id: int | None = None
+    approval_id: int | None = None
+    key_namespace: str | None = None
 
 
 class ActionExecutor:
@@ -74,6 +77,10 @@ class ActionExecutor:
     def write_in_flight(self) -> bool:
         return self._write_in_flight > 0
 
+    @property
+    def execution_namespace(self) -> str:
+        return self.scope.key_namespace or self._run
+
     def idempotency_key(self, tool: Tool, arguments: dict[str, Any]) -> str:
         """Stable across a retry of the same call with the same arguments.
 
@@ -83,10 +90,14 @@ class ActionExecutor:
         Ask thread or automation run).
         """
         digest = hashlib.sha256(json.dumps(arguments, sort_keys=True, default=str).encode()).hexdigest()[:16]
-        where = f"call{self.scope.call_id}" if self.scope.call_id else f"run{self._run}"
+        where = f"approval{self.scope.approval_id}" if self.scope.approval_id else (f"call{self.scope.call_id}" if self.scope.call_id else f"run{self._run}")
+        if self.scope.key_namespace:
+            where = "run" + hashlib.sha256(self.scope.key_namespace.encode()).hexdigest()[:16]
         return f"{where}-d{self.scope.delegation_id or 0}-{tool.name}-{digest}"
 
     async def execute(self, tool: Tool, arguments: dict[str, Any], state: Any) -> ToolResult:
+        from .desk_tools import acting_for
+        self.scope.conversation_id = acting_for(state)
         if not tool.audited:
             return await self._dispatch(tool, arguments, state)
 
@@ -160,6 +171,7 @@ class ActionExecutor:
         try:
             started = await self._sdk.start_tool_call(
                 action_slug=tool.name, arguments=arguments, idempotency_key=key, call_id=self.scope.call_id,
+                conversation_id=self.scope.conversation_id,
                 delegation_id=self.scope.delegation_id, expert_slug=self.scope.expert_slug, kind=tool.kind, attempt=attempt,
             )
         except AppSdkError as e:
@@ -220,7 +232,8 @@ class ActionExecutor:
 
     async def _dispatch(self, tool: Tool, arguments: dict[str, Any], state: Any) -> ToolResult:
         try:
-            raw = await tool.handler(arguments, state)
+            dispatched = {**arguments, "_idempotency_key": self.idempotency_key(tool, arguments)} if tool.inject_idempotency_key else arguments
+            raw = await tool.handler(dispatched, state)
         except asyncio.CancelledError:
             raise
         except Exception as e:  # noqa: BLE001 — a tool fault must not kill the loop

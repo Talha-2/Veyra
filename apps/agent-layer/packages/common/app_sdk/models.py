@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class _Model(BaseModel):
@@ -136,8 +136,8 @@ class ToolSpec(_Model):
         return failure != "timeout"
 
 
-class ExpertRecord(_Model):
-    """A data record, not an agent: what gets swapped into the one loop."""
+class RuntimeDefinition(_Model):
+    """Instructions and permitted capabilities for one execution role."""
 
     slug: str
     name: str
@@ -152,6 +152,23 @@ class ExpertRecord(_Model):
 
     def tool(self, name: str) -> ToolSpec | None:
         return next((t for t in self.tools if t.name == name), None)
+
+
+class ExpertRecord(RuntimeDefinition):
+    """An optional company specialist, fetched separately for its own execution."""
+
+    id: int | None = None
+
+
+class CoreRuntime(_Model):
+    taker: RuntimeDefinition
+    worker: RuntimeDefinition
+
+    @model_validator(mode="after")
+    def _roles(self) -> "CoreRuntime":
+        if self.taker.slug != "core-taker" or self.taker.runtime != "talker" or self.worker.slug != "core-worker" or self.worker.runtime != "worker":
+            raise ValueError("Core runtime must contain the core-taker and core-worker roles")
+        return self
 
 
 class TicketTypeInfo(_Model):
@@ -176,6 +193,8 @@ class TenantContext(_Model):
     """``GET /context``: everything for one tenant, without a call."""
 
     contract: str
+    architecture: Literal["legacy", "skills-first"] = "legacy"
+    core: CoreRuntime | None = None
     organization: OrganizationInfo
     business: BusinessProfile = Field(default_factory=BusinessProfile)
     agent: AgentSettings = Field(default_factory=AgentSettings)
@@ -185,6 +204,8 @@ class TenantContext(_Model):
     memory: list[MemoryEntry] = Field(default_factory=list)
     # Internal (built-in) action slugs an owner switched off in Studio.
     disabled_actions: list[str] = Field(default_factory=list)
+    healthcare_enabled: bool = False
+    scheduling_actions: list[dict[str, Any]] = Field(default_factory=list)
     # Present on a live chat's bundle: the conversation the tools act for.
     session: SessionInfo | None = None
 
@@ -199,13 +220,21 @@ class TenantContext(_Model):
         return [e for e in self.experts if e.runtime == runtime]
 
     @property
-    def talker(self) -> ExpertRecord | None:
+    def talker(self) -> RuntimeDefinition | None:
+        if self.architecture == "skills-first":
+            return self.core.taker if self.core else None
         found = self.experts_for("talker")
         return found[0] if found else None
 
     @property
     def workers(self) -> list[ExpertRecord]:
         return self.experts_for("worker")
+
+    @model_validator(mode="after")
+    def _core_required(self) -> "TenantContext":
+        if self.architecture == "skills-first" and self.core is None:
+            raise ValueError("skills-first context requires explicit core runtime configuration")
+        return self
 
 
 # ── Call bundle ──────────────────────────────────────────────────────────
@@ -577,3 +606,42 @@ class HealthStatus(_Model):
     contract: str
     app: str | None = None
     time: str | None = None
+
+
+class ScheduleLocation(_Model):
+    id: int
+    name: str
+    timezone: str
+
+
+class ScheduleService(_Model):
+    id: int
+    name: str
+    duration_minutes: int
+    fee_minor: int | None = None
+    currency: str = "PKR"
+
+
+class ScheduleProvider(_Model):
+    id: int
+    name: str
+    specialty: str | None = None
+    locations: list[ScheduleLocation] = Field(default_factory=list)
+    services: list[ScheduleService] = Field(default_factory=list)
+
+
+class AvailableSlot(_Model):
+    starts_at: str
+    ends_at: str
+    timezone: str
+
+
+class AppointmentRecord(AvailableSlot):
+    id: int
+    status: str
+    provider_id: int
+    clinic_location_id: int
+    healthcare_service_id: int
+    provider: str
+    location: str
+    service: str

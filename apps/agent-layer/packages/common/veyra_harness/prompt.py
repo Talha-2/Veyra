@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from app_sdk.models import CallContext, CallerInfo, ExpertRecord, TenantContext
+from app_sdk.models import CallContext, CallerInfo, RuntimeDefinition, TenantContext
 
 _PROMPTS = Path(__file__).parent / "prompts"
 
@@ -38,7 +38,7 @@ REPLY_TEMPLATE = "That came back. Tell the caller what it means for them, in you
 REPLY_COVERED_TEMPLATE = "That came back, and you may have said some of it already.\nGive them the part they have not heard yet, in fresh words."
 SUPERSEDE_TEMPLATE = "Not sent — the request is working on what you gave it last."
 SUPERSEDE_CONFIRM_TEMPLATE = "Not sent — the same thing is already with the request."
-FALLBACK_LINE = "The request failed. Nothing was booked, recorded or sent. There is no detail on why beyond that."
+FALLBACK_LINE = "The request did not finish. Some actions may already have completed. Check the recorded results before retrying; do not claim that nothing happened."
 UNCONFIRMED_LINE = "The request finished but nothing durable was confirmed. Do not say anything was booked, recorded or sent."
 STILL_WRITING = "Not ended — something is still being written."
 NOTHING_NEW = "Not sent — there is no new caller conversation."
@@ -157,7 +157,7 @@ def caller_block(call: CallContext) -> str:
     return "\n".join(lines)
 
 
-def skill_catalog(expert: ExpertRecord) -> str:
+def skill_catalog(expert: RuntimeDefinition) -> str:
     """Name + description + read hint, one per line. Never the body. Step-gated skills say so."""
     if not expert.skills:
         return "(No skills are configured. Work from the business information and the tools you have.)"
@@ -173,7 +173,7 @@ def ticket_types_block(context: TenantContext) -> str:
     return "\n".join(f"- {t.name}" + (f": {t.description}" if t.description else "") for t in context.ticket_types)
 
 
-def peers_block(expert: ExpertRecord) -> str:
+def peers_block(expert: RuntimeDefinition) -> str:
     return "\n".join(f"- {p}" for p in expert.peers) if expert.peers else ""
 
 
@@ -186,7 +186,7 @@ def talker_instructions(context: TenantContext, call: CallContext | None = None)
     talker = context.talker
     agent = context.agent
     persona = "\n\n".join(p for p in ((talker.system_prompt or "").strip() if talker else "", (agent.persona or "").strip()) if p)
-    return fill(
+    instructions = fill(
         load("talker"),
         agent_name=agent.display_name or "the assistant",
         business_name=context.business.name or context.organization.name,
@@ -197,9 +197,13 @@ def talker_instructions(context: TenantContext, call: CallContext | None = None)
         caller=caller_block(call) if call else "- Status: unknown (text conversation)",
         now=now_block(context),
     )
+    if context.architecture == "skills-first" and context.core:
+        instructions += "\n\n# Shared procedures\n\n" + skill_catalog(context.core.worker)
+        instructions += "\n\nDelegate operational work to the core worker. It reads and follows the relevant shared skill. Optional specialists do not replace you or the worker."
+    return instructions
 
 
-def worker_instructions(context: TenantContext, expert: ExpertRecord, call: CallContext | None = None, *, peers: str | None = None) -> str:
+def worker_instructions(context: TenantContext, expert: RuntimeDefinition, call: CallContext | None = None, *, peers: str | None = None) -> str:
     """``peers`` is the specialists block from ``assembly`` (with how to hand over); without it, the expert's own peer lines."""
     return fill(
         load("worker"),
@@ -218,7 +222,7 @@ def post_call_instructions() -> str:
     return load("post-call").strip()
 
 
-def text_instructions(context: TenantContext, expert: ExpertRecord | None, *, peers: str = "") -> str:
+def text_instructions(context: TenantContext, expert: RuntimeDefinition | None, *, peers: str = "") -> str:
     """The Ask / automation runner: one agent, no caller, may speak to the person directly."""
     persona = (expert.system_prompt if expert else "") or ""
     return fill(
@@ -252,7 +256,7 @@ def chat_caller_block(caller: CallerInfo | None) -> str:
     return "\n".join(lines)
 
 
-def chat_instructions(context: TenantContext, expert: ExpertRecord | None, caller: CallerInfo | None, *, peers: str = "") -> str:
+def chat_instructions(context: TenantContext, expert: RuntimeDefinition | None, caller: CallerInfo | None, *, peers: str = "") -> str:
     """The live-chat agent: the phone agent's front-desk voice and the worker's
     tools and rules, in one text agent, talking to a customer."""
     talker = context.talker
@@ -260,7 +264,7 @@ def chat_instructions(context: TenantContext, expert: ExpertRecord | None, calle
     persona = "\n\n".join(p for p in (
         (talker.system_prompt or "").strip() if talker else "",
         (agent.persona or "").strip(),
-        (expert.system_prompt or "").strip() if expert else "",
+        (expert.system_prompt or "").strip() if expert and expert is not talker else "",
     ) if p)
     return fill(
         load("chat"),

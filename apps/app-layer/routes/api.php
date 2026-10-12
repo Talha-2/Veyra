@@ -6,15 +6,18 @@ use App\Http\Controllers\Api\Agent\ContactController;
 use App\Http\Controllers\Api\Agent\ContextController;
 use App\Http\Controllers\Api\Agent\ConversationController;
 use App\Http\Controllers\Api\Agent\DelegationController;
+use App\Http\Controllers\Api\Agent\ExpertController;
 use App\Http\Controllers\Api\Agent\HealthController;
 use App\Http\Controllers\Api\Agent\KnowledgeController;
 use App\Http\Controllers\Api\Agent\LeadController;
 use App\Http\Controllers\Api\Agent\MemoryController;
 use App\Http\Controllers\Api\Agent\MessageController;
+use App\Http\Controllers\Api\Agent\SchedulingController;
 use App\Http\Controllers\Api\Agent\SkillController;
 use App\Http\Controllers\Api\Agent\ThreadController;
 use App\Http\Controllers\Api\Agent\TicketController;
 use App\Http\Controllers\Api\Agent\ToolCallController;
+use App\Http\Controllers\Site\InquiryController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -41,7 +44,7 @@ use Illuminate\Support\Facades\Route;
 | The company website's contact and demo form. Public; throttled per IP.
 | CORS for api/* comes from Laravel's default HandleCors config.
 */
-Route::post('site/inquiries', [\App\Http\Controllers\Site\InquiryController::class, 'store'])
+Route::post('site/inquiries', [InquiryController::class, 'store'])
     ->middleware('throttle:6,1')
     ->name('site.inquiries.store');
 
@@ -63,7 +66,18 @@ Route::prefix('agent/v1')->name('agent.')->middleware('agent.auth')->group(funct
 
     Route::prefix('organizations/{organization}')->group(function () {
         Route::get('/context', ContextController::class)->name('context');
+        Route::prefix('scheduling')->group(function () {
+            Route::get('/providers', [SchedulingController::class, 'providers']);
+            Route::get('/slots', [SchedulingController::class, 'slots']);
+            Route::get('/appointments', [SchedulingController::class, 'index']);
+            Route::post('/appointments', [SchedulingController::class, 'store']);
+            Route::patch('/appointments/{appointment}/reschedule', [SchedulingController::class, 'reschedule']);
+            Route::post('/appointments/{appointment}/cancel', [SchedulingController::class, 'cancel']);
+        });
 
+        Route::get('/experts/{expert:slug}/execution', [ExpertController::class, 'execution'])->withoutScopedBindings()->name('experts.execution');
+        Route::get('/experts/{expert:slug}/skills', [ExpertController::class, 'skills'])->withoutScopedBindings()->name('experts.skills');
+        Route::get('/experts/{expert:slug}/skills/{skill:slug}', [ExpertController::class, 'skill'])->withoutScopedBindings()->name('experts.skills.show');
         Route::get('/skills', [SkillController::class, 'index'])->name('skills');
         // withoutScopedBindings: a custom key under a parent parameter makes
         // Laravel look for $organization->skills(), which does not exist.

@@ -16,7 +16,5 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// The surface root is the dashboard, as in Z360. The inbox is one click away
-// and is where an operator will spend the day; the dashboard is where a lead
-// starts it.
-Route::redirect('/', '/desk/dashboard')->name('home');
+// Enter Desk through the clinic launchpad; working modules retain navigation.
+Route::redirect('/', '/desk/modules')->name('home');

@@ -154,8 +154,9 @@ def select_pipeline(ctx: CallContext) -> PipelineSpec:
         spec.max_endpointing_s = min(spec.max_endpointing_s, AUDIO_MAX_ENDPOINTING_S)
 
     # Models: Studio's references, else defaults. Env can still force either.
-    spec.talker_model = os.getenv("TALKER_MODEL") or agent.advanced.get("talker_model") or DEFAULT_TALKER
-    worker = ctx.workers[0] if ctx.workers else None
+    core_taker = ctx.core.taker if ctx.architecture == "skills-first" and ctx.core else None
+    spec.talker_model = os.getenv("TALKER_MODEL") or (core_taker.model if core_taker else None) or agent.advanced.get("talker_model") or DEFAULT_TALKER
+    worker = ctx.core.worker if ctx.architecture == "skills-first" and ctx.core else (ctx.workers[0] if ctx.workers else None)
     spec.worker_model = os.getenv("WORKER_MODEL") or (worker.model if worker and worker.model else None) or agent.advanced.get("worker_model") or DEFAULT_WORKER
     for role, ref in (("talker", spec.talker_model), ("worker", spec.worker_model)):
         try:

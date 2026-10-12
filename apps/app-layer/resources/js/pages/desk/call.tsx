@@ -69,7 +69,7 @@ export default function CallDetail({ call }: Props) {
                     }
                     actions={
                         <>
-                            {call.contact && <Link href={`/desk/contacts/${call.contact.id}`} className="v-btn v-btn--quiet">Contact</Link>}
+                            {call.contact && <Link href={`/desk/patients/profile/${call.contact.id}`} className="v-btn v-btn--quiet">Patient record</Link>}
                             {call.conversation_id && <Link href={`/desk/inbox/${call.conversation_id}`} className="v-btn v-btn--quiet"><MessagesSquare size={14} strokeWidth={1.8} />Open conversation</Link>}
                         </>
                     }
@@ -147,7 +147,7 @@ export default function CallDetail({ call }: Props) {
 
                         {call.contact && (
                             <Panel className="overflow-hidden">
-                                <PanelRow href={`/desk/contacts/${call.contact.id}`}
+                                <PanelRow href={`/desk/patients/profile/${call.contact.id}`}
                                     leading={<Avatar name={call.contact.name} initials={call.contact.initials} size={40} />}
                                     title={<UserText>{call.contact.name}</UserText>}
                                     subtitle="Known customer · open profile"

@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Skill;
 use App\Services\Agent\AgentGateway;
 use App\Services\Agent\AgentUnavailable;
+use App\Services\Agent\CoreRuntimeConfig;
+use App\Services\Agent\SkillOwnership;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -20,7 +22,7 @@ class SkillController extends Controller
         return Inertia::render('studio/skills', [
             'skills' => Skill::query()
                 ->withCount('experts')
-                ->with(['updatedBy:id,name', 'experts:id,name'])
+                ->with(['updatedBy:id,name', 'experts:id,name', 'privateExpert:id,name'])
                 ->orderBy('name')
                 ->get()
                 ->map(fn (Skill $s) => [
@@ -32,12 +34,14 @@ class SkillController extends Controller
                     'mode_label' => $s->execution_mode->label(),
                     'enabled' => $s->enabled,
                     'version' => $s->version,
+                    'private_expert' => $s->privateExpert ? ['id' => $s->privateExpert->id, 'name' => $s->privateExpert->name] : null,
                     'experts_count' => $s->experts_count,
                     // Names, so the list can say who uses a skill rather than how many.
                     'experts' => $s->experts->map(fn ($e) => ['id' => $e->id, 'name' => $e->name])->values()->all(),
                     'updated_by' => $s->updatedBy?->name,
                     'updated_at' => $s->updated_at?->toIso8601String(),
                 ]),
+            'private_experts' => app(SkillOwnership::class)->owners(),
             'modes' => collect(SkillExecutionMode::cases())->map(fn ($m) => [
                 'value' => $m->value, 'label' => $m->label(), 'description' => $m->description(), 'caution' => $m->caution(),
             ])->all(),
@@ -58,11 +62,14 @@ class SkillController extends Controller
                 'steps' => $skill->steps ?? [],
                 'enabled' => $skill->enabled,
                 'version' => $skill->version,
+                'private_expert' => $skill->privateExpert ? ['id' => $skill->privateExpert->id, 'name' => $skill->privateExpert->name] : null,
                 // What the model will actually read, so the author sees exactly
                 // the artefact — frontmatter included — rather than a form.
                 'rendered' => $skill->toMarkdown(),
+                'test_available' => $gateway->available() && $skill->enabled && ($skill->private_expert_id === null || ($skill->privateExpert && app(CoreRuntimeConfig::class)->canExecute($skill->privateExpert))),
                 'experts' => $skill->experts()->get(['experts.id', 'name'])->map(fn ($e) => ['id' => $e->id, 'name' => $e->name])->all(),
             ],
+            'private_experts' => app(SkillOwnership::class)->owners(),
             'modes' => collect(SkillExecutionMode::cases())->map(fn ($m) => [
                 'value' => $m->value, 'label' => $m->label(), 'description' => $m->description(), 'caution' => $m->caution(),
             ])->all(),
@@ -80,6 +87,10 @@ class SkillController extends Controller
      */
     public function test(Request $request, Skill $skill, AgentGateway $gateway): RedirectResponse
     {
+        if (! $skill->enabled || ($skill->private_expert_id !== null && (! $skill->privateExpert || ! app(CoreRuntimeConfig::class)->canExecute($skill->privateExpert)))) {
+            return back()->withErrors(['scenario' => 'Enable the skill and its specialist owner before testing.']);
+        }
+
         $validated = $request->validate(['scenario' => ['required', 'string', 'max:5000']]);
 
         try {
@@ -99,53 +110,75 @@ class SkillController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:80'],
-            'description' => ['required', 'string', 'max:200'],
-            'execution_mode' => ['required', Rule::enum(SkillExecutionMode::class)],
-        ]);
+        return app(SkillOwnership::class)->transact(function () use ($request) {
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:80'],
+                'description' => ['required', 'string', 'max:200'],
+                'execution_mode' => ['required', Rule::enum(SkillExecutionMode::class)],
+                'private_expert_id' => ['nullable', 'integer', app(SkillOwnership::class)->ownerRule()],
+            ]);
 
-        $skill = Skill::create([
-            ...$validated,
-            'slug' => $this->uniqueSlug($validated['name']),
-            'updated_by_id' => $request->user()->getKey(),
-        ]);
+            $skill = Skill::create([
+                ...$validated,
+                'slug' => $this->uniqueSlug($validated['name']),
+                'updated_by_id' => $request->user()->getKey(),
+            ]);
+            app(SkillOwnership::class)->syncPrivateOwner($skill);
 
-        return redirect()->route('studio.skills.show', $skill);
+            return redirect()->route('studio.skills.show', $skill);
+        });
     }
 
     public function update(Request $request, Skill $skill): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['sometimes', 'string', 'max:80'],
-            // Short on purpose: this is what the model reads to decide whether
-            // to open the skill at all, and it is in the prompt for every skill
-            // the expert has, on every turn.
-            'description' => ['sometimes', 'string', 'max:200'],
-            'body' => ['sometimes', 'nullable', 'string', 'max:30000'],
-            'execution_mode' => ['sometimes', Rule::enum(SkillExecutionMode::class)],
-            'steps' => ['sometimes', 'nullable', 'array', 'max:30'],
-            'steps.*.name' => ['required', 'string', 'max:80'],
-            'steps.*.instruction' => ['required', 'string', 'max:1000'],
-            'enabled' => ['sometimes', 'boolean'],
-        ]);
+        return app(SkillOwnership::class)->transact(function () use ($request, $skill) {
+            $skill->refresh();
+            $validated = $request->validate([
+                'name' => ['sometimes', 'string', 'max:80'],
+                // Short on purpose: this is what the model reads to decide whether
+                // to open the skill at all, and it is in the prompt for every skill
+                // the expert has, on every turn.
+                'description' => ['sometimes', 'string', 'max:200'],
+                'body' => ['sometimes', 'nullable', 'string', 'max:30000'],
+                'execution_mode' => ['sometimes', Rule::enum(SkillExecutionMode::class)],
+                'steps' => ['sometimes', 'nullable', 'array', 'max:30'],
+                'steps.*.name' => ['required', 'string', 'max:80'],
+                'steps.*.instruction' => ['required', 'string', 'max:1000'],
+                'enabled' => ['sometimes', 'boolean'],
+                'private_expert_id' => ['sometimes', 'nullable', 'integer', app(SkillOwnership::class)->ownerRule()],
+            ]);
 
-        // A gated skill with no steps is a prose skill that will refuse to run.
-        if (($validated['execution_mode'] ?? $skill->execution_mode->value) === 'gated'
-            && empty($validated['steps'] ?? $skill->steps)) {
-            return back()->withErrors(['steps' => 'A step-gated skill needs at least one step.']);
-        }
+            // A gated skill with no steps is a prose skill that will refuse to run.
+            if (($validated['execution_mode'] ?? $skill->execution_mode->value) === 'gated'
+                && empty($validated['steps'] ?? $skill->steps)) {
+                return back()->withErrors(['steps' => 'A step-gated skill needs at least one step.']);
+            }
 
-        $skill->fill([...$validated, 'updated_by_id' => $request->user()->getKey()])->save();
+            $skill->fill([...$validated, 'updated_by_id' => $request->user()->getKey()])->save();
+            app(SkillOwnership::class)->syncPrivateOwner($skill);
 
-        return back()->with('success', "Skill saved as version {$skill->version}.");
+            return back()->with('success', "Skill saved as version {$skill->version}.");
+        });
     }
 
     public function destroy(Skill $skill): RedirectResponse
     {
-        $skill->delete();
+        return app(SkillOwnership::class)->transact(function () use ($skill) {
+            $skill->delete();
 
-        return redirect()->route('studio.skills');
+            return redirect()->route('studio.skills');
+        });
+    }
+
+    public function restore(Skill $skill): RedirectResponse
+    {
+        return app(SkillOwnership::class)->transact(function () use ($skill) {
+            $skill->refresh();
+            $skill->restore();
+            app(SkillOwnership::class)->syncPrivateOwner($skill);
+
+            return redirect()->route('studio.skills.show', $skill)->with('success', 'Skill restored with its original audience.');
+        });
     }
 
     /**

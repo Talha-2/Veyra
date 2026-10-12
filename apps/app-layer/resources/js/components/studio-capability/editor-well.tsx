@@ -37,14 +37,31 @@ export function EditorWell({
     mono?: boolean;
 }) {
     const ref = useRef<HTMLTextAreaElement>(null);
+    const fit = () => {
+        const el = ref.current;
+        if (!el || !el.getClientRects().length) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight + 2}px`;
+    };
 
     // Grow to fit: reset, then take the scroll height.
     useLayoutEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-        el.style.height = 'auto';
-        el.style.height = `${el.scrollHeight + 2}px`;
-    }, [value]);
+        fit();
+    }, [value, minRows]);
+
+    useLayoutEffect(() => {
+        if (!ref.current) return;
+        let previousWidth = 0;
+        const observer = new ResizeObserver(([entry]) => {
+            const width = entry.contentRect.width;
+            if (width > 0 && width !== previousWidth) {
+                previousWidth = width;
+                fit();
+            }
+        });
+        observer.observe(ref.current);
+        return () => observer.disconnect();
+    }, []);
 
     const words = value.trim() ? value.trim().split(/\s+/).length : 0;
     const near = max != null && value.length > max * 0.9;

@@ -16,9 +16,9 @@ import Toaster from '../components/ui/toaster';
  *
  * `flush` hands a page the whole viewport as a fixed frame — Ask and the
  * voice console manage their own panes and inner scrolling.
- * `width="wide"` is for pages that are mostly tables or boards.
+ * Standard pages share one frame. `width` remains accepted for existing pages.
  */
-export default function StudioLayout({ children, flush = false, width = 'default' }: { children: ReactNode; flush?: boolean; width?: 'default' | 'wide' }) {
+export default function StudioLayout({ children, flush = false }: { children: ReactNode; flush?: boolean; width?: 'default' | 'wide' }) {
     return (
         <div className={`flex bg-bg ${flush ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
             <div className="sticky top-0 hidden h-screen shrink-0 self-start md:block">
@@ -27,7 +27,7 @@ export default function StudioLayout({ children, flush = false, width = 'default
             <main className={`min-w-0 flex-1 ${flush ? 'flex h-screen flex-col overflow-hidden' : ''}`}>
                 <MobileNav product="studio" />
                 {flush ? <div className="min-h-0 flex-1">{children}</div> : (
-                    <div className={`mx-auto w-full px-6 pt-10 pb-28 md:px-10 lg:px-14 lg:pt-12 ${width === 'wide' ? 'max-w-[1440px] min-[1800px]:max-w-[1640px]' : 'max-w-[1200px] min-[1800px]:max-w-[1360px]'}`}>
+                    <div className="studio-page-frame mx-auto w-full max-w-[1440px] px-6 pt-10 pb-28 md:px-10 lg:px-14 lg:pt-12 min-[1800px]:max-w-[1640px]">
                         {children}
                     </div>
                 )}

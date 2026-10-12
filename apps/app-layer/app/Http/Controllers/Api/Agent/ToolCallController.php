@@ -34,6 +34,7 @@ class ToolCallController extends Controller
             'arguments' => ['nullable', 'array'],
             'idempotency_key' => ['nullable', 'string', 'max:128'],
             'call_id' => ['nullable', 'integer'],
+            'conversation_id' => ['nullable', 'integer', Rule::exists('conversations', 'id')->where('organization_id', $organization->id)],
             'delegation_id' => ['nullable', 'integer'],
             'expert_slug' => ['nullable', 'string', 'max:120'],
             'attempt' => ['nullable', 'integer', 'min:1'],
@@ -53,6 +54,7 @@ class ToolCallController extends Controller
         $toolCall = ToolCall::create([
             'action_id' => $action?->id,
             'call_id' => $validated['call_id'] ?? $delegation?->call_id,
+            'conversation_id' => $validated['conversation_id'] ?? null,
             'delegation_id' => $delegation?->id,
             'expert_id' => $expert?->id,
             'action_slug' => $validated['action_slug'],

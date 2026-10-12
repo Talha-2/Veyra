@@ -62,7 +62,7 @@ export default function SettingsShell({ title, description, actions, meta, child
                         <KeyHint />
                     </div>
                 </nav>
-                <div className="min-w-0 max-w-[880px]">
+                <div className="min-w-0">
                     <PageHeader title={title} description={description} actions={actions} meta={meta} />
                     <div className="mt-3">{children}</div>
                 </div>

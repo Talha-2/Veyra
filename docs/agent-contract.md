@@ -20,6 +20,28 @@ exercises the SDK against those responses.
 
 ---
 
+## Skills-first runtime capability (October 2026)
+
+Current tenant/call bundles add `architecture: "skills-first"` and `core: {taker, worker}`. Each core definition includes slug, name, description, runtime, prompt, model, reasoning effort, enabled shared skill stubs and explicit permitted tool specs. Core slugs `core-taker` / `core-worker` are execution roles, not Expert records. New tenants require no Experts. AgentConfig stores core settings and a one-time copy of existing built-in profile settings/grants; historical profiles are retained.
+
+`experts` is now the optional specialist directory: enabled company-created worker/text descriptions only, with empty prompts, tools and skill arrays. It does not carry private metadata. An unflagged bundle remains a legacy persona-roster bundle for SDK compatibility. Roll out both updated layers together; old clients do not implement the skills-first capability.
+
+| Agent → app, inside `/organizations/{organization}` | Result |
+|---|---|
+| `GET /skills` | Enabled shared skill index only |
+| `GET /skills/{skill:slug}` | Shared document; private/disabled/deleted returns 404 |
+| `GET /experts/{expert:slug}/execution` | `{expert: RuntimeDefinition}` with assigned actions and enabled shared plus owned-private skill stubs |
+| `GET /experts/{expert:slug}/skills` | That Expert's authorized skill index |
+| `GET /experts/{expert:slug}/skills/{skill:slug}` | Shared or that Expert's own private document; sibling-private, disabled Expert, built-in/talker or foreign tenant returns 404 |
+
+The machine secret still authenticates the trusted agent layer. Model tools cannot change tenant/role identity: `AppSdk.for_expert(slug)` makes a separate scoped client inside the delegation host; `read_skill` accepts only a skill slug. Tenant rebinding clears the Expert identity and skill cache. Every read reauthorizes; gated step advances also reauthorize and invalidate revoked/version-changed procedures.
+
+Core voice retains delegate/check-progress behavior. Chat's core taker uses `delegate_work`, and the core worker may use `delegate_expert` from its optional directory. Each child has separate history, gate and action executor; only the delegated task and necessary customer scope are passed, not parent transcript/tool history. Experts receive no recursive delegate tool or unassigned durable actions. Identical tasks within one parent turn reuse the result; child writes retain namespaced idempotency keys, caller scope and parent delegation audit links. Core action rows use `expert_slug: null`; specialist rows use the actual company slug. Streaming tool events distinguish `runtime_role` and `runtime_name`.
+
+Partial failure is distinct from rollback: failed/timed-out outcomes retain any confirmed durable-write evidence and do not assert that nothing happened. Progress includes active child work and aggregate write-in-flight state. Dry-run writes and actions awaiting approval are never counted as confirmed writes.
+
+App → gateway `POST /v1/skills/test` adds optional `expert` (owner slug, derived by PHP from the saved skill). Generic tests cannot read private skills; explicit private tests use a scoped Expert definition, verify current ownership/enabled state and simulate writes. Studio `/studio/runtime` edits core prompts, models, worker reasoning and action grants. `/studio/experts` manages optional specialists and keeps historical profiles separate.
+
 ## Authentication
 
 One shared secret, `AGENT_SHARED_SECRET`, set on both sides. Sent as
@@ -59,6 +81,53 @@ for that, not for a browser.
 ---
 
 ## Routes
+
+### Healthcare scheduling extension
+
+The tenant bundle includes healthcare_enabled (false when absent). Workspaces
+with Providers receive scheduling built-ins; other workspaces keep their
+existing tool set. All records are scoped to the organization in the path.
+
+Under /organizations/{organization}/scheduling:
+
+| Route | Payload / result |
+| --- | --- |
+| GET /providers | Active providers with id/name/specialty and assigned locations/services; no account or registration credentials |
+| GET /slots | provider_id, location_id, service_id, from, to; maximum 31 days. Returns free UTC starts_at/ends_at and timezone; no patient identity |
+| GET /appointments | Up to 50 recent/upcoming appointments; customers see only their own patient; staff may filter patient_id |
+| POST /appointments | provider_id, clinic_location_id, healthcare_service_id, starts_at, confirmed, idempotency_key; patient_id required only for staff |
+| PATCH /appointments/{appointment}/reschedule | starts_at, confirmed; retains original booking on conflict |
+| POST /appointments/{appointment}/cancel | confirmed; releases availability |
+
+Slot lookup accepts ignore_appointment_id for rescheduling. The appointment
+must belong to the selected provider and, on customer runs, this conversation's
+patient. Another patient's appointment is a 404.
+
+Agent writes require confirmed. The harness asks for explicit confirmation of
+the selected provider/service/date/time; this boolean is a conversation guard,
+not independent identity verification. Customer writes resolve Patient from
+ActingFor's linked Contact, never an arbitrary model-selected patient ID.
+Unregistered or unlinked customers are refused and directed to staff.
+Clinical records are not exposed.
+
+Booking results contain appointment id/status, UTC starts_at/ends_at, timezone,
+provider_id, clinic_location_id, healthcare_service_id and provider/location/
+service display names. Staff list results also include patient id/name/mrn.
+Customer results do not include other patient identity.
+
+ActionExecutor supplies book_appointment's private idempotency key; it is never
+part of the model's input schema. Mutations are audited durable writes; a
+timeout remains unconfirmed. Studio restrictions and approvals still apply.
+Reminders require a separate delivery integration.
+
+The context also carries scheduling_actions with organization-wide action IDs,
+approval policies and timeouts. Automatic tools and the no-expert fallback
+apply those same policies. Tool-call audit records carry the trusted
+conversation_id independently of model arguments, including web chats.
+Approval dispatch sends that origin in execution_context. The gateway restores
+it for ActingFor and uses the approval row ID as a stable booking-key namespace.
+An unavailable write response is recorded as timeout/unconfirmed so Desk can
+reconcile it; it is not treated as proof that nothing happened.
 
 Base: `{APP_LAYER_URL}/api/agent/v1`. All bodies JSON. Validation failures are
 422 with Laravel's `{message, errors: {field: [..]}}` shape.

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\DocsController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OrganizationSwitchController;
 use App\Http\Controllers\SurfaceRedirectController;
@@ -24,7 +25,7 @@ use Illuminate\Support\Facades\Route;
 
 // The public API reference, readable without an account (partners evaluating
 // an integration). Same spec as Studio › Developer: App\Support\PublicApi\OpenApiSpec.
-Route::get('/docs/api', [\App\Http\Controllers\DocsController::class, 'api'])->name('docs.api');
+Route::get('/docs/api', [DocsController::class, 'api'])->name('docs.api');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -53,3 +54,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', SurfaceRedirectController::class)->name('home');
     });
 });
+
+if (is_file(__DIR__.'/portal.php')) {
+    require __DIR__.'/portal.php';
+}

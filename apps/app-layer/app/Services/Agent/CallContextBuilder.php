@@ -2,19 +2,23 @@
 
 namespace App\Services\Agent;
 
+use App\Enums\ActionKind;
 use App\Models\Action;
 use App\Models\AgentConfig;
 use App\Models\BusinessProfile;
 use App\Models\Call;
 use App\Models\Contact;
+use App\Models\Conversation;
 use App\Models\Document;
 use App\Models\Expert;
 use App\Models\Identifier;
 use App\Models\Organization;
 use App\Models\PhoneNumber;
+use App\Models\Provider;
 use App\Models\Skill;
 use App\Models\Ticket;
 use App\Models\TicketType;
+use App\Services\Healthcare\HealthcareActions;
 use App\Services\Voice\VoiceCatalog;
 use App\Support\LanguageCapabilities;
 
@@ -37,13 +41,6 @@ class CallContextBuilder
 
     public function forOrganization(Organization $organization): array
     {
-        // An organization that never went through onboarding (created by a
-        // seeder, an import, the API) still answers with a working agent:
-        // without experts the front desk has no worker to look anything up.
-        if (! Expert::query()->exists()) {
-            app(\App\Services\Organization\StarterAgent::class)->provision($organization);
-        }
-
         $config = AgentConfig::query()->firstOrCreate([]);
         $profile = BusinessProfile::query()->firstOrCreate([]);
 
@@ -57,10 +54,21 @@ class CallContextBuilder
             $profile->refresh();
         }
 
+        $config = app(CoreRuntimeConfig::class)->initialize($config);
         $experts = $this->experts();
+        $healthcareEnabled = Provider::query()->exists();
+        if ($healthcareEnabled) {
+            HealthcareActions::sync();
+        }
 
         return [
             'contract' => self::CONTRACT,
+            'architecture' => 'skills-first',
+            'core' => app(CoreRuntimeConfig::class)->definitions($config),
+            'healthcare_enabled' => $healthcareEnabled,
+            'scheduling_actions' => Action::query()->where('kind', ActionKind::Internal)
+                ->whereIn('slug', HealthcareActions::SLUGS)->where('enabled', true)
+                ->get()->map(fn ($action) => $action->toToolSpec())->all(),
             'organization' => [
                 'id' => $organization->id,
                 'slug' => $organization->slug,
@@ -68,7 +76,7 @@ class CallContextBuilder
                 'timezone' => $organization->timezone,
             ],
             'business' => $profile->only(['name', 'description', 'industry', 'timezone', 'website', 'address', 'hours', 'holidays']),
-            'agent' => $this->withTalkerModel($this->agent($config), $experts),
+            'agent' => $this->agent($config),
             'experts' => $experts,
             'skills' => $this->skillIndex(),
             'ticket_types' => TicketType::query()->where('enabled', true)->orderBy('position')->get(['id', 'name', 'description'])->all(),
@@ -76,7 +84,7 @@ class CallContextBuilder
                 ->map(fn (Document $d) => ['name' => $d->name, 'content' => $d->content])->all(),
             // Built-in tools an owner switched off in Studio. The agent layer
             // gives every worker the built-ins; this is how "off" stays off.
-            'disabled_actions' => Action::query()->where('kind', \App\Enums\ActionKind::Internal)->where('enabled', false)->orderBy('slug')->pluck('slug')->all(),
+            'disabled_actions' => Action::query()->where('kind', ActionKind::Internal)->where('enabled', false)->orderBy('slug')->pluck('slug')->all(),
         ];
     }
 
@@ -124,7 +132,7 @@ class CallContextBuilder
      * A text conversation's bundle for live chat: the tenant bundle plus who
      * the agent is talking to, with no call or line.
      */
-    public function forConversation(\App\Models\Conversation $conversation): array
+    public function forConversation(Conversation $conversation): array
     {
         return [
             ...$this->forOrganization(Organization::current()),
@@ -170,54 +178,19 @@ class CallContextBuilder
         ];
     }
 
-    /**
-     * A model set on the talker expert is the talker's model in voice. The
-     * voice host reads `advanced.talker_model` (Identity → Models); the
-     * expert's own setting is the more specific one, so it wins.
-     */
-    private function withTalkerModel(array $agent, array $experts): array
-    {
-        $talker = collect($experts)->firstWhere('runtime', 'talker');
-        if ($talker && filled($talker['model'] ?? null)) {
-            $agent['advanced'] = [...(array) $agent['advanced'], 'talker_model' => $talker['model']];
-        }
-
-        return $agent;
-    }
-
-    /**
-     * Every enabled expert with what it needs to be swapped in: prompt, tool
-     * schemas with their reliability flags, and the skill catalog (names and
-     * descriptions only — bodies are read on demand via /skills/{slug}).
-     *
-     * Order matters: the agent layer starts as the first enabled expert of a
-     * runtime and routes to the others by their descriptions.
-     */
+    /** Optional descriptors; execution instructions are fetched only in the specialist scope. */
     private function experts(): array
     {
-        $experts = Expert::query()->enabled()->with(['skills' => fn ($q) => $q->where('enabled', true), 'actions' => fn ($q) => $q->where('enabled', true), 'actions.integration'])->orderBy('position')->orderBy('id')->get();
-
-        return $experts->map(fn (Expert $e) => [
-            'slug' => $e->slug,
-            'name' => $e->name,
-            'description' => $e->description,
-            'runtime' => $e->runtime->value,
-            'system_prompt' => $e->system_prompt,
-            'model' => $e->model,
-            'reasoning_effort' => $e->reasoning_effort,
-            'skills' => $e->skills->map(fn (Skill $s) => [
-                'slug' => $s->slug, 'name' => $s->name, 'description' => $s->description,
-                'path' => "/skills/org/{$s->slug}/SKILL.md", 'version' => $s->version, 'execution_mode' => $s->execution_mode->value,
-            ])->values()->all(),
-            'tools' => $e->actions->map(fn (Action $a) => $a->toToolSpec())->values()->all(),
-            // Peer routing: one line per sibling on the same runtime.
-            'peers' => $experts->where('runtime', $e->runtime)->where('id', '!=', $e->id)->map(fn (Expert $p) => $p->routingLine())->values()->all(),
-        ])->values()->all();
+        return Expert::query()->enabled()->where('is_builtin', false)->whereIn('runtime', ['worker', 'text'])->orderBy('position')->orderBy('id')->get()
+            ->map(fn (Expert $expert) => [
+                'slug' => $expert->slug, 'name' => $expert->name, 'description' => $expert->description, 'runtime' => $expert->runtime->value,
+                'system_prompt' => null, 'model' => null, 'reasoning_effort' => null, 'skills' => [], 'tools' => [], 'peers' => [],
+            ])->all();
     }
 
     private function skillIndex(): array
     {
-        return Skill::query()->enabled()->orderBy('name')->get()
+        return Skill::query()->enabled()->shared()->orderBy('name')->get()
             ->map(fn (Skill $s) => ['slug' => $s->slug, 'name' => $s->name, 'description' => $s->description, 'version' => $s->version, 'scope' => $s->scope])
             ->all();
     }

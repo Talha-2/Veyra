@@ -185,10 +185,9 @@ async def entrypoint(ctx: JobContext) -> None:
     for note in spec.notes:
         logger.info("voice.pipeline_note %s", note)
 
-    # The worker, assembled the same way as on every other surface: every
-    # enabled worker expert as a persona (switch_expert routes between them),
-    # step-gated skills, each expert's own model and reasoning effort.
-    if not call_ctx.workers:
+    # Core execution needs no Experts. Specialist clients are initialized
+    # off the audio loop only when separately delegated.
+    if call_ctx.architecture == "legacy" and not call_ctx.workers:
         logger.warning("voice.no_worker_expert: delegation will fail honestly")
     # Building the model clients loads the CA bundle synchronously (seconds on
     # a busy host, measured 6.6 s), so it happens off the loop that carries audio.

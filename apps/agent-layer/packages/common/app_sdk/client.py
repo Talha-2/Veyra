@@ -22,6 +22,7 @@ one mistake worth making impossible.
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Literal
 
 import asyncio
@@ -42,6 +43,7 @@ from .models import (
     ConversationWrapUp,
     DelegationOutcome,
     DelegationRecord,
+    ExpertRecord,
     HandoffResult,
     HealthStatus,
     KnowledgeResult,
@@ -98,6 +100,7 @@ class AppSdk:
             transport=transport,
         )
         self._skills: dict[str, SkillDocument] = {}
+        self._expert_slug: str | None = None
 
     # ── lifecycle ────────────────────────────────────────────────────────
 
@@ -107,7 +110,31 @@ class AppSdk:
         bound.__dict__.update(self.__dict__)
         bound.organization_id = organization_id
         bound._skills = {}
+        bound._expert_slug = None
         return bound
+
+    def for_expert(self, slug: str) -> "AppSdk":
+        """Bind specialist reads without changing the parent client's identity or cache."""
+        if self.organization_id is None or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", slug):
+            raise AppSdkError("Expert scope needs a tenant-bound client and a valid slug.")
+        bound = AppSdk.__new__(AppSdk)
+        bound.__dict__.update(self.__dict__)
+        bound._expert_slug = slug
+        bound._skills = {}
+        return bound
+
+    async def expert_definition(self) -> ExpertRecord:
+        if self._expert_slug is None:
+            raise AppSdkError("An expert definition requires a separately scoped Expert client.")
+        body = await self._get(self._org(f"/experts/{self._expert_slug}/execution"))
+        definition = ExpertRecord.model_validate(body["expert"])
+        if definition.slug != self._expert_slug:
+            raise AppSdkError("Expert definition does not match this execution scope.")
+        return definition
+
+    def _skill_path(self, suffix: str = "") -> str:
+        prefix = f"/experts/{self._expert_slug}" if self._expert_slug else ""
+        return self._org(f"{prefix}/skills{suffix}")
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -122,6 +149,37 @@ class AppSdk:
 
     async def health(self) -> HealthStatus:
         return HealthStatus.model_validate(await self._get("/health"))
+
+    async def scheduling_providers(self, *, acting_for: int | None = None):
+        from .models import ScheduleProvider
+        body = await self._get(self._org("/scheduling/providers"), headers=_acting(acting_for))
+        return [ScheduleProvider.model_validate(row) for row in body["providers"]]
+
+    async def scheduling_slots(self, *, provider_id: int, location_id: int, service_id: int, from_: str, to: str, acting_for: int | None = None, ignore_appointment_id: int | None = None):
+        from .models import AvailableSlot
+        body = await self._get(self._org("/scheduling/slots"), params=_compact({"provider_id": provider_id, "location_id": location_id, "service_id": service_id, "from": from_, "to": to, "ignore_appointment_id": ignore_appointment_id}), headers=_acting(acting_for))
+        return [AvailableSlot.model_validate(row) for row in body["slots"]]
+
+    async def appointments(self, *, patient_id: int | None = None, acting_for: int | None = None):
+        from .models import AppointmentRecord
+        body = await self._get(self._org("/scheduling/appointments"), params=_compact({"patient_id": patient_id}), headers=_acting(acting_for))
+        return [AppointmentRecord.model_validate(row) for row in body["appointments"]]
+
+    async def book_appointment(self, *, provider_id: int, location_id: int, service_id: int, starts_at: str, confirmed: bool, idempotency_key: str, patient_id: int | None = None, acting_for: int | None = None):
+        from .models import AppointmentRecord
+        body = await self._post(self._org("/scheduling/appointments"), _compact({"provider_id": provider_id, "clinic_location_id": location_id, "healthcare_service_id": service_id,
+            "starts_at": starts_at, "confirmed": confirmed, "idempotency_key": idempotency_key, "patient_id": patient_id}), headers=_acting(acting_for))
+        return AppointmentRecord.model_validate(body["appointment"])
+
+    async def reschedule_appointment(self, appointment_id: int, *, starts_at: str, confirmed: bool, acting_for: int | None = None):
+        from .models import AppointmentRecord
+        body = await self._patch(self._org(f"/scheduling/appointments/{appointment_id}/reschedule"), {"starts_at": starts_at, "confirmed": confirmed}, headers=_acting(acting_for))
+        return AppointmentRecord.model_validate(body["appointment"])
+
+    async def cancel_appointment(self, appointment_id: int, *, confirmed: bool, acting_for: int | None = None):
+        from .models import AppointmentRecord
+        body = await self._post(self._org(f"/scheduling/appointments/{appointment_id}/cancel"), {"confirmed": confirmed}, headers=_acting(acting_for))
+        return AppointmentRecord.model_validate(body["appointment"])
 
     async def inbound_call(self, *, to: str, from_: str, provider: str, provider_sid: str, room: str | None = None) -> CallContext:
         """Report an arriving call and get everything needed to answer it.
@@ -170,20 +228,25 @@ class AppSdk:
         return TenantContext.model_validate(await self._get(self._org("/context")))
 
     async def skills(self) -> list[SkillStub]:
-        body = await self._get(self._org("/skills"))
+        body = await self._get(self._skill_path())
         return [SkillStub.model_validate(s) for s in body.get("skills", [])]
 
     async def skill(self, slug: str, *, version: int | None = None) -> SkillDocument:
         """The skill body, read when the model decides it is relevant.
 
-        Cached per client on ``version``: the stub in the prompt carries the
-        version, so a body edited in Studio mid-call is re-read on the next
-        call and never served stale.
+        Reauthorize every read: ownership, enabled state or tenant access can
+        change during a conversation. Cached content never bypasses the API.
         """
-        cached = self._skills.get(slug)
-        if cached is not None and (version is None or cached.version == version):
-            return cached
-        doc = SkillDocument.model_validate(await self._get(self._org(f"/skills/{slug}")))
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", slug):
+            raise NotFound("Invalid skill slug.", status=404)
+        try:
+            body = await self._get(self._skill_path(f"/{slug}"))
+        except NotFound:
+            self._skills.pop(slug, None)
+            raise
+        doc = SkillDocument.model_validate(body)
+        if doc.slug != slug:
+            raise AppSdkError("Skill document does not match the requested slug.")
         self._skills[slug] = doc
         return doc
 
@@ -343,7 +406,7 @@ class AppSdk:
 
     async def start_tool_call(
         self, *, action_slug: str, arguments: dict[str, Any] | None = None, idempotency_key: str | None = None,
-        call_id: int | None = None, delegation_id: int | None = None, expert_slug: str | None = None, kind: str | None = None, attempt: int = 1,
+        call_id: int | None = None, delegation_id: int | None = None, expert_slug: str | None = None, kind: str | None = None, attempt: int = 1, conversation_id: int | None = None,
     ) -> ToolCallStart:
         """Record a tool call *before* dispatching it.
 
@@ -354,6 +417,7 @@ class AppSdk:
         body = await self._post(self._org("/tool-calls"), {
             "action_slug": action_slug, "arguments": arguments or {}, "idempotency_key": idempotency_key, "call_id": call_id,
             "delegation_id": delegation_id, "expert_slug": expert_slug, "kind": kind, "attempt": attempt,
+            "conversation_id": conversation_id,
         })
         return ToolCallStart.model_validate(body)
 

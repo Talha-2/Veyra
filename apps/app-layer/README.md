@@ -1,5 +1,55 @@
 # Veyra app layer
 
+## Healthcare Desk: first release
+
+Desk now includes patient registration, provider profiles and built-in provider
+calendars. Patients link to existing CRM Contacts, preserving conversations,
+calls and tickets. This release covers demographics and scheduling; clinical
+charts, prescriptions and billing follow in later phases.
+
+Setup order: register patients, add locations and services under Providers,
+create a provider and assign their locations/services, then set working hours.
+Calendar offers day/week views, booking, rescheduling, cancellation, check-in
+and visit status. Leave and blocked time are managed from the provider profile.
+Default location timezone is Asia/Karachi; service fees are PKR.
+
+Staff and AI use one transactional booking service. Saving rechecks the slot
+while locking the provider, including appointments across locations. Schedule
+edits and time blocks use that same lock. Repeated bookings use idempotency
+keys. Cancellation releases time; a failed reschedule retains the original.
+
+Creating a provider adds scheduling actions to Studio's integration catalog.
+The context enables healthcare tools only for workspaces with providers.
+Disable actions or require approval in Studio as usual. A customer agent can
+book only for the registered patient linked to its conversation. Unregistered
+patients are referred to staff; availability never reveals other patients.
+Appointment reminders are not delivered in this release.
+
+Apply ordinary migrations, not migrate:fresh, and build the frontend. Existing
+Contacts are not automatically converted.
+
+    php artisan migrate
+    npm run build
+    php artisan test --filter='Patient|Provider|Appointment|AgentScheduling'
+
+The default suite uses in-memory SQLite. Race tests require a disposable
+PostgreSQL database named exactly healthcare_test; the guard refuses other
+databases. Use the dedicated container on port 5444:
+
+    docker run -d --name veyra-healthcare-pg -p 5444:5432 -e POSTGRES_USER=healthcare_test -e POSTGRES_PASSWORD=healthcare_test_only -e POSTGRES_DB=healthcare_test postgres:17
+
+Inside a PHP development container, use only these disposable DB settings:
+
+    DB_CONNECTION=pgsql DB_DATABASE=healthcare_test DB_HOST=host.docker.internal DB_PORT=5444 DB_USERNAME=healthcare_test DB_PASSWORD=healthcare_test_only DB_URL= php vendor/bin/phpunit -c phpunit-scheduling-pg.xml
+
+Those tests rebuild the dedicated test database and run independent processes
+for overlapping bookings, booking versus leave and rescheduling versus booking.
+
+Synthetic preview fixtures are opt-in at
+tests/Fixtures/HealthcareDemoSeeder.php. Run only against a separate preview
+database; the fixture refuses production. Preview login:
+demo@healthcare.test / healthcare-demo-only.
+
 Laravel 13 + Inertia + React 19 + PostgreSQL. Owns all customer data, both
 product surfaces, auth and tenancy. It never runs AI — that is the agent layer's
 job, reached over HTTP. See [ARCHITECTURE.md](../../ARCHITECTURE.md).

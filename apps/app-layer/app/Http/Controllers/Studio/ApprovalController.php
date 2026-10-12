@@ -39,7 +39,12 @@ class ApprovalController extends Controller
         }
 
         try {
-            $outcome = $gateway->executeTool($action->toToolSpec(), $this->arguments($toolCall, $action), $toolCall->id);
+            $executionContext = $action->kind === ActionKind::Internal ? [
+                'conversation_id' => $toolCall->conversation_id ?? $toolCall->call?->conversation_id,
+                'call_id' => $toolCall->call_id,
+                'delegation_id' => $toolCall->delegation_id,
+            ] : [];
+            $outcome = $gateway->executeTool($action->toToolSpec(), $this->arguments($toolCall, $action), $toolCall->id, $executionContext);
         } catch (AgentUnavailable $e) {
             // Nothing ran: put the request back for another try.
             $toolCall->forceFill(['status' => ToolCallStatus::AwaitingApproval, 'approved_by_id' => null, 'approved_at' => null])->save();

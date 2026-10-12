@@ -9,7 +9,7 @@ import { Menu, MenuItem, MenuSeparator } from '../../components/shell/menu';
 import { Field, Toggle } from '../../components/studio/form';
 import { AppLogo } from '../../components/studio-knowledge/app-logo';
 import { plural } from '../../components/studio-knowledge/format';
-import Dialog from '../../components/ui/dialog';
+import Sidebar from '../../components/ui/sidebar';
 import { DialogActions, Disclosure, InlineEmpty, PageSection, PanelHeader, StatRow } from '../../components/studio-ops/page-parts';
 import { Card, IconTile, List, SearchField, SegmentedControl, Switch, Toolbar } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
@@ -99,7 +99,7 @@ export default function Actions({ actions, integrations }: { actions: ActionRow[
 
             <div className="mt-3">
                 {flash.test_result && (
-                    <Card className="mb-12">
+                    <Card className="mb-8">
                         <PanelHeader
                             icon={<IconTile tone={testOk ? 'success' : 'danger'}><FlaskConical size={16} strokeWidth={1.8} /></IconTile>}
                             title="Test request"
@@ -128,7 +128,7 @@ export default function Actions({ actions, integrations }: { actions: ActionRow[
                         hint: attention.length > 0 ? `${plural(attention.length, 'action')} need attention` : calls > 0 ? 'Across every action, 7 days' : 'No calls yet this week' },
                 ]} />
 
-                <div className="mt-12">
+                <div className="mt-8">
                     <PageSection
                         title="Connections"
                         description="Apps the agent acts through, like a calendar or a CRM, and MCP servers that expose their own tools. Connections belong to the organization."
@@ -148,7 +148,7 @@ export default function Actions({ actions, integrations }: { actions: ActionRow[
                                 {apps.length > 0 && (
                                     <div>
                                         <Eyebrow className="mb-3 block">Apps</Eyebrow>
-                                        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                                        <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
                                             {apps.map((i) => <AppCard key={i.id} integration={i} />)}
                                         </div>
                                     </div>
@@ -166,9 +166,9 @@ export default function Actions({ actions, integrations }: { actions: ActionRow[
                                                 {mcp.map((i) => {
                                                     const s = integrationStatus(i.status);
                                                     return (
-                                                        <div key={i.id} className="flex min-h-15 items-center gap-4 px-6 py-3">
+                                                        <div key={i.id} className="flex min-h-15 flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3 sm:px-6">
                                                             <IconTile tone={i.status === 'error' ? 'danger' : 'muted'} size={36}><Server size={16} strokeWidth={1.8} /></IconTile>
-                                                            <div className="min-w-0 flex-1">
+                                                            <div className="min-w-0 flex-1 basis-48">
                                                                 <div className="truncate text-base font-medium text-primary">{i.label}</div>
                                                                 <div className="truncate text-sm text-secondary">
                                                                     {i.error
@@ -371,12 +371,12 @@ function AppCard({ integration: i }: { integration: IntegrationRow }) {
     const refresh = () => router.post(`/studio/integrations/${i.id}/refresh`, {}, { preserveScroll: true });
 
     return (
-        <Card className="flex flex-col p-6">
-            <div className="flex items-start gap-4">
-                <AppLogo name={i.label} logo={i.logo} size={48} />
-                <div className="min-w-0 flex-1 pt-0.5">
+        <Card className="flex min-w-0 flex-col p-5">
+            <div className="flex items-start gap-3">
+                <AppLogo name={i.label} logo={i.logo} size={40} />
+                <div className="min-w-0 flex-1">
                     <div className="truncate text-md font-semibold text-primary">{i.label}</div>
-                    <div className="mt-1.5"><Badge tone={s.tone} dot>{s.label}</Badge></div>
+                    <div className="mt-1"><Badge tone={s.tone} dot>{s.label}</Badge></div>
                 </div>
                 <RowMenu label={`Actions for ${i.label}`}>
                     {(close) => (
@@ -388,9 +388,9 @@ function AppCard({ integration: i }: { integration: IntegrationRow }) {
                     )}
                 </RowMenu>
             </div>
-            <div className="mt-5 flex-1 pt-4 text-sm" style={{ borderTop: '1px solid var(--separator)' }}>
+            <div className="mt-3 text-sm">
                 {i.error
-                    ? <p className="line-clamp-2 text-danger" title={i.error}>{i.error}</p>
+                    ? <p className="break-words text-danger">{i.error}</p>
                     : <p className="text-secondary">{plural(i.actions_count, 'action')}{i.connected_at && <> · connected <RelativeTime at={i.connected_at} /></>}</p>}
             </div>
             {i.status !== 'connected' && (
@@ -407,7 +407,7 @@ function AppCard({ integration: i }: { integration: IntegrationRow }) {
 function DialogFooter({ onClose, processing, label }: { onClose: () => void; processing: boolean; label: string }) {
     return (
         <DialogActions>
-            <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
+            <button type="button" className="v-btn v-btn--ghost" onClick={onClose} disabled={processing}>Cancel</button>
             <button type="submit" className="v-btn v-btn--primary" disabled={processing}>{processing ? 'Saving…' : label}</button>
         </DialogActions>
     );
@@ -415,33 +415,36 @@ function DialogFooter({ onClose, processing, label }: { onClose: () => void; pro
 
 function McpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { data, setData, post, processing, errors, reset } = useForm({ label: '', url: '', transport: 'streamable_http', auth_type: 'none', auth_value: '' });
-    const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/integrations/mcp', { onSuccess: () => { reset(); onClose(); } }); };
+    const close = () => { if (!processing) onClose(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (processing) return; post('/studio/integrations/mcp', { onSuccess: () => { reset(); onClose(); } }); };
 
     return (
-        <Dialog open={open} onClose={onClose} title="Add an MCP server" description="Its tools become actions the agent can be granted, once the server is tested." width={600}>
-            <form onSubmit={submit}>
-                <Field label="Name" error={errors.label} hint="What people in Studio will see, e.g. “Booking system”.">
-                    <input className="v-field" value={data.label} onChange={(e) => setData('label', e.target.value)} autoFocus />
-                </Field>
-                <Field label="URL" error={errors.url}>
-                    <input className="v-field" type="url" value={data.url} onChange={(e) => setData('url', e.target.value)} placeholder="https://mcp.example.com/sse" />
-                </Field>
-                <div className="grid gap-x-4 md:grid-cols-2">
-                    <Field label="Transport" error={errors.transport}>
-                        <select className="v-field" value={data.transport} onChange={(e) => setData('transport', e.target.value)}><option value="streamable_http">Streamable HTTP</option><option value="sse">SSE</option></select>
+        <Sidebar open={open} onClose={close} title="Add an MCP server" description="Its tools become actions the agent can be granted, once the server is tested." width={600}>
+            <form onSubmit={submit} aria-busy={processing}>
+                <fieldset disabled={processing} className="m-0 min-w-0 border-0 p-0">
+                    <Field label="Name" error={errors.label} hint="What people in Studio will see, e.g. “Booking system”.">
+                        <input className="v-field" value={data.label} onChange={(e) => setData('label', e.target.value)} autoFocus />
                     </Field>
-                    <Field label="Authentication" error={errors.auth_type}>
-                        <select className="v-field" value={data.auth_type} onChange={(e) => setData('auth_type', e.target.value)}><option value="none">None</option><option value="bearer">Bearer token</option><option value="header">Custom header</option></select>
+                    <Field label="URL" error={errors.url}>
+                        <input className="v-field" type="url" value={data.url} onChange={(e) => setData('url', e.target.value)} placeholder="https://mcp.example.com/sse" />
                     </Field>
-                </div>
-                {data.auth_type !== 'none' && (
-                    <Field label={data.auth_type === 'bearer' ? 'Token' : 'Header'} error={errors.auth_value} hint={data.auth_type === 'header' ? 'As Name: value, e.g. X-Api-Key: abc123' : 'Stored encrypted; never shown again.'}>
-                        <input className="v-field" type="password" value={data.auth_value} onChange={(e) => setData('auth_value', e.target.value)} />
-                    </Field>
-                )}
-                <DialogFooter onClose={onClose} processing={processing} label="Add server" />
+                    <div className="grid gap-x-4 md:grid-cols-2">
+                        <Field label="Transport" error={errors.transport}>
+                            <select className="v-field" value={data.transport} onChange={(e) => setData('transport', e.target.value)}><option value="streamable_http">Streamable HTTP</option><option value="sse">SSE</option></select>
+                        </Field>
+                        <Field label="Authentication" error={errors.auth_type}>
+                            <select className="v-field" value={data.auth_type} onChange={(e) => setData('auth_type', e.target.value)}><option value="none">None</option><option value="bearer">Bearer token</option><option value="header">Custom header</option></select>
+                        </Field>
+                    </div>
+                    {data.auth_type !== 'none' && (
+                        <Field label={data.auth_type === 'bearer' ? 'Token' : 'Header'} error={errors.auth_value} hint={data.auth_type === 'header' ? 'As Name: value, e.g. X-Api-Key: abc123' : 'Stored encrypted; never shown again.'}>
+                            <input className="v-field" type="password" value={data.auth_value} onChange={(e) => setData('auth_value', e.target.value)} />
+                        </Field>
+                    )}
+                    <DialogFooter onClose={close} processing={processing} label="Add server" />
+                </fieldset>
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }
 
@@ -454,89 +457,95 @@ function HttpActionDialog({ action, onClose }: { action: ActionRow | null; onClo
     });
     const [testArgs, setTestArgs] = useState('{}');
     const [testError, setTestError] = useState<string | null>(null);
-    const submit = (e: FormEvent) => { e.preventDefault(); if (action) patch(`/studio/integrations/http/${action.id}`, { onSuccess: onClose }); else post('/studio/integrations/http', { onSuccess: onClose }); };
+    const [testing, setTesting] = useState(false);
+    const busy = processing || testing;
+    const close = () => { if (!busy) onClose(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (busy) return; if (action) patch(`/studio/integrations/http/${action.id}`, { onSuccess: onClose }); else post('/studio/integrations/http', { onSuccess: onClose }); };
     const err = (k: string) => (errors as Record<string, string>)[k];
     const setParam = (i: number, patchValue: Partial<{ name: string; description: string; required: boolean }>) =>
         setData('parameters', data.parameters.map((x, j) => (j === i ? { ...x, ...patchValue } : x)));
     const sendTest = () => {
-        if (!action) return;
+        if (!action || busy) return;
         let args = {};
         try { args = JSON.parse(testArgs); } catch { setTestError('That is not valid JSON.'); return; }
         setTestError(null);
-        router.post(`/studio/integrations/http/${action.id}/test`, { arguments: args }, { preserveScroll: true, onSuccess: onClose });
+        setTesting(true);
+        router.post(`/studio/integrations/http/${action.id}/test`, { arguments: args }, { preserveScroll: true, onSuccess: onClose, onFinish: () => setTesting(false) });
     };
 
     return (
-        <Dialog open onClose={onClose} title={action ? `Edit ${action.name}` : 'Custom HTTP action'} description="Call any endpoint. The agent fills in the parameters; the URL, method and authentication stay yours." width={720}>
-            <form onSubmit={submit}>
-                <div className="grid gap-x-4 md:grid-cols-[1fr_160px]">
-                    <Field label="Name" error={err('name')}>
-                        <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Book a job" autoFocus />
-                    </Field>
-                    <Field label="Method" error={err('method')}>
-                        <select className="v-field" value={data.method} onChange={(e) => setData('method', e.target.value)}><option>POST</option><option>GET</option></select>
-                    </Field>
-                </div>
-                <Field label="Description" error={err('description')} hint="The agent decides when to call this from the description alone. Say what it does and when to use it.">
-                    <input className="v-field" value={data.description} onChange={(e) => setData('description', e.target.value)} />
-                </Field>
-                <Field label="URL" error={err('url')}>
-                    <input className="v-field" type="url" value={data.url} onChange={(e) => setData('url', e.target.value)} placeholder="https://api.example.com/bookings" />
-                </Field>
-                <div className="grid gap-x-4 md:grid-cols-2">
-                    <Field label="Authentication" error={err('auth_type')}>
-                        <select className="v-field" value={data.auth_type} onChange={(e) => setData('auth_type', e.target.value)}><option value="none">None</option><option value="bearer">Bearer</option><option value="basic">Basic (user:pass)</option><option value="header">Header (Name: value)</option></select>
-                    </Field>
-                    {data.auth_type !== 'none' && (
-                        <Field label="Secret" error={err('auth_value')} hint={action ? 'Never sent back to the browser: re-enter it when saving.' : undefined}>
-                            <input className="v-field" type="password" value={data.auth_value} onChange={(e) => setData('auth_value', e.target.value)} />
+        <Sidebar open onClose={close} title={action ? `Edit ${action.name}` : 'Custom HTTP action'} description="Call any endpoint. The agent fills in the parameters; the URL, method and authentication stay yours." width={720}>
+            <form onSubmit={submit} aria-busy={busy}>
+                <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">
+                    <div className="grid gap-x-4 md:grid-cols-[1fr_160px]">
+                        <Field label="Name" error={err('name')}>
+                            <input className="v-field" value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Book a job" autoFocus />
                         </Field>
-                    )}
-                </div>
-
-                <div className="mb-6">
-                    <div className="mb-2.5 flex items-center justify-between">
-                        <span className="v-label" style={{ marginBottom: 0 }}>Parameters</span>
-                        <button type="button" className="v-btn v-btn--ghost v-btn--sm" onClick={() => setData('parameters', [...data.parameters, { name: '', description: '', required: true }])}><Plus size={13} strokeWidth={2} />Add parameter</button>
+                        <Field label="Method" error={err('method')}>
+                            <select className="v-field" value={data.method} onChange={(e) => setData('method', e.target.value)}><option>POST</option><option>GET</option></select>
+                        </Field>
                     </div>
-                    {data.parameters.length === 0 ? (
-                        <p className="rounded-md px-4 py-3.5 text-sm text-tertiary" style={{ background: 'var(--surface-sunken)' }}>None. Add one for each value the agent should fill in from the conversation, like a date or an address.</p>
-                    ) : (
-                        <div className="flex flex-col gap-2.5">
-                            {data.parameters.map((p, i) => (
-                                <div key={i}>
-                                    <div className="grid grid-cols-[160px_1fr_auto_auto] items-center gap-2.5">
-                                        <input className="v-field font-mono text-sm" placeholder="name" value={p.name} onChange={(e) => setParam(i, { name: e.target.value })} aria-label="Parameter name" />
-                                        <input className="v-field" placeholder="What it is, for the agent" value={p.description} onChange={(e) => setParam(i, { description: e.target.value })} aria-label="Parameter description" />
-                                        <label className="flex items-center gap-1.5 text-xs text-secondary"><input type="checkbox" checked={p.required} onChange={(e) => setParam(i, { required: e.target.checked })} />Required</label>
-                                        <button type="button" aria-label="Remove parameter" className="v-btn v-btn--ghost v-btn--icon" onClick={() => setData('parameters', data.parameters.filter((_, j) => j !== i))}><X size={13} strokeWidth={2} /></button>
+                    <Field label="Description" error={err('description')} hint="The agent decides when to call this from the description alone. Say what it does and when to use it.">
+                        <input className="v-field" value={data.description} onChange={(e) => setData('description', e.target.value)} />
+                    </Field>
+                    <Field label="URL" error={err('url')}>
+                        <input className="v-field" type="url" value={data.url} onChange={(e) => setData('url', e.target.value)} placeholder="https://api.example.com/bookings" />
+                    </Field>
+                    <div className="grid gap-x-4 md:grid-cols-2">
+                        <Field label="Authentication" error={err('auth_type')}>
+                            <select className="v-field" value={data.auth_type} onChange={(e) => setData('auth_type', e.target.value)}><option value="none">None</option><option value="bearer">Bearer</option><option value="basic">Basic (user:pass)</option><option value="header">Header (Name: value)</option></select>
+                        </Field>
+                        {data.auth_type !== 'none' && (
+                            <Field label="Secret" error={err('auth_value')} hint={action ? 'Never sent back to the browser: re-enter it when saving.' : undefined}>
+                                <input className="v-field" type="password" value={data.auth_value} onChange={(e) => setData('auth_value', e.target.value)} />
+                            </Field>
+                        )}
+                    </div>
+
+                    <div className="mb-6">
+                        <div className="mb-2.5 flex items-center justify-between">
+                            <span className="v-label" style={{ marginBottom: 0 }}>Parameters</span>
+                            <button type="button" className="v-btn v-btn--ghost v-btn--sm" onClick={() => setData('parameters', [...data.parameters, { name: '', description: '', required: true }])}><Plus size={13} strokeWidth={2} />Add parameter</button>
+                        </div>
+                        {data.parameters.length === 0 ? (
+                            <p className="rounded-md px-4 py-3.5 text-sm text-tertiary" style={{ background: 'var(--surface-sunken)' }}>None. Add one for each value the agent should fill in from the conversation, like a date or an address.</p>
+                        ) : (
+                            <div className="flex flex-col gap-2.5">
+                                {data.parameters.map((p, i) => (
+                                    <div key={i}>
+                                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[140px_minmax(0,1fr)_auto_auto]">
+                                            <input className="v-field font-mono text-sm" placeholder="name" value={p.name} onChange={(e) => setParam(i, { name: e.target.value })} aria-label="Parameter name" />
+                                            <input className="v-field" placeholder="What it is, for the agent" value={p.description} onChange={(e) => setParam(i, { description: e.target.value })} aria-label="Parameter description" />
+                                            <label className="flex items-center gap-1.5 text-xs text-secondary"><input type="checkbox" checked={p.required} onChange={(e) => setParam(i, { required: e.target.checked })} />Required</label>
+                                            <button type="button" aria-label="Remove parameter" className="v-btn v-btn--ghost v-btn--icon" onClick={() => setData('parameters', data.parameters.filter((_, j) => j !== i))}><X size={13} strokeWidth={2} /></button>
+                                        </div>
+                                        {(err(`parameters.${i}.name`) || err(`parameters.${i}.description`)) && <p className="mt-1 text-xs text-danger">{err(`parameters.${i}.name`) ?? err(`parameters.${i}.description`)}</p>}
                                     </div>
-                                    {(err(`parameters.${i}.name`) || err(`parameters.${i}.description`)) && <p className="mt-1 text-xs text-danger">{err(`parameters.${i}.name`) ?? err(`parameters.${i}.description`)}</p>}
-                                </div>
-                            ))}
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="rounded-lg px-5 py-5" style={{ border: '1px solid var(--border)' }}>
+                        <Toggle checked={data.is_idempotent} onChange={(v) => setData('is_idempotent', v)} label="Repeatable" hint="Calling it twice with the same input is harmless, so a dropped connection is retried automatically." />
+                        <Toggle checked={data.is_durable_write} onChange={(v) => setData('is_durable_write', v)} label="Writes" hint="It changes something outside. The agent will not hang up while it is in flight."
+                            caution={data.is_durable_write && !data.is_idempotent ? 'A write that is not repeatable is never retried: a timeout leaves its outcome unknown.' : undefined} />
+                        <Toggle checked={data.requires_approval} onChange={(v) => setData('requires_approval', v)} label="Needs approval" hint="The agent asks instead of running it; a person approves or rejects it on the Overview page." />
+                    </div>
+
+                    {action && (
+                        <div className="mt-6 rounded-lg px-5 py-5" style={{ background: 'var(--surface-sunken)', border: '1px solid var(--border)' }}>
+                            <div className="mb-1 text-base font-medium text-primary">Send a test request</div>
+                            <p className="mb-3 text-sm text-secondary">Uses the saved version of this action. The response appears at the top of the page.</p>
+                            <textarea className="v-field h-auto font-mono text-sm" rows={4} value={testArgs} onChange={(e) => setTestArgs(e.target.value)} aria-label="Test arguments as JSON" />
+                            {testError && <p className="mt-1.5 text-sm text-danger">{testError}</p>}
+                            <button type="button" className="v-btn v-btn--quiet v-btn--sm mt-3" onClick={sendTest} disabled={busy}><FlaskConical size={13} strokeWidth={1.9} />{testing ? 'Testing…' : 'Send test request'}</button>
                         </div>
                     )}
-                </div>
 
-                <div className="rounded-lg px-5 py-5" style={{ border: '1px solid var(--border)' }}>
-                    <Toggle checked={data.is_idempotent} onChange={(v) => setData('is_idempotent', v)} label="Repeatable" hint="Calling it twice with the same input is harmless, so a dropped connection is retried automatically." />
-                    <Toggle checked={data.is_durable_write} onChange={(v) => setData('is_durable_write', v)} label="Writes" hint="It changes something outside. The agent will not hang up while it is in flight."
-                        caution={data.is_durable_write && !data.is_idempotent ? 'A write that is not repeatable is never retried: a timeout leaves its outcome unknown.' : undefined} />
-                    <Toggle checked={data.requires_approval} onChange={(v) => setData('requires_approval', v)} label="Needs approval" hint="The agent asks instead of running it; a person approves or rejects it on the Overview page." />
-                </div>
-
-                {action && (
-                    <div className="mt-6 rounded-lg px-5 py-5" style={{ background: 'var(--surface-sunken)', border: '1px solid var(--border)' }}>
-                        <div className="mb-1 text-base font-medium text-primary">Send a test request</div>
-                        <p className="mb-3 text-sm text-secondary">Uses the saved version of this action. The response appears at the top of the page.</p>
-                        <textarea className="v-field h-auto font-mono text-sm" rows={4} value={testArgs} onChange={(e) => setTestArgs(e.target.value)} aria-label="Test arguments as JSON" />
-                        {testError && <p className="mt-1.5 text-sm text-danger">{testError}</p>}
-                        <button type="button" className="v-btn v-btn--quiet v-btn--sm mt-3" onClick={sendTest}><FlaskConical size={13} strokeWidth={1.9} />Send test request</button>
-                    </div>
-                )}
-
-                <DialogFooter onClose={onClose} processing={processing} label={action ? 'Save' : 'Create action'} />
+                    <DialogFooter onClose={close} processing={busy} label={action ? 'Save' : 'Create action'} />
+                </fieldset>
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }

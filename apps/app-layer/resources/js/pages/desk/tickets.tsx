@@ -9,7 +9,7 @@ import {
     type SortDir, type ViewMode,
 } from '../../components/desk-pages/collection';
 import { DeskPage, Panel } from '../../components/desk-pages/layout';
-import Dialog from '../../components/ui/dialog';
+import Sidebar from '../../components/ui/sidebar';
 import { SearchField } from '../../components/ui/kit';
 import { PageHeader, Segmented } from '../../components/ui/page';
 import { Badge, EmptyState, Mono, RelativeTime, UserText, toneColor, type Tone } from '../../components/ui/primitives';
@@ -280,7 +280,7 @@ function TicketTable({ tickets, statuses, priorities, team, sort, onSort, onStat
                         <Cell className="hidden 2xl:table-cell"><Mono>{t.reference}</Mono></Cell>
                         <Cell className="max-w-[170px]">
                             {t.contact
-                                ? <Link href={`/desk/contacts/${t.contact.id}`} className="block truncate text-secondary hover:text-accent-text"><UserText>{t.contact.name}</UserText></Link>
+                                ? <Link href={`/desk/patients/profile/${t.contact.id}`} className="block truncate text-secondary hover:text-accent-text"><UserText>{t.contact.name}</UserText></Link>
                                 : <span className="text-tertiary">—</span>}
                         </Cell>
                         <Cell className="hidden max-w-[150px] text-secondary 2xl:table-cell">{t.type ? <TypeLabel type={t.type} /> : <span className="text-tertiary">—</span>}</Cell>
@@ -316,7 +316,7 @@ function NewTicketDialog({ open, status, onClose, types, team, priorities, statu
     const startsIn = status ? statuses.find((s) => s.value === status) : undefined;
 
     return (
-        <Dialog open={open} onClose={onClose} title="New ticket" width={620}
+        <Sidebar open={open} onClose={onClose} title="New ticket" width={620}
             description={startsIn ? `For a follow-up that did not start in a conversation. It starts as ${startsIn.label.toLowerCase()}.` : 'For a follow-up that did not start in a conversation.'}>
             <form onSubmit={submit} className="flex flex-col gap-5">
                 <div>
@@ -348,6 +348,6 @@ function NewTicketDialog({ open, status, onClose, types, team, priorities, statu
                     <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.subject.trim()}>{processing ? 'Creating…' : 'Create ticket'}</button>
                 </div>
             </form>
-        </Dialog>
+        </Sidebar>
     );
 }

@@ -1,189 +1,67 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { Bot, ChevronRight, Plus } from 'lucide-react';
-import type { FormEvent } from 'react';
-import { useState } from 'react';
-
-import { runtimeLook } from '../../components/studio-agent/runtime';
-import { ChoiceCard } from '../../components/studio-capability/choice-card';
+import { useState, type FormEvent, type ReactNode } from 'react';
+import { useCreateParam } from '../../components/studio-capability/use-create-param';
 import { Group, PageStack, Stacked } from '../../components/studio/space';
-import Dialog from '../../components/ui/dialog';
-import { Card, IconTile, List, ListRow } from '../../components/ui/kit';
+import { Card, SearchField, SegmentedControl, Toolbar } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
-import { Badge, EmptyState, Mono } from '../../components/ui/primitives';
+import { Badge, EmptyState } from '../../components/ui/primitives';
+import Sidebar from '../../components/ui/sidebar';
+import StudioLayout from '../../layouts/studio-layout';
 
 interface ExpertRow {
     id: number; slug: string; name: string; description: string;
     runtime: string; runtime_label: string; model: string | null;
     is_builtin: boolean; enabled: boolean; skills_count: number; actions_count: number;
-    /** The first enabled expert of its runtime: the talker that speaks, the worker that starts. */
-    primary: boolean;
 }
-
 interface Props {
     experts: ExpertRow[];
     runtimes: { value: string; label: string; description: string }[];
+    legacy_experts: ExpertRow[];
 }
 
-const count = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
-
-/**
- * An expert is a record, and this list is meant to make that obvious: the two
- * built-ins are the talker and the worker, and anything an organization adds is
- * the same kind of thing with a different prompt and a different tool list.
- * Grouped by runtime, because the runtime decides what an expert may do.
- */
-export default function Experts({ experts, runtimes }: Props) {
-    const [creating, setCreating] = useState<string | null>(null);
-    const enabled = experts.filter((e) => e.enabled).length;
-
-    return (
-        <>
-            <Head title="Experts" />
-
-            <PageHeader
-                title="Experts"
-                description="An expert is a prompt, a set of skills and a set of actions. There is one agent loop: it starts as the first enabled worker and switches to another when that one’s description fits the task better."
-                meta={<Mono>{count(experts.length, 'expert')} · {enabled} enabled</Mono>}
-                actions={
-                    <button type="button" className="v-btn v-btn--primary" onClick={() => setCreating('worker')}>
-                        <Plus size={15} strokeWidth={2} />
-                        New expert
-                    </button>
-                }
-            />
-
-            <PageStack>
-                {experts.length === 0 ? (
-                    <Card>
-                        <EmptyState
-                            icon={<Bot size={20} strokeWidth={1.8} />}
-                            title="No experts yet"
-                            action={<button type="button" className="v-btn v-btn--quiet" onClick={() => setCreating('talker')}>Add a talker</button>}
-                        >
-                            A call needs two: a talker that owns every word the caller hears, and a worker that runs skills and actions behind it.
-                        </EmptyState>
-                    </Card>
-                ) : (
-                    runtimes.map((r) => {
-                        const look = runtimeLook(r.value);
-                        const group = experts.filter((e) => e.runtime === r.value);
-                        return (
-                            <Group
-                                key={r.value}
-                                title={
-                                    <span className="flex items-center gap-2.5">
-                                        {r.label}
-                                        <span className="text-md font-medium text-tertiary tabular-nums">{group.length}</span>
-                                    </span>
-                                }
-                                description={r.description}
-                                aside={
-                                    <button type="button" className="v-btn v-btn--quiet v-btn--sm" onClick={() => setCreating(r.value)} aria-label={`New ${r.label} expert`}>
-                                        <Plus size={14} strokeWidth={2} />
-                                        Add
-                                    </button>
-                                }
-                            >
-                                <Card>
-                                    {group.length === 0 ? (
-                                        <div className="flex min-h-15 items-center gap-3.5 px-5 text-sm text-secondary">
-                                            <IconTile><look.icon size={15} strokeWidth={1.9} /></IconTile>
-                                            {look.empty}
-                                        </div>
-                                    ) : (
-                                        <List>
-                                            {group.map((e) => {
-                                                const href = `/studio/experts/${e.id}`;
-                                                return (
-                                                    <ListRow
-                                                        key={e.id}
-                                                        href={href}
-                                                        onClick={() => router.visit(href)}
-                                                        dim={!e.enabled}
-                                                        leading={<IconTile tone={e.enabled ? look.tone : 'muted'}><look.icon size={15} strokeWidth={1.9} /></IconTile>}
-                                                        title={
-                                                            <span className="flex items-center gap-2">
-                                                                <span className="truncate">{e.name}</span>
-                                                                {e.is_builtin && <Badge>Built-in</Badge>}
-                                                                {e.primary && group.filter((x) => x.enabled).length > 1 && <Badge tone="info">{e.runtime === 'talker' ? 'Speaks' : 'Starts here'}</Badge>}
-                                                                {e.enabled && !e.primary && e.runtime === 'talker' && <Badge tone="warning">Not used</Badge>}
-                                                                {!e.enabled && <Badge tone="warning" dot>Disabled</Badge>}
-                                                            </span>
-                                                        }
-                                                        subtitle={e.description}
-                                                        trailing={
-                                                            <>
-                                                                {e.runtime !== 'talker' && (
-                                                                    <span className="hidden items-center gap-6 text-sm text-secondary tabular-nums md:flex">
-                                                                        <span>{count(e.skills_count, 'skill')}</span>
-                                                                        <span>{count(e.actions_count, 'action')}</span>
-                                                                    </span>
-                                                                )}
-                                                                <span className="hidden w-36 truncate text-right lg:block">
-                                                                    <Mono>{e.model || 'Runtime default'}</Mono>
-                                                                </span>
-                                                                <ChevronRight size={16} strokeWidth={1.9} className="text-tertiary" />
-                                                            </>
-                                                        }
-                                                    />
-                                                );
-                                            })}
-                                        </List>
-                                    )}
-                                </Card>
-                            </Group>
-                        );
-                    })
-                )}
-            </PageStack>
-
-            <Dialog
-                open={creating !== null}
-                onClose={() => setCreating(null)}
-                title="New expert"
-                description="Name it and say what it handles. Prompt, skills and actions come next, on its own page."
-                width={620}
-            >
-                {creating !== null && <CreateForm key={creating} runtimes={runtimes} runtime={creating} onDone={() => setCreating(null)} />}
-            </Dialog>
-        </>
-    );
+export default function Experts({ experts, runtimes, legacy_experts = [] }: Props) {
+    const [creating, setCreating] = useCreateParam();
+    const [busy, setBusy] = useState(false);
+    const [query, setQuery] = useState('');
+    const [status, setStatus] = useState('all');
+    const visible = experts.filter(expert => (status === 'all' || expert.enabled === (status === 'enabled'))
+        && [expert.name, expert.description, expert.runtime_label].some(value => value.toLowerCase().includes(query.trim().toLowerCase())));
+    return <>
+        <Head title="Experts" />
+        <PageHeader title="Experts" description="Optional specialists for tasks that need dedicated instructions or private skills. The core taker and worker handle conversations and shared skills even with no experts."
+            actions={<button type="button" className="v-btn v-btn--primary" onClick={() => setCreating(true)}><Plus size={15} />New expert</button>} />
+        <PageStack>
+            <div className="flex flex-wrap items-center justify-between gap-3 text-base text-secondary"><p>Configure everyday conversation and actions in the core runtime.</p><Link href="/studio/runtime" className="v-btn v-btn--quiet">Core runtime<ChevronRight size={15} /></Link></div>
+            <section>
+                <Toolbar trailing={<SearchField value={query} onChange={setQuery} placeholder="Search specialists" className="w-full sm:w-72" />}><SegmentedControl value={status} onChange={setStatus} options={[{ value: 'all', label: 'All' }, { value: 'enabled', label: 'Enabled' }, { value: 'disabled', label: 'Disabled' }]} /></Toolbar>
+                <Card className="mt-5">
+                    {visible.length === 0 ? <EmptyState icon={<Bot size={22} />} title={experts.length === 0 ? 'Add a specialist when you need one' : 'No specialists in this view'}
+                        action={experts.length === 0 ? <button type="button" className="v-btn v-btn--quiet" onClick={() => setCreating(true)}>Create an expert</button> : <button type="button" className="v-btn v-btn--ghost" onClick={() => { setQuery(''); setStatus('all'); }}>Show all experts</button>}>
+                        {experts.length === 0 ? 'Use an expert for a focused area such as billing, with its own private procedures and permitted actions. Shared skills already work through the core worker.' : 'Search names, descriptions and runtimes, or change the status filter.'}
+                    </EmptyState> : <ul className="divide-y divide-border">{visible.map(expert => <li key={expert.id}>
+                        <Link href={`/studio/experts/${expert.id}`} className="group flex flex-col gap-4 px-6 py-6 hover:bg-surface-hover sm:flex-row sm:items-start sm:gap-6 sm:px-8">
+                            <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-3"><h2 className="break-words text-lg font-semibold text-primary">{expert.name}</h2><Badge tone={expert.enabled ? 'success' : 'muted'} dot>{expert.enabled ? 'Enabled' : 'Disabled'}</Badge></div><p className="mt-2 max-w-[72ch] break-words text-base leading-relaxed text-secondary">{expert.description}</p><div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-secondary"><span>{expert.runtime_label}</span><span>{expert.skills_count} assigned skills</span><span>{expert.actions_count} permitted actions</span><span className="break-all">{expert.model || 'Core worker model'}</span></div></div>
+                            <span className="flex shrink-0 items-center gap-2 text-sm font-medium text-primary sm:pt-1">Configure<ChevronRight size={16} /></span>
+                        </Link>
+                    </li>)}</ul>}
+                </Card>
+                <p className="mt-4 text-sm text-secondary">Showing {visible.length} of {experts.length} optional experts. Delegated work runs in each expert’s own context.</p>
+            </section>
+            {legacy_experts.length > 0 && <Group title="Preserved legacy profiles" description="Historical conversation and built-in profiles remain available for reference. Core runtime settings now control the taker and worker."><Card><ul className="divide-y divide-border">{legacy_experts.map(expert => <li key={expert.id}><Link href={`/studio/experts/${expert.id}`} className="flex flex-wrap items-center justify-between gap-3 px-7 py-5 hover:bg-surface-hover"><span className="min-w-0 break-words font-medium">{expert.name}</span><span className="flex items-center gap-3 text-sm text-secondary">{expert.runtime_label || expert.runtime}<ChevronRight size={16} /></span></Link></li>)}</ul></Card></Group>}
+        </PageStack>
+        <Sidebar open={creating} onClose={() => { if (!busy) setCreating(false); }} title="New expert" description="Define a focused specialty. Configure its instructions, private skills and action permissions next." width={640}><CreateForm runtimes={runtimes.filter(runtime => runtime.value !== 'talker')} onBusy={setBusy} onDone={() => setCreating(false)} /></Sidebar>
+    </>;
 }
 
-function CreateForm({ runtimes, runtime, onDone }: { runtimes: Props['runtimes']; runtime: string; onDone: () => void }) {
-    const { data, setData, post, processing, errors } = useForm({ name: '', description: '', runtime });
-
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
-        post('/studio/experts', { onSuccess: onDone });
-    };
-
-    return (
-        <form onSubmit={submit} className="flex flex-col gap-5 pt-1">
-            <Stacked label="Runtime" error={errors.runtime}>
-                <div role="radiogroup" aria-label="Runtime" className="flex flex-col gap-3">
-                    {runtimes.map((r) => {
-                        const look = runtimeLook(r.value);
-                        return (
-                            <ChoiceCard key={r.value} selected={data.runtime === r.value} onSelect={() => setData('runtime', r.value)}
-                                icon={<look.icon size={16} strokeWidth={1.9} />} title={r.label} description={r.description} />
-                        );
-                    })}
-                </div>
-            </Stacked>
-            <Stacked label="Name" htmlFor="expert-name" error={errors.name}>
-                <input id="expert-name" className="v-field" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} autoFocus placeholder="Billing" />
-            </Stacked>
-            <Stacked label="One-line description" htmlFor="expert-description" error={errors.description}
-                hint="Other experts read this to decide when to hand off."
-                aside={<Mono>{data.description.length}/160</Mono>}>
-                <input id="expert-description" className="v-field" value={data.description} onChange={(e) => setData('description', e.target.value)} maxLength={160}
-                    placeholder="Refunds, invoices and failed payments." />
-            </Stacked>
-            <div className="mt-2 flex justify-end gap-2 border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
-                <button type="button" className="v-btn v-btn--ghost" onClick={onDone}>Cancel</button>
-                <button type="submit" className="v-btn v-btn--primary" disabled={processing}>{processing ? 'Creating…' : 'Create expert'}</button>
-            </div>
-        </form>
-    );
+function CreateForm({ runtimes, onBusy, onDone }: { runtimes: Props['runtimes']; onBusy: (busy: boolean) => void; onDone: () => void }) {
+    const { data, setData, post, processing, errors } = useForm({ name: '', description: '', runtime: 'worker' });
+    const submit = (event: FormEvent) => { event.preventDefault(); post('/studio/experts', { onStart: () => onBusy(true), onFinish: () => onBusy(false), onSuccess: onDone }); };
+    return <form onSubmit={submit} className="flex flex-col gap-6">
+        <Stacked label="Name" htmlFor="expert-name" error={errors.name}><input id="expert-name" className="v-field" value={data.name} maxLength={80} onChange={event => setData('name', event.target.value)} autoFocus required disabled={processing} placeholder="Billing specialist" /></Stacked>
+        <Stacked label="When to delegate" htmlFor="expert-description" error={errors.description} hint="Describe the tasks this specialist handles so the core worker can choose it."><textarea id="expert-description" className="v-field text-base leading-relaxed" rows={4} value={data.description} maxLength={160} onChange={event => setData('description', event.target.value)} required disabled={processing} placeholder="Invoice questions, payment disputes and refund requests." /></Stacked>
+        <Stacked label="Runtime" htmlFor="expert-runtime" error={errors.runtime} hint="Worker is the standard specialist runtime."><select id="expert-runtime" className="v-field" value={data.runtime} onChange={event => setData('runtime', event.target.value)} disabled={processing}>{runtimes.map(runtime => <option key={runtime.value} value={runtime.value}>{runtime.label}</option>)}</select></Stacked>
+        <div className="flex justify-end gap-3 border-t border-border pt-6"><button type="button" className="v-btn v-btn--ghost" disabled={processing} onClick={onDone}>Cancel</button><button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.name.trim() || !data.description.trim()}>{processing ? 'Creating…' : 'Create expert'}</button></div>
+    </form>;
 }
+Experts.layout = (page: ReactNode) => <StudioLayout width="wide">{page}</StudioLayout>;

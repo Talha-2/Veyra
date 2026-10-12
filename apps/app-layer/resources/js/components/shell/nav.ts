@@ -1,6 +1,7 @@
 import {
     AudioLines,
     Bell,
+    CalendarDays,
     Blocks,
     BookOpenText,
     Bot,
@@ -8,7 +9,7 @@ import {
     Code2,
     FlaskConical,
     Inbox,
-    KanbanSquare,
+    MessageCircle,
     LayoutDashboard,
     Library,
     Phone,
@@ -55,8 +56,9 @@ export const NAV: Record<SurfaceKey, ShellNavGroup[]> = {
                 { label: 'Ask', href: '/studio/ask', icon: Sparkles, keywords: 'chat assistant claude agent' },
                 { label: 'Talk', href: '/studio/talk', icon: AudioLines, keywords: 'voice mode call live chat test customer' },
                 { label: 'Identity', href: '/studio/agent', icon: UserRound, keywords: 'persona greeting language models' },
+                { label: 'Core runtime', href: '/studio/runtime', icon: Workflow, keywords: 'taker worker prompts models action permissions' },
                 { label: 'Voice', href: '/studio/voice', icon: AudioLines, keywords: 'tts speech cartesia elevenlabs' },
-                { label: 'Experts', href: '/studio/experts', icon: Bot, keywords: 'talker worker specialists' },
+                { label: 'Experts', href: '/studio/experts', icon: Bot, keywords: 'optional specialists private skills' },
             ],
         },
         {
@@ -84,17 +86,25 @@ export const NAV: Record<SurfaceKey, ShellNavGroup[]> = {
     desk: [
         {
             items: [
-                { label: 'Dashboard', href: '/desk/dashboard', icon: LayoutDashboard, keywords: 'home overview' },
-                { label: 'Inbox', href: '/desk/inbox', icon: Inbox, keywords: 'conversations messages sms email' },
+                { label: 'Clinic workspace', href: '/desk/modules', icon: Blocks, keywords: 'clinical chart notes prescriptions laboratory images documents vaccines referrals billing inventory' },
+                { label: 'Dashboard', href: '/desk/dashboard', icon: LayoutDashboard, keywords: 'today overview worklist' },
+                { label: 'Patients', href: '/desk/patients', icon: Users, keywords: 'healthcare registration demographics medical record' },
+                { label: 'Calendar', href: '/desk/calendar', icon: CalendarDays, keywords: 'provider appointments scheduling booking slots' },
+                { label: 'Providers', href: '/desk/providers', icon: UserCog, keywords: 'doctors practitioners clinic services availability' },
+                { label: 'Patient inbox', href: '/desk/inbox', icon: Inbox, keywords: 'conversations messages sms email' },
                 { label: 'Calls', href: '/desk/calls', icon: PhoneCall, keywords: 'phone log review' },
-                { label: 'Contacts', href: '/desk/contacts', icon: Users, keywords: 'customers people' },
-                { label: 'Leads', href: '/desk/leads', icon: KanbanSquare, keywords: 'pipeline deals' },
                 { label: 'Tickets', href: '/desk/tickets', icon: Ticket, keywords: 'issues support' },
             ],
         },
         {
             heading: 'Workspace',
             items: [
+                { label: 'Billing', href: '/desk/billing', icon: Ticket, keywords: 'invoice payments PKR receipts' },
+                { label: 'Inventory', href: '/desk/inventory', icon: Library, keywords: 'stock batches expiry dispensing' },
+                { label: 'Care tasks', href: '/desk/care-tasks', icon: Workflow, keywords: 'recalls followup due assigned' },
+                { label: 'Analytics', href: '/desk/analytics', icon: LayoutDashboard, keywords: 'revenue appointments reports' },
+                { label: 'Practice Settings', href: '/desk/practice', icon: Settings, keywords: 'clinic templates questionnaires quick text' },
+                { label: 'Team chat', href: '/desk/chat', icon: MessageCircle, keywords: 'internal staff channels direct messages' },
                 { label: 'Team', href: '/desk/team', icon: UserCog, keywords: 'people workload' },
                 { label: 'Notifications', href: '/desk/notifications', icon: Bell, keywords: 'alerts' },
             ],

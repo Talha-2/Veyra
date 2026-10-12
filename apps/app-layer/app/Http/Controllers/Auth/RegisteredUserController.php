@@ -25,6 +25,12 @@ class RegisteredUserController extends Controller
         event(new Registered($user));
         Auth::login($user);
 
+        $intended = $request->session()->get('url.intended');
+        if (is_string($intended) && parse_url($intended, PHP_URL_HOST) === $request->getHost()
+            && str_starts_with((string) parse_url($intended, PHP_URL_PATH), '/portal/')) {
+            return redirect()->intended(route('portal.index'));
+        }
+
         // A new account has no organization yet. `home` is behind the tenant
         // middleware, which will bounce them to onboarding — so send them there
         // directly rather than through a redirect that only looks like a loop.

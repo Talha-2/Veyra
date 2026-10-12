@@ -46,8 +46,9 @@ class SurfaceAccessTest extends TestCase
     {
         $user = $this->member($this->organization(), OrganizationRole::Owner);
 
-        // /desk lands on the dashboard, as in Z360; the inbox is one click away.
-        $this->actingAs($user)->get('/desk')->assertRedirect('/desk/dashboard');
+        // Desk opens the clinic launchpad; working pages remain accessible.
+        $this->actingAs($user)->get('/desk')->assertRedirect('/desk/modules');
+        $this->actingAs($user)->get('/desk/modules')->assertOk();
         $this->actingAs($user)->get('/desk/dashboard')->assertOk();
         $this->actingAs($user)->get('/desk/inbox')->assertOk();
         $this->actingAs($user)->get('/studio')->assertOk();

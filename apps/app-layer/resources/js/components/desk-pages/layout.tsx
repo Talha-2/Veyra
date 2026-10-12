@@ -5,23 +5,21 @@ import type { ReactNode } from 'react';
  * The Desk page frame and the roomier card pieces Desk pages are laid out
  * from (DESIGN.md › "Space and scrolling", binding).
  *
- * - DeskPage: the content column. Same padding as Studio, 1200px by default,
- *   1440px (`wide`) for boards and tables. The header sits 40px above the
- *   first section; sections are 48px apart. The document scrolls; nothing
+ * - DeskPage: the shared 1440px content column, matching Studio's frame.
+ *   The header and sections use 32px separation. The document scrolls; nothing
  *   here adds a scrolling wrapper.
  * - Panel / PanelHeader / PanelBody: a card with 28px of padding.
  * - PanelRow: a 60px hairline-separated row.
  */
 
-// Wider on big monitors (a 1200px column on a 2000px screen read as a narrow
-// strip floating in empty space).
-const WIDTHS = { narrow: 'max-w-[1000px]', default: 'max-w-[1200px] min-[1800px]:max-w-[1360px]', wide: 'max-w-[1440px] min-[1800px]:max-w-[1640px]' } as const;
+// Existing width options remain compatible while using one shared page frame.
+const WIDTHS = { narrow: 'max-w-[1440px] min-[1800px]:max-w-[1640px]', default: 'max-w-[1440px] min-[1800px]:max-w-[1640px]', wide: 'max-w-[1440px] min-[1800px]:max-w-[1640px]' } as const;
 
 export function DeskPage({ header, children, width = 'default' }: { header?: ReactNode; children: ReactNode; width?: keyof typeof WIDTHS }) {
     return (
         <div className={`mx-auto w-full px-6 pt-10 pb-28 md:px-10 lg:px-14 lg:pt-12 ${WIDTHS[width]}`}>
-            {header && <div className="mb-10 [&>header]:mb-0">{header}</div>}
-            <div className="flex flex-col gap-12">{children}</div>
+            {header && <div className="mb-8 [&>header]:mb-0">{header}</div>}
+            <div className="flex flex-col gap-8">{children}</div>
         </div>
     );
 }
@@ -45,7 +43,7 @@ export function PageSection({ title, description, actions, children, className =
 }
 
 export function Panel({ children, className = '', as: Tag = 'section' }: { children: ReactNode; className?: string; as?: 'section' | 'div' | 'aside' | 'article' }) {
-    return <Tag className={`v-panel min-w-0 ${className}`}>{children}</Tag>;
+    return <Tag className={`v-panel desk-record-section min-w-0 w-full self-start ${className}`}>{children}</Tag>;
 }
 
 export function PanelHeader({ title, description, actions, icon, border = true }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; icon?: ReactNode; border?: boolean }) {

@@ -1,0 +1,16 @@
+import { Head, Link, router } from '@inertiajs/react';
+import { DeskPage } from '../../components/desk-pages/layout';
+import { PageHeader } from '../../components/ui/page';
+import { controlClass } from '../../components/healthcare/patient-form';
+import { ClinicalPatientNav } from '../../components/healthcare/clinical-patient-nav';
+import { vitalFields } from '../../types/clinical';
+import type { CarePatient } from '../../types/clinical-care';
+
+export default function Flowsheets({ patient, patients, visits }: { patient: CarePatient | null; patients: CarePatient[]; visits: { id: number; occurred_at: string; status: string; vitals: Record<string, number | null> | null }[] }) {
+    return <><Head title="Vitals flowsheet" /><DeskPage width="wide" header={<PageHeader title="Vitals flowsheet" description="Compare recorded vital signs across patient visits." />}><section className="space-y-6">
+        <label className="block max-w-md text-sm">Patient<select className={controlClass + ' mt-2'} value={patient?.id ?? ''} onChange={event => router.get('/desk/flowsheets', { patient_id: event.target.value })}><option value="">Choose patient</option>{patient&&!patients.some(option=>option.id===patient.id)&&<option value={patient.id}>{patient.name} · {patient.mrn}</option>}{patients.map(option => <option key={option.id} value={option.id}>{option.name} · {option.mrn}</option>)}</select></label>
+        {patient ? <><ClinicalPatientNav id={patient.id} /><div className="flex flex-wrap items-baseline justify-between gap-3"><h2 className="text-lg font-semibold">{patient.name} · {patient.mrn}</h2><p className="text-sm text-secondary">{visits.length} {visits.length === 1 ? 'visit' : 'visits'} shown · newest first</p></div>
+            {visits.length ? <><div className="overflow-x-auto"><table className="w-auto text-left text-sm"><caption className="sr-only">Recorded vital signs by consultation for {patient.name}</caption><thead><tr><th scope="col" className="min-w-64 px-4 py-5">Vital sign</th>{visits.map(visit => <th scope="col" key={visit.id} className="min-w-40 px-4 py-5 font-medium"><Link className="text-accent-text hover:underline" href={'/desk/encounters/' + visit.id}>{new Date(visit.occurred_at).toLocaleDateString()}</Link><p className="mt-2 text-xs text-secondary">{new Date(visit.occurred_at).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})} · {visit.status}</p></th>)}</tr></thead><tbody>{vitalFields.map(([key, label]) => <tr key={key} className="border-t border-border"><th scope="row" className="px-4 py-4 font-medium">{label}</th>{visits.map(visit => <td key={visit.id} className="px-4 py-4 tabular-nums">{visit.vitals?.[key] ?? '—'}</td>)}</tr>)}</tbody></table></div><p className="text-xs text-secondary">— means no value was recorded. Open a visit date to inspect its consultation. This view shows up to 50 visits available to your account.</p></> : <p className="border-t border-border py-6 text-sm text-secondary">No consultations are available in this patient’s flowsheet.</p>}
+        </> : <p className="border-t border-border py-6 text-sm text-secondary">Choose a patient to compare their recorded vital signs and open the source consultations.</p>}
+    </section></DeskPage></>;
+}

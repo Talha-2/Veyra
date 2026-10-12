@@ -73,16 +73,16 @@ class ExpertsAndApprovalsTest extends TestCase
 
     // ── experts ─────────────────────────────────────────────────────────
 
-    public function test_a_model_set_on_the_talker_expert_becomes_the_voice_talker_model(): void
+    public function test_a_legacy_custom_talker_model_does_not_override_the_core_talker(): void
     {
         $this->assertArrayNotHasKey('talker_model', (array) ($this->context()['agent']['advanced'] ?? []));
 
         $this->asTenant(fn () => Expert::query()->where('slug', 'front')->update(['model' => 'groq:openai/gpt-oss-20b']));
 
-        $this->assertSame('groq:openai/gpt-oss-20b', $this->context()['agent']['advanced']['talker_model']);
+        $this->assertArrayNotHasKey('talker_model', (array) ($this->context()['agent']['advanced'] ?? []));
     }
 
-    public function test_experts_ship_in_studio_order_so_the_first_worker_is_the_primary(): void
+    public function test_optional_experts_ship_in_studio_order_with_no_primary(): void
     {
         $this->asTenant(fn () => Expert::create(['slug' => 'billing', 'name' => 'Billing', 'description' => 'Invoices.', 'runtime' => AgentRuntime::Worker, 'position' => 3]));
 
@@ -90,8 +90,8 @@ class ExpertsAndApprovalsTest extends TestCase
         $this->assertSame(['operations', 'billing'], $workers);
 
         $this->actingAs($this->owner)->get('/studio/experts')->assertOk()->assertInertia(fn ($page) => $page
-            ->where('experts.1.slug', 'operations')->where('experts.1.primary', true)
-            ->where('experts.2.slug', 'billing')->where('experts.2.primary', false));
+            ->where('experts.0.slug', 'operations')->where('experts.0.primary', false)
+            ->where('experts.1.slug', 'billing')->where('experts.1.primary', false));
     }
 
     public function test_reasoning_effort_accepts_only_what_the_agent_layer_sends(): void
@@ -101,7 +101,7 @@ class ExpertsAndApprovalsTest extends TestCase
         $this->actingAs($this->owner)->patch("/studio/experts/{$expert->id}", ['reasoning_effort' => 'extreme'])->assertSessionHasErrors('reasoning_effort');
         $this->actingAs($this->owner)->patch("/studio/experts/{$expert->id}", ['reasoning_effort' => 'high'])->assertSessionHasNoErrors();
         $this->assertSame('high', $expert->refresh()->reasoning_effort);
-        $this->assertSame('high', collect($this->context()['experts'])->firstWhere('slug', 'operations')['reasoning_effort']);
+        $this->assertSame('high', $this->withToken(self::SECRET)->getJson('/api/agent/v1/organizations/'.$this->organization->id.'/experts/operations/execution')->assertOk()->json('expert.reasoning_effort'));
     }
 
     // ── MCP ─────────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ class ExpertsAndApprovalsTest extends TestCase
 
         // Granted to the worker, it ships with where it runs and how to authenticate.
         $this->asTenant(fn () => Expert::query()->where('slug', 'operations')->first()->actions()->attach($get));
-        $tool = collect(collect($this->context()['experts'])->firstWhere('slug', 'operations')['tools'])->firstWhere('name', $get->slug);
+        $tool = collect($this->withToken(self::SECRET)->getJson('/api/agent/v1/organizations/'.$this->organization->id.'/experts/operations/execution')->assertOk()->json('expert.tools'))->firstWhere('name', $get->slug);
         $this->assertSame('mcp', $tool['kind']);
         $this->assertSame(['tool' => 'get_issue', 'url' => 'https://mcp.example/mcp', 'transport' => 'streamable_http', 'headers' => ['Authorization' => 'Bearer tok-123']], $tool['config']);
     }

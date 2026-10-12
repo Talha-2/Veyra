@@ -12,14 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 /**
  * An expert is a data record, not a class.
  *
- * This is the single most misunderstood part of the harness. There is no router
- * graph and no expert subgraph — there is one agent loop whose system prompt and
- * bound tools get swapped between turns. An "expert" is the bundle that gets
- * swapped in: a prompt, a tool list, a skill list, a model.
- *
- * Because it is data, an organization can define its own experts in Studio and
- * the agent layer picks them up without a deploy. Built-ins are seeded rows,
- * distinguished only by `is_builtin` so the UI can stop someone deleting them.
+ * Optional specialists execute delegated tasks with their own prompt, granted
+ * actions, shared and owned private skills, model and isolated history.
+ * Historical built-in profiles remain editable for recovery; AgentConfig owns
+ * the independent core runtime and no Expert record is required to run it.
  */
 #[Fillable([
     'slug', 'name', 'description', 'system_prompt', 'model',
@@ -83,6 +79,7 @@ class Expert extends Model
     public function skillCatalog(): array
     {
         return $this->skills()
+            ->shared()
             ->where('enabled', true)
             ->get()
             ->map(fn (Skill $skill) => [

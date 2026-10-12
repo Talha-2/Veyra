@@ -6,7 +6,9 @@ use App\Enums\AgentRuntime;
 use App\Http\Controllers\Controller;
 use App\Models\Action;
 use App\Models\Expert;
+use App\Models\Organization;
 use App\Models\Skill;
+use App\Services\Agent\SkillOwnership;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -24,7 +26,6 @@ class ExpertController extends Controller
             ->orderBy('position')
             ->orderBy('id')
             ->get();
-        $primary = $experts->where('enabled', true)->groupBy(fn (Expert $e) => $e->runtime->value)->map(fn ($group) => $group->first()->id);
 
         $experts = $experts
             ->map(fn (Expert $e) => [
@@ -39,12 +40,13 @@ class ExpertController extends Controller
                 'enabled' => $e->enabled,
                 'skills_count' => $e->skills_count,
                 'actions_count' => $e->actions_count,
-                'primary' => $primary->get($e->runtime->value) === $e->id,
+                'primary' => false,
             ]);
 
         return Inertia::render('studio/experts', [
-            'experts' => $experts,
-            'runtimes' => collect(AgentRuntime::cases())->map(fn ($r) => [
+            'experts' => $experts->filter(fn ($expert) => ! $expert['is_builtin'] && in_array($expert['runtime'], ['worker', 'text'], true))->values(),
+            'legacy_experts' => $experts->filter(fn ($expert) => $expert['is_builtin'] || $expert['runtime'] === 'talker')->values(),
+            'runtimes' => collect([AgentRuntime::Worker, AgentRuntime::Text])->map(fn ($r) => [
                 'value' => $r->value, 'label' => $r->label(), 'description' => $r->description(),
             ])->all(),
         ]);
@@ -71,16 +73,16 @@ class ExpertController extends Controller
                 'enabled' => $expert->enabled,
                 'skill_ids' => $expert->skills->pluck('id')->all(),
                 'action_ids' => $expert->actions->pluck('id')->all(),
-                // How the agent layer will use it: the first enabled expert of
-                // its runtime is the primary; other workers are routed to.
-                'primary' => $expert->enabled && Expert::query()->enabled()->forRuntime($expert->runtime)->orderBy('position')->orderBy('id')->value('id') === $expert->id,
+                'primary' => false,
                 'siblings' => Expert::query()->enabled()->forRuntime($expert->runtime)->whereKeyNot($expert->id)->count(),
             ],
             // Everything it could be granted, so the page is one form rather
             // than a picker per relation.
-            'all_skills' => Skill::query()->enabled()->orderBy('name')->get()
-                ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'description' => $s->description, 'gated' => $s->isGated()])
+            'all_skills' => Skill::query()->enabled()->availableToExpert($expert)->orderBy('name')->get()
+                ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'description' => $s->description, 'gated' => $s->isGated(), 'private' => $s->private_expert_id !== null])
                 ->all(),
+            'retired_private_skills' => Skill::onlyTrashed()->where('private_expert_id', $expert->id)->orderBy('name')->get(['id', 'name'])
+                ->map(fn (Skill $skill) => ['id' => $skill->id, 'name' => $skill->name])->all(),
             'all_actions' => Action::query()->enabled()->orderBy('name')->get()
                 ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name, 'kind' => $a->kind->label(), 'durable' => $a->is_durable_write])
                 ->all(),
@@ -92,7 +94,7 @@ class ExpertController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:80'],
             'description' => ['required', 'string', 'max:160'],
-            'runtime' => ['required', Rule::enum(AgentRuntime::class)],
+            'runtime' => ['required', Rule::in(['worker', 'text'])],
         ]);
 
         $expert = Expert::create([
@@ -106,43 +108,51 @@ class ExpertController extends Controller
 
     public function update(Request $request, Expert $expert): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['sometimes', 'string', 'max:80'],
-            // Hard-capped, and it is not a style choice: every peer's routing
-            // block includes this line, so its length is paid on every turn of
-            // every other expert.
-            'description' => ['sometimes', 'string', 'max:160'],
-            'system_prompt' => ['sometimes', 'nullable', 'string', 'max:20000'],
-            'model' => ['sometimes', 'nullable', 'string', 'max:80'],
-            // The agent layer sends these as the provider's reasoning_effort;
-            // anything else would be silently dropped there.
-            'reasoning_effort' => ['sometimes', 'nullable', Rule::in(['low', 'medium', 'high'])],
-            'enabled' => ['sometimes', 'boolean'],
-            'skill_ids' => ['sometimes', 'array'],
-            'skill_ids.*' => ['integer', 'exists:skills,id'],
-            'action_ids' => ['sometimes', 'array'],
-            'action_ids.*' => ['integer', 'exists:actions,id'],
-        ]);
+        return app(SkillOwnership::class)->transact(function () use ($request, $expert) {
+            $validated = $request->validate([
+                'name' => ['sometimes', 'string', 'max:80'],
+                // Hard-capped, and it is not a style choice: every peer's routing
+                // block includes this line, so its length is paid on every turn of
+                // every other expert.
+                'description' => ['sometimes', 'string', 'max:160'],
+                'system_prompt' => ['sometimes', 'nullable', 'string', 'max:20000'],
+                'model' => ['sometimes', 'nullable', 'string', 'max:80'],
+                // The agent layer sends these as the provider's reasoning_effort;
+                // anything else would be silently dropped there.
+                'reasoning_effort' => ['sometimes', 'nullable', Rule::in(['low', 'medium', 'high'])],
+                'enabled' => ['sometimes', 'boolean'],
+                'skill_ids' => ['sometimes', 'array'],
+                'skill_ids.*' => ['integer', Rule::exists('skills', 'id')->where('organization_id', Organization::current()->id)->whereNull('deleted_at')->where(fn ($query) => $query->whereNull('private_expert_id')->orWhere('private_expert_id', $expert->id))],
+                'action_ids' => ['sometimes', 'array'],
+                'action_ids.*' => ['integer', Rule::exists('actions', 'id')->where('organization_id', Organization::current()->id)],
+            ]);
 
-        $expert->fill(collect($validated)->except(['skill_ids', 'action_ids'])->all())->save();
+            $expert->fill(collect($validated)->except(['skill_ids', 'action_ids'])->all())->save();
 
-        if (array_key_exists('skill_ids', $validated)) {
-            $expert->skills()->sync($validated['skill_ids']);
-        }
-        if (array_key_exists('action_ids', $validated)) {
-            $expert->actions()->sync($validated['action_ids']);
-        }
+            if (array_key_exists('skill_ids', $validated)) {
+                $expert->skills()->sync($validated['skill_ids']);
+            }
+            if (array_key_exists('action_ids', $validated)) {
+                $expert->actions()->sync($validated['action_ids']);
+            }
 
-        return back()->with('success', 'Expert saved.');
+            return back()->with('success', 'Expert saved.');
+        });
     }
 
     public function destroy(Expert $expert): RedirectResponse
     {
-        abort_if($expert->is_builtin, 403, 'Built-in experts cannot be deleted. Disable it instead.');
+        return app(SkillOwnership::class)->transact(function () use ($expert) {
+            abort_if($expert->is_builtin, 403, 'Built-in experts cannot be deleted. Disable it instead.');
 
-        $expert->delete();
+            if (Skill::withTrashed()->where('private_expert_id', $expert->id)->exists()) {
+                return back()->withErrors(['expert' => 'Reassign or share this expert’s private skills before deleting the expert. Restore any deleted private skills here first, then change their owner.']);
+            }
 
-        return redirect()->route('studio.experts');
+            $expert->delete();
+
+            return redirect()->route('studio.experts');
+        });
     }
 
     /**

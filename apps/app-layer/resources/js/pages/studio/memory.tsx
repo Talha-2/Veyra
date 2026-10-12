@@ -1,10 +1,10 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Brain, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 
 import { EditorWell } from '../../components/studio-capability/editor-well';
 import { Stacked } from '../../components/studio/space';
-import Dialog from '../../components/ui/dialog';
+import Sidebar from '../../components/ui/sidebar';
 import { Card, SearchField, SegmentedControl, Toolbar } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { EmptyState, Kbd, RelativeTime, UserText } from '../../components/ui/primitives';
@@ -17,6 +17,8 @@ const wordCount = (text: string | null) => (text?.trim() ? text.trim().split(/\s
 
 export default function MemoryPage({ memories, contacts_with_history }: { memories: Memory[]; contacts_with_history: number }) {
     const [adding, setAdding] = useState(false);
+    const [addingBusy, setAddingBusy] = useState(false);
+    const [editingBusy, setEditingBusy] = useState(false);
     const [editing, setEditing] = useState<Memory | null>(null);
     const [query, setQuery] = useState('');
     const [sort, setSort] = useState<Sort>('recent');
@@ -82,19 +84,19 @@ export default function MemoryPage({ memories, contacts_with_history }: { memori
                             </EmptyState>
                         </Card>
                     ) : (
-                        <div className="grid gap-6 md:grid-cols-2">
+                        <div className="grid items-start gap-6 md:grid-cols-2">
                             {visible.map((m) => <MemoryCard key={m.id} memory={m} onOpen={() => setEditing(m)} />)}
                         </div>
                     )}
                 </div>
             )}
 
-            <Dialog open={adding} onClose={() => setAdding(false)} title="Add a memory" description="The agent reads it from the next call on." width={760}>
-                <MemoryForm onClose={() => setAdding(false)} />
-            </Dialog>
-            <Dialog open={!!editing} onClose={() => setEditing(null)} title={editing?.name ?? ''} description="Changes reach the agent on its next call." width={760}>
-                {editing && <MemoryForm key={editing.id} memory={editing} onClose={() => setEditing(null)} />}
-            </Dialog>
+            <Sidebar open={adding} onClose={() => { if (!addingBusy) setAdding(false); }} title="Add a memory" description="The agent reads it from the next call on." width={760}>
+                <MemoryForm onClose={() => setAdding(false)} onProcessingChange={setAddingBusy} />
+            </Sidebar>
+            <Sidebar open={!!editing} onClose={() => { if (!editingBusy) setEditing(null); }} title={editing?.name ?? ''} description="Changes reach the agent on its next call." width={760}>
+                {editing && <MemoryForm key={editing.id} memory={editing} onClose={() => setEditing(null)} onProcessingChange={setEditingBusy} />}
+            </Sidebar>
         </>
     );
 }
@@ -103,9 +105,9 @@ function MemoryCard({ memory: m, onOpen }: { memory: Memory; onOpen: () => void 
     const words = wordCount(m.content);
 
     return (
-        <button type="button" onClick={onOpen} className="v-panel v-card-hover flex min-h-52 flex-col p-7 text-left">
+        <button type="button" onClick={onOpen} className="v-panel v-card-hover flex flex-col p-7 text-left">
             <h3 className="line-clamp-2 text-md font-semibold text-primary"><UserText>{m.name}</UserText></h3>
-            <p className="mt-2 line-clamp-4 flex-1 text-base leading-relaxed whitespace-pre-line text-secondary" dir="auto">
+            <p className="mt-2 line-clamp-4 text-base leading-relaxed whitespace-pre-line text-secondary" dir="auto">
                 {m.content || <span className="text-tertiary">Empty</span>}
             </p>
             <div className="mt-5 flex items-center gap-2 border-t pt-4 text-xs text-tertiary" style={{ borderColor: 'var(--separator)' }}>
@@ -118,41 +120,48 @@ function MemoryCard({ memory: m, onOpen }: { memory: Memory; onOpen: () => void 
     );
 }
 
-function MemoryForm({ onClose, memory }: { onClose: () => void; memory?: Memory }) {
+function MemoryForm({ onClose, memory, onProcessingChange }: { onClose: () => void; memory?: Memory; onProcessingChange: (busy: boolean) => void }) {
     const { data, setData, post, patch, processing, errors, reset } = useForm({ name: memory?.name ?? '', content: memory?.content ?? '' });
+    const [deleting, setDeleting] = useState(false);
+    const busy = processing || deleting;
+    useEffect(() => { onProcessingChange(busy); return () => onProcessingChange(false); }, [busy, onProcessingChange]);
+    const close = () => { if (!busy) onClose(); };
     const submit = (e?: FormEvent) => {
         e?.preventDefault();
+        if (busy) return;
         if (memory) patch(`/studio/memory/${memory.id}`, { onSuccess: onClose });
         else post('/studio/memory', { onSuccess: () => { reset(); onClose(); } });
     };
     const forget = () => {
-        if (!memory) return;
-        if (confirm(`Forget “${memory.name}”? The agent stops knowing it from the next call.`)) router.delete(`/studio/memory/${memory.id}`, { onSuccess: onClose });
+        if (!memory || busy) return;
+        if (confirm(`Forget “${memory.name}”? The agent stops knowing it from the next call.`)) router.delete(`/studio/memory/${memory.id}`, { onStart: () => setDeleting(true), onFinish: () => setDeleting(false), onSuccess: onClose });
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-5 pt-1">
-            {!memory && (
-                <Stacked label="Title" htmlFor="memory-title" error={errors.name}>
-                    <input id="memory-title" className="v-field max-w-md" value={data.name} maxLength={120} onChange={(e) => setData('name', e.target.value)} placeholder="Scheduling rules" autoFocus />
+        <form onSubmit={submit} aria-busy={busy}>
+            <fieldset disabled={busy} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0 pt-1">
+                {!memory && (
+                    <Stacked label="Title" htmlFor="memory-title" error={errors.name}>
+                        <input id="memory-title" className="v-field max-w-md" value={data.name} maxLength={120} onChange={(e) => setData('name', e.target.value)} placeholder="Scheduling rules" autoFocus />
+                    </Stacked>
+                )}
+                <Stacked label="What to remember" htmlFor="memory-content" hint="Write it the way you would tell a new hire.">
+                    <EditorWell id="memory-content" value={data.content} onChange={(v) => setData('content', v)} max={MAX_CONTENT} minRows={8} error={errors.content} autoFocus={!!memory}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }}
+                        placeholder="We never book installs on Fridays. If a caller insists, offer the Thursday before or the Monday after." />
                 </Stacked>
-            )}
-            <Stacked label="What to remember" htmlFor="memory-content" hint="Write it the way you would tell a new hire.">
-                <EditorWell id="memory-content" value={data.content} onChange={(v) => setData('content', v)} max={MAX_CONTENT} minRows={8} error={errors.content} autoFocus={!!memory}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }}
-                    placeholder="We never book installs on Fridays. If a caller insists, offer the Thursday before or the Monday after." />
-            </Stacked>
-            <div className="mt-2 flex items-center gap-2 border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
+            </fieldset>
+            <div className="mt-7 flex items-center gap-2 border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
                 {memory && (
-                    <button type="button" className="v-btn v-btn--danger v-btn--sm" onClick={forget}>
+                    <button type="button" className="v-btn v-btn--danger v-btn--sm" onClick={forget} disabled={busy}>
                         <Trash2 size={14} strokeWidth={1.9} />
                         Forget
                     </button>
                 )}
                 <span className="hidden flex-1 items-center gap-1 text-xs text-tertiary sm:flex sm:justify-end"><Kbd>Ctrl</Kbd><Kbd>Enter</Kbd> saves</span>
                 <span className="flex-1 sm:hidden" />
-                <button type="button" className="v-btn v-btn--ghost" onClick={onClose}>Cancel</button>
-                <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.content.trim() || (!memory && !data.name.trim())}>
+                <button type="button" className="v-btn v-btn--ghost" onClick={close} disabled={busy}>Cancel</button>
+                <button type="submit" className="v-btn v-btn--primary" disabled={busy || !data.content.trim() || (!memory && !data.name.trim())}>
                     {processing ? 'Saving…' : 'Save'}
                 </button>
             </div>

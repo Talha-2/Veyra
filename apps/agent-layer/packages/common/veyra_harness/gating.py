@@ -29,7 +29,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from app_sdk.errors import NotFound
+from app_sdk.errors import AppSdkError, NotFound
 
 from .tools import Tool, ToolResult
 
@@ -52,6 +52,7 @@ class OpenSkill:
     slug: str
     name: str
     steps: list[Step]
+    version: int = 0
     current: int = 0  # index into steps
     waiting: str | None = None  # what the open step is waiting for, this turn
     notes: list[str] = field(default_factory=list)
@@ -171,14 +172,15 @@ class SkillGate:
         try:
             doc = await state.sdk.skill(slug)
         except NotFound:
+            self.open.pop(slug, None)
             return ToolResult.failure(f"No skill named {slug!r}. The catalog lists the ones that exist.")
         steps = _steps(doc.steps) if getattr(doc, "execution_mode", "prose") == "gated" else []
         if not steps:
             return ToolResult.success(doc.markdown, text=doc.markdown)
 
         existing = self.open.get(doc.slug)
-        if existing is None:
-            existing = OpenSkill(slug=doc.slug, name=doc.name, steps=steps)
+        if existing is None or existing.version != doc.version:
+            existing = OpenSkill(slug=doc.slug, name=doc.name, steps=steps, version=doc.version)
             self.open[doc.slug] = existing
         return ToolResult.success({"slug": doc.slug, "gated": True, "step": existing.current + 1, "of": len(existing.steps)}, text=self._render(doc.markdown, existing))
 
@@ -191,6 +193,16 @@ class SkillGate:
             if slug in self.completed:
                 return ToolResult.failure(f"'{slug}' is already finished. Read it again with read_skill to start it over.")
             return ToolResult.failure(f"No step-gated skill '{slug}' is open. Open it with read_skill first.")
+        try:
+            current = await state.sdk.skill(slug)
+        except NotFound:
+            self.open.pop(slug, None)
+            return ToolResult.failure("This skill is no longer available to this execution. Its cached steps were closed.")
+        except AppSdkError:
+            return ToolResult.failure("Skill access could not be checked. No step was advanced; retry the check before continuing.")
+        if current.version != skill.version or current.execution_mode != "gated":
+            self.open.pop(slug, None)
+            return ToolResult.failure("The skill changed. Read it again and review recorded actions before starting its updated steps.")
         try:
             number = int(args.get("step") or 0)
         except (TypeError, ValueError):

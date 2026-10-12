@@ -1,0 +1,6 @@
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import type { ReactNode } from 'react';
+export default function PortalLayout({ title, practice, children }: { title: string; practice?: string; children: ReactNode }) {
+    const { flash } = usePage<{ flash: { success: string | null; error: string | null } }>().props;
+    return <div className="min-h-screen bg-bg text-primary"><Head title={title}><meta name="referrer" content="no-referrer" /></Head><header className="border-b border-border bg-surface"><div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-5 sm:px-8"><Link href="/portal" className="font-semibold">Patient portal{practice && <span className="mt-1 block text-sm font-normal text-secondary">{practice}</span>}</Link><button type="button" className="v-btn v-btn--ghost" onClick={() => router.post('/logout')}>Sign out</button></div></header><main className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-12">{flash?.success && <p role="status" className="mb-6 border-l-2 border-border pl-4 text-sm text-primary">{flash.success}</p>}{flash?.error && <p role="alert" className="mb-6 text-sm text-danger">{flash.error}</p>}{children}</main></div>;
+}

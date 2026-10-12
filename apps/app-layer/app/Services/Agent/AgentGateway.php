@@ -224,6 +224,7 @@ class AgentGateway
         return $this->post('/v1/skills/test', [
             'organization_id' => Organization::currentId(),
             'skill' => $skill->slug,
+            ...($skill->private_expert_id !== null ? ['expert' => $skill->privateExpert->slug] : []),
             'version' => $skill->version,
             'scenario' => $scenario,
         ], timeout: 110);
@@ -262,13 +263,14 @@ class AgentGateway
      *
      * @return array{ok: bool, status: string, output?: string, result?: mixed, error?: ?string, duration_ms?: int}
      */
-    public function executeTool(array $tool, array $arguments, ?int $toolCallId = null): array
+    public function executeTool(array $tool, array $arguments, ?int $toolCallId = null, array $executionContext = []): array
     {
         $timeout = (int) min(150, ceil(($tool['timeout_ms'] ?? 15000) / 1000) + 15);
 
         return $this->postExplained('/v1/tools/execute', [
             'organization_id' => Organization::currentId(),
             'tool_call_id' => $toolCallId,
+            'execution_context' => $executionContext ?: new \stdClass,
             'tool' => $tool,
             'arguments' => $arguments ?: new \stdClass,
         ], timeout: $timeout);

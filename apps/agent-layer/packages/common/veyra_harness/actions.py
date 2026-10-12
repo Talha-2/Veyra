@@ -29,10 +29,11 @@ from typing import Any
 import httpx
 
 from app_sdk.errors import NotFound
-from app_sdk.models import ExpertRecord, TenantContext, ToolSpec
+from app_sdk.models import ExpertRecord, RuntimeDefinition, TenantContext, ToolSpec
 
 from .desk_tools import DESK_SLUGS, DESK_TOOLS, TICKET_TYPE_ARGUMENTS, acting_for
 from .tools import Tool, ToolResult
+from .scheduling_tools import SCHEDULING_TOOLS
 
 logger = logging.getLogger("veyra.harness.actions")
 
@@ -96,6 +97,7 @@ BUILTINS: dict[str, Tool] = {
     ),
     # Contacts, tickets, the conversation and leads: see desk_tools.py.
     **DESK_TOOLS,
+    **SCHEDULING_TOOLS,
     "remember": Tool(
         name="remember", handler=remember, is_durable_write=True, is_idempotent=True, timeout_ms=8000,
         description="Store a durable fact about how this business works that future calls should know. Not for per-caller details. Not available in a customer conversation.",
@@ -108,6 +110,7 @@ BUILTINS: dict[str, Tool] = {
 # an action is not offered it until SMS and email are actually delivered.
 INTERNAL_SLUGS: dict[str, str] = {
     **DESK_SLUGS,
+    **{name: name for name in SCHEDULING_TOOLS},
     "search_knowledge": "search_knowledge",
     "remember": "remember",
 }
@@ -253,8 +256,8 @@ def unconnected_handler(spec: ToolSpec):
 # ── assembly ─────────────────────────────────────────────────────────────
 
 
-def tools_for_expert(expert: ExpertRecord, context: TenantContext, *, include_builtins: bool = True) -> list[Tool]:
-    """Everything one worker expert may call.
+def tools_for_definition(definition: RuntimeDefinition, context: TenantContext, *, include_builtins: bool = True) -> list[Tool]:
+    """Actions one runtime definition may call.
 
     Actions granted in Studio come first under the org's names; built-ins fill
     in what the org did not grant explicitly. A built-in that the org already
@@ -268,15 +271,25 @@ def tools_for_expert(expert: ExpertRecord, context: TenantContext, *, include_bu
     tools: list[Tool] = []
     covered: set[str] = set()
     disabled = {INTERNAL_SLUGS.get(slug, slug) for slug in (getattr(context, "disabled_actions", None) or [])}
+    policies = {policy["name"]: policy for policy in context.scheduling_actions}
 
-    for spec in expert.tools:
+    for spec in definition.tools:
         if spec.kind == "internal":
             builtin = BUILTINS.get(INTERNAL_SLUGS.get(spec.name, spec.name))
             if builtin is None:
                 logger.warning("actions.unknown_internal slug=%s", spec.name)
                 continue
+            if builtin.name in SCHEDULING_TOOLS and (not context.healthcare_enabled or builtin.name in disabled):
+                continue
             tool = Tool.from_spec(spec, builtin.handler)
             tool.plumbing = builtin.plumbing
+            tool.inject_idempotency_key = builtin.inject_idempotency_key
+            if builtin.name in SCHEDULING_TOOLS and builtin.is_durable_write:
+                tool.is_durable_write = True
+                tool.is_idempotent = False
+            if builtin.name in policies:
+                policy = policies[builtin.name]
+                tool.requires_approval = tool.requires_approval or bool(policy.get("requires_approval"))
             tool.description = spec.description or builtin.description
             tool.input_schema = _schema_for(builtin, context)
             # The app's flags win, but an internal action is transactional
@@ -294,10 +307,22 @@ def tools_for_expert(expert: ExpertRecord, context: TenantContext, *, include_bu
 
     if include_builtins:
         for name, builtin in BUILTINS.items():
+            if name in SCHEDULING_TOOLS and not context.healthcare_enabled:
+                continue
             if name not in covered and name not in disabled and not any(t.name == name for t in tools):
                 schema = _schema_for(builtin, context)
-                tools.append(builtin if schema is builtin.input_schema else dataclasses.replace(builtin, input_schema=schema))
+                if name in policies:
+                    policy = policies[name]
+                    tools.append(dataclasses.replace(builtin, input_schema=schema, action_id=policy.get("id"),
+                        requires_approval=bool(policy.get("requires_approval")), timeout_ms=policy.get("timeout_ms", builtin.timeout_ms), max_retries=policy.get("max_retries", builtin.max_retries)))
+                else:
+                    tools.append(builtin if schema is builtin.input_schema else dataclasses.replace(builtin, input_schema=schema))
     return tools
+
+
+def tools_for_expert(expert: ExpertRecord, context: TenantContext, *, include_builtins: bool = True) -> list[Tool]:
+    """Compatibility entry point for legacy bundles and existing integrations."""
+    return tools_for_definition(expert, context, include_builtins=include_builtins)
 
 
 def _schema_for(builtin: Tool, context: TenantContext) -> dict[str, Any]:

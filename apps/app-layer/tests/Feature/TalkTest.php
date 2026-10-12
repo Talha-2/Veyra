@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\Channel;
 use App\Enums\OrganizationRole;
+use App\Models\Action;
+use App\Models\AgentConfig;
 use App\Models\Call;
 use App\Models\Conversation;
 use App\Models\Document;
@@ -12,6 +14,7 @@ use App\Models\Message;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\Knowledge\KnowledgeSearch;
+use App\Services\Organization\StarterAgent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -77,7 +80,8 @@ class TalkTest extends TestCase
         $this->assertSame('northwind', $first->json('organization.slug'));
         $this->assertSame('web', $first->json('line.e164'));
         $this->assertSame('web_session', $first->json('caller.identifier.type'));
-        $this->assertNotEmpty($first->json('experts'), 'a starter agent exists even for an organization that never configured one');
+        $this->assertSame('core-worker', $first->json('core.worker.slug'));
+        $this->assertSame([], $first->json('experts'));
         $this->assertSame('in-progress', Call::withoutGlobalScopes()->sole()->status);
 
         // A retry (worker restarted) gets the same call back, not a new one.
@@ -129,10 +133,10 @@ class TalkTest extends TestCase
         $org = Organization::query()->where('name', 'Harbor Plumbing')->sole();
         Organization::setCurrent($org);
         try {
-            $this->assertSame(['front-desk', 'operations'], Expert::query()->orderBy('position')->pluck('slug')->all());
+            $this->assertSame(0, Expert::query()->count());
             // The front-desk tools in StarterAgent's catalog that are granted by default.
-            $granted = collect(\App\Services\Organization\StarterAgent::catalog())->filter(fn ($a) => $a[6])->keys()->sort()->values()->all();
-            $this->assertSame($granted, Expert::query()->where('slug', 'operations')->sole()->actions()->pluck('slug')->sort()->values()->all());
+            $granted = collect(StarterAgent::catalog())->filter(fn ($a) => $a[6])->keys()->sort()->values()->all();
+            $this->assertSame($granted, Action::query()->whereIn('id', AgentConfig::query()->firstOrFail()->advanced['core_action_ids'])->pluck('slug')->sort()->values()->all());
             $this->assertContains('find_contact', $granted);
             $this->assertContains('hand_off', $granted);
         } finally {

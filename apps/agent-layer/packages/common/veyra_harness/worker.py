@@ -101,6 +101,8 @@ _TOOL_LABELS = {
     "save_lead": ("Saving the lead", "Saved the lead"),
     "skill_step": ("Checking off a step", "Checked off a step"),
     "switch_expert": ("Handing to a specialist", "Handed to a specialist"),
+    "delegate_work": ("Delegating work", "Worker replied"),
+    "delegate_expert": ("Consulting a specialist", "Specialist replied"),
 }
 
 
@@ -165,6 +167,7 @@ class Worker:
         self, *, executor: ActionExecutor, state: Any,
         model: ChatModel | None = None, instructions: str | None = None, tools: list[Tool] | None = None,
         personas: list[Persona] | None = None, gate: Any = None,
+        runtime_role: str | None = None,
     ):
         """One persona from ``model``/``instructions``/``tools``, or several from ``personas`` (the first is the primary).
 
@@ -186,6 +189,10 @@ class Worker:
             personas = [Persona(p.slug, p.name, p.instructions, gate.wrap(p.tools), p.model, p.description) for p in personas]
         self._executor = executor
         self._state = state
+        self.runtime_role = runtime_role
+        self._children: dict[str, Worker] = {}
+        self._retired_child_tokens = 0
+        self.turn_sequence = 0
         self._gate = gate
         self._personas: dict[str | None, Persona] = {}
         if len(personas) > 1:
@@ -200,6 +207,7 @@ class Worker:
             for t in p.tools:
                 self._known.setdefault(t.name, t)
         self._history: list[dict[str, Any]] = [{"role": "system", "content": ""}]
+        self._current_history_start = 1
         self._activate(personas[0])
 
         self._status = "idle"  # idle | working | waiting | failed
@@ -216,6 +224,9 @@ class Worker:
         # beside the history rather than in it: an extra key on a message is
         # a 400 from every provider.
         self._tool_ok: dict[str, bool] = {}
+        self._tool_confirmed: dict[str, bool] = {}
+        self._delegated_actions: dict[str, tuple[str, ...]] = {}
+        self.awaiting_approval = False
         # Why the last delegation failed, for hosts that report it (the
         # automation run's error column). Never spoken.
         self.last_error: str | None = None
@@ -233,11 +244,17 @@ class Worker:
 
     @property
     def write_in_flight(self) -> bool:
-        return self._executor.write_in_flight
+        return self._executor.write_in_flight or any(child.write_in_flight for child in self._children.values())
 
     @property
     def tokens(self) -> int:
-        return self._tokens
+        return self._tokens + self._retired_child_tokens + sum(child.tokens for child in self._children.values())
+
+    def attach_child(self, actor: str, child: "Worker") -> None:
+        previous = self._children.get(actor)
+        if previous is not None and previous is not child:
+            self._retired_child_tokens += previous.tokens
+        self._children[actor] = child
 
     # ── experts ───────────────────────────────────────────────────────────
 
@@ -275,7 +292,7 @@ class Worker:
         self._tools = {t.name: t for t in persona.tools}
         self._schemas = [t.schema() for t in persona.tools]
         self._history[0] = {"role": "system", "content": persona.instructions}
-        self._executor.scope.expert_slug = persona.slug
+        self._executor.scope.expert_slug = persona.slug if self.runtime_role in {None, "expert"} else None
 
     async def _switch(self, args: dict[str, Any], state: Any) -> ToolResult:
         slug = str(args.get("expert") or "").strip()
@@ -319,6 +336,8 @@ class Worker:
         return True
 
     def abort(self) -> None:
+        for child in self._children.values():
+            child.abort()
         if self._driver is not None:
             self._driver.cancel()
         if self._status == "working":
@@ -339,11 +358,16 @@ class Worker:
         if self._status in ("idle", "waiting"):
             return "No request is running."
         if self._status == "failed":
-            return "The request failed. Nothing it was asked to do was completed."
+            _, classification = self._finalization_outcome(self._current_history_start)
+            if not self._executor.scope.dry_run and classification in {"action_completed", "ticket_created_or_updated"}:
+                return "The request failed before finishing. Some actions were confirmed; do not repeat them. Unfinished work needs review."
+            return "The request failed before finishing. No completed write has been confirmed for this request."
 
         named = [name for name in self._steps_since_delta if not (self._known.get(name) and self._known[name].plumbing)]
         steps = len(self._steps_since_delta)
         body = "Just started. Nothing yet." if not named else "In progress, not finished. Steps so far, latest last:\n" + "\n".join(f"- {n.replace('_', ' ')}" for n in named)
+        if any(child.is_running for child in self._children.values()):
+            body += "\nA delegated task is running. Its outcome has not been confirmed yet."
 
         # Counting the checks that changed nothing is what turns a stall into
         # evidence. The count includes hidden plumbing so a busy worker
@@ -429,6 +453,8 @@ class Worker:
 
     async def _drive(self, transcript: str, queue: asyncio.Queue[DelegationOutcome | None], *, is_finalization: bool) -> None:
         self._status = "working"
+        self.turn_sequence += 1
+        self._current_history_start = len(self._history)
         started = time.perf_counter()
         delegation_id = await self._open_delegation(transcript, is_finalization)
         if delegation_id is None:
@@ -436,7 +462,8 @@ class Worker:
             self._status = "failed"
             await queue.put(None)
             return
-        self._executor.scope.delegation_id = delegation_id
+        if delegation_id or self._executor.scope.delegation_id is None:
+            self._executor.scope.delegation_id = delegation_id
         reply = ""
         status = "completed"
         error: str | None = None
@@ -453,7 +480,7 @@ class Worker:
             logger.warning("worker.timed_out seconds=%s", MAX_SECONDS)
             self._status, status, error = "failed", "timeout", f"no reply within {MAX_SECONDS:.0f}s"
         except asyncio.CancelledError:
-            await self._close_delegation(delegation_id, "aborted", None, "cancelled", started)
+            status, error = "aborted", "cancelled"
             raise
         except Exception as e:  # noqa: BLE001 — a worker fault must not kill the call
             logger.exception("worker.error")
@@ -461,7 +488,7 @@ class Worker:
         finally:
             self.last_error = error
             outcome = await self._close_delegation(delegation_id, status, reply, error, started)
-            if outcome is not None and self._status != "failed":
+            if outcome is not None:
                 await queue.put(outcome)
             await queue.put(None)
 
@@ -486,11 +513,13 @@ class Worker:
         duration_ms = int((time.perf_counter() - started) * 1000)
         call = getattr(self._state, "call", None)
         failed = status != "completed" or not reply
-        durable = False
+        _, classification = self._finalization_outcome(self._current_history_start)
+        durable = not self._executor.scope.dry_run and classification in {"action_completed", "ticket_created_or_updated"}
         if call is not None and delegation_id and delegation_id > 0:
             try:
                 closed = await self._state.sdk.finish_delegation(call.id, delegation_id, status=status, reply=reply or None, error=error, duration_ms=duration_ms)
-                failed, durable = closed.failed, closed.completed_durable_write
+                failed = closed.failed
+                durable = durable or closed.completed_durable_write
             except AppSdkError as e:
                 logger.warning("worker.delegation_close_failed error=%s", e)
         if status == "aborted":
@@ -531,9 +560,12 @@ class Worker:
                 if tool and tool.is_durable_write:
                     writes.append((tc["id"], name))
         names = tuple(name for _, name in writes)
+        if self.runtime_role:
+            names = tuple(action for call_id, name in writes for action in self._delegated_actions.get(call_id, (name,)))
         if not writes:
             return names, "no_action_needed"
-        successful = [name for call_id, name in writes if self._tool_ok.get(call_id)]
+        successful = [action for call_id, name in writes if (self._tool_confirmed if self.runtime_role else self._tool_ok).get(call_id)
+                      for action in self._delegated_actions.get(call_id, (name,))]
         if any(name in ("save_ticket", "create_ticket") for name in successful):
             return names, "ticket_created_or_updated"
         if successful:
@@ -544,6 +576,7 @@ class Worker:
         # Resume, don't restart: each user message is one unseen transcript delta.
         self._history.append({"role": "user", "content": transcript})
         self._steps_since_delta = []
+        self.awaiting_approval = False
         nudges = 0
         gate = self._gate if gated else None
         if gate is not None:
@@ -637,6 +670,11 @@ class Worker:
         return result
 
     def _expert_fields(self) -> dict[str, Any]:
+        if self.runtime_role:
+            fields = {"runtime_role": self.runtime_role, "runtime_name": self._active.name}
+            if self.runtime_role == "expert":
+                fields.update(expert=self._active.slug, expert_name=self._active.name)
+            return fields
         if len(self._personas) < 2:
             return {}
         return {"expert": self._active.slug, "expert_name": self._active.name}
@@ -644,6 +682,16 @@ class Worker:
     def _record(self, call: ToolCall, result: ToolResult) -> None:
         self._history.append(tool_result_message(call, result.output))
         self._tool_ok[call.id] = result.ok
+        tool = self._known.get(call.name)
+        data = result.data if isinstance(result.data, dict) else {}
+        if data.get("awaiting_approval") or data.get("status") == "waiting_for_approval":
+            self.awaiting_approval = True
+        if tool and tool.is_durable_write:
+            if not tool.audited:
+                self._tool_confirmed[call.id] = bool(data.get("completed_durable_write"))
+                self._delegated_actions[call.id] = tuple(data.get("actions") or ())
+            else:
+                self._tool_confirmed[call.id] = result.ok and not self._executor.scope.dry_run and not data.get("simulated", False)
 
     def _is_write(self, name: str) -> bool:
         tool = self._tools.get(name) or self._known.get(name)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from app_sdk.models import CallContext
 
 from veyra_harness.tests.fakes import CALL_CONTEXT, call_context
 from veyra_voice.pipeline import DEFAULT_VOICES, _turn_detector, build_session_kwargs, select_pipeline, turn_detector_kind, turn_handling
@@ -161,3 +162,14 @@ def test_models_come_from_studio_then_the_expert_and_a_keyless_provider_falls_ba
 
     monkeypatch.setenv("GROQ_API_KEY", "gsk")
     assert select_pipeline(call_context(agent=agent)).talker_model == "groq:openai/gpt-oss-20b"
+
+
+@pytest.mark.parametrize("optional_experts", [[], [{"slug": "specialist", "name": "Specialist", "description": "Optional", "runtime": "worker", "model": "openai:gpt-4.1-mini"}]])
+def test_skills_first_voice_pipeline_uses_core_models_with_or_without_experts(optional_experts):
+    data = {**CALL_CONTEXT, "architecture": "skills-first", "experts": optional_experts, "core": {
+        "taker": {"slug": "core-taker", "name": "Taker", "description": "Conversation", "runtime": "talker", "model": "openai:gpt-4.1-nano"},
+        "worker": {"slug": "core-worker", "name": "Worker", "description": "Operations", "runtime": "worker", "model": "openai:gpt-4.1"},
+    }}
+    spec = select_pipeline(CallContext.model_validate(data))
+    assert spec.talker_model == "openai:gpt-4.1-nano"
+    assert spec.worker_model == "openai:gpt-4.1"

@@ -2,6 +2,7 @@
 
 namespace App\Services\Agent;
 
+use App\Models\Appointment;
 use App\Models\Contact;
 use App\Models\Conversation;
 use App\Models\Ticket;
@@ -78,6 +79,11 @@ final class ActingFor
 
         return $ticket->conversation_id === $this->conversation->id
             || ($ticket->contact_id !== null && $ticket->contact_id === $this->contactId());
+    }
+
+    public function allowsAppointment(Appointment $appointment): bool
+    {
+        return ! $this->customerFacing() || ($this->contactId() !== null && $appointment->patient?->contact_id === $this->contactId());
     }
 
     /** Refuse a write on someone other than the person in the conversation. */

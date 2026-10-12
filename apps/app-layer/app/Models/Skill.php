@@ -29,7 +29,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 #[Fillable([
     'slug', 'name', 'description', 'body', 'execution_mode',
-    'steps', 'scope', 'enabled', 'updated_by_id',
+    'steps', 'scope', 'enabled', 'updated_by_id', 'private_expert_id',
 ])]
 class Skill extends Model
 {
@@ -41,6 +41,7 @@ class Skill extends Model
             'execution_mode' => SkillExecutionMode::class,
             'steps' => 'array',
             'enabled' => 'boolean',
+            'private_expert_id' => 'integer',
         ];
     }
 
@@ -50,7 +51,7 @@ class Skill extends Model
         // the version is bumped on every content change. The agent layer caches
         // skill bodies per call; the version is the cache key.
         static::updating(function (self $skill) {
-            if ($skill->isDirty(['body', 'steps', 'execution_mode'])) {
+            if ($skill->isDirty(['body', 'steps', 'execution_mode', 'private_expert_id'])) {
                 $skill->version = $skill->version + 1;
             }
         });
@@ -64,6 +65,21 @@ class Skill extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by_id');
+    }
+
+    public function privateExpert(): BelongsTo
+    {
+        return $this->belongsTo(Expert::class, 'private_expert_id');
+    }
+
+    public function scopeShared(Builder $query): void
+    {
+        $query->whereNull('private_expert_id');
+    }
+
+    public function scopeAvailableToExpert(Builder $query, Expert $expert): void
+    {
+        $query->where(fn (Builder $skills) => $skills->whereNull('private_expert_id')->orWhere('private_expert_id', $expert->id));
     }
 
     public function scopeEnabled(Builder $query): void

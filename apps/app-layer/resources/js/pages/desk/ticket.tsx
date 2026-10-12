@@ -199,7 +199,7 @@ function ContactCard({ contact }: { contact: NonNullable<Props['ticket']['contac
     return (
         <Panel className="overflow-hidden">
             <PanelHeader title="Contact" />
-            <Link href={`/desk/contacts/${contact.id}`} className="group flex items-center gap-3.5 px-7 py-4 transition-colors hover:bg-surface-hover">
+            <Link href={`/desk/patients/profile/${contact.id}`} className="group flex items-center gap-3.5 px-7 py-4 transition-colors hover:bg-surface-hover">
                 <Avatar initials={contact.initials} name={contact.name} size={40} />
                 <span className="min-w-0 flex-1">
                     <span className="block truncate text-base font-semibold text-primary"><UserText>{contact.name}</UserText></span>

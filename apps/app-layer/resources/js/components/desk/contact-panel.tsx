@@ -39,7 +39,6 @@ export default function ContactPanel({ thread, existingTags }: { thread: ThreadV
                             ...(contact.phone ? [{ label: 'Phone', value: <a href={`tel:${contact.phone}`} className="tabular-nums hover:text-accent-text">{contact.phone}</a> }] : []),
                             ...(contact.email ? [{ label: 'Email', value: <a href={`mailto:${contact.email}`} className="block truncate hover:text-accent-text">{contact.email}</a> }] : []),
                             ...(contact.company ? [{ label: 'Company', value: <UserText>{contact.company}</UserText> }] : []),
-                            { label: 'Stage', value: <Badge tone={contact.stage_tone} dot>{contact.stage_label}</Badge> },
                         ]} />
                         {contact.tags.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -154,7 +153,7 @@ function ContactHeader({ thread }: { thread: ThreadView }) {
             <Avatar initials={contact.initials} name={contact.name} size={72} />
             <div className="mt-3 flex max-w-full items-center gap-1">
                 <h3 className="truncate text-lg font-semibold tracking-tight text-primary"><UserText>{contact.name}</UserText></h3>
-                <button type="button" title={contact.is_favorite ? 'Remove from favourites' : 'Add to favourites'} aria-label="Toggle favorite contact" aria-pressed={contact.is_favorite}
+                <button type="button" title={contact.is_favorite ? 'Remove from favourites' : 'Add to favourites'} aria-label="Toggle favorite patient" aria-pressed={contact.is_favorite}
                     onClick={() => router.post(`/desk/contacts/${contact.id}/favorite`, {}, { preserveScroll: true })}
                     className="flex size-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-surface-hover"
                     style={{ color: contact.is_favorite ? 'var(--warning)' : 'var(--text-tertiary)' }}>
@@ -167,7 +166,7 @@ function ContactHeader({ thread }: { thread: ThreadView }) {
             <div className="mt-4 grid w-full grid-cols-3 gap-2">
                 <QuickAction href={contact.phone ? `tel:${contact.phone}` : undefined} icon={<Phone size={16} strokeWidth={1.9} />} label="Call" />
                 <QuickAction href={contact.email ? `mailto:${contact.email}` : undefined} icon={<Mail size={16} strokeWidth={1.9} />} label="Email" />
-                <QuickAction inertia href={`/desk/contacts/${contact.id}`} icon={<UserRound size={16} strokeWidth={1.9} />} label="Profile" />
+                <QuickAction inertia href={`/desk/patients/profile/${contact.id}`} icon={<UserRound size={16} strokeWidth={1.9} />} label="Patient" />
             </div>
         </div>
     );
@@ -194,10 +193,10 @@ function UnknownHeader({ thread }: { thread: ThreadView }) {
             <Avatar initials={initialsOf(label)} name={label} size={72} />
             <h3 className="mt-3 max-w-full truncate text-lg font-semibold tracking-tight text-primary tabular-nums">{label}</h3>
             <p className="mt-1 max-w-[36ch] text-sm text-secondary">
-                Not a contact yet. Create one and this whole history moves with it.
+                Register this person as a patient to connect their care record and conversation history.
             </p>
-            <button type="button" onClick={() => router.post('/desk/contacts', { from_conversation_id: thread.id })} className="v-btn v-btn--quiet mt-4 w-full">
-                <UserPlus size={15} strokeWidth={1.9} /> Create contact
+            <button type="button" onClick={() => router.post('/desk/contacts', { from_conversation_id: thread.id }, { onSuccess: () => router.get('/desk/patients', { conversation_id: thread.id }) })} className="v-btn v-btn--quiet mt-4 w-full">
+                <UserPlus size={15} strokeWidth={1.9} /> Register patient
             </button>
         </div>
     );

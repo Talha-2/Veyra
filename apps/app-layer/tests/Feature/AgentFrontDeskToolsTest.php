@@ -11,6 +11,7 @@ use App\Enums\OrganizationRole;
 use App\Enums\TicketStatus;
 use App\Models\Action;
 use App\Models\Activity;
+use App\Models\AgentConfig;
 use App\Models\Call;
 use App\Models\Contact;
 use App\Models\Conversation;
@@ -449,6 +450,7 @@ class AgentFrontDeskToolsTest extends TestCase
         Organization::setCurrent($this->organization);
         try {
             $worker = Expert::query()->where('slug', 'ops')->sole();
+            $worker->forceFill(['is_builtin' => true])->save();
             // What an organization provisioned before this change looks like…
             $stock = Action::create(['kind' => ActionKind::Internal, 'slug' => 'find_contact', 'name' => 'Find contact', 'description' => 'Look up a customer by phone number or email.', 'is_idempotent' => true]);
             $edited = Action::create(['kind' => ActionKind::Internal, 'slug' => 'create_ticket', 'name' => 'Create ticket', 'description' => 'Our own words.', 'is_durable_write' => true]);
@@ -470,8 +472,8 @@ class AgentFrontDeskToolsTest extends TestCase
             $this->assertFalse(Action::query()->where('slug', 'save_lead')->sole()->enabled, 'switched off stays off');
             $this->assertSame(count(StarterAgent::catalog()), Action::query()->count(), 'nothing created twice');
             $granted = $worker->actions()->pluck('slug')->sort()->values()->all();
-            $this->assertContains('hand_off', $granted);
-            $this->assertContains('ticket_status', $granted);
+            $this->assertSame(['create_ticket', 'find_contact'], $granted);
+            $this->assertSame($granted, Action::query()->whereIn('id', AgentConfig::query()->firstOrFail()->advanced['core_action_ids'])->pluck('slug')->sort()->values()->all());
             $this->assertNotContains('save_lead', $granted, 'an existing row is not re-granted on a backfill');
             $this->assertNotContains('send_message', Action::query()->pluck('slug')->all());
         } finally {

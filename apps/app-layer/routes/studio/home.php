@@ -12,6 +12,7 @@ use App\Http\Controllers\Studio\IntegrationController;
 use App\Http\Controllers\Studio\KnowledgeController;
 use App\Http\Controllers\Studio\MemoryController;
 use App\Http\Controllers\Studio\OverviewController;
+use App\Http\Controllers\Studio\RuntimeController;
 use App\Http\Controllers\Studio\SettingsController;
 use App\Http\Controllers\Studio\SkillController;
 use App\Http\Controllers\Studio\TelephonyController;
@@ -45,6 +46,9 @@ Route::get('/voice', [VoiceController::class, 'index'])->name('voice');
 Route::put('/voice', [VoiceController::class, 'update'])->name('voice.update');
 Route::get('/voice/preview', [VoiceController::class, 'preview'])->middleware('throttle:60,1')->name('voice.preview');
 
+Route::get('/runtime', [RuntimeController::class, 'index'])->name('runtime');
+Route::patch('/runtime', [RuntimeController::class, 'update'])->name('runtime.update');
+
 Route::get('/experts', [ExpertController::class, 'index'])->name('experts');
 Route::post('/experts', [ExpertController::class, 'store'])->name('experts.store');
 Route::get('/experts/{expert}', [ExpertController::class, 'show'])->name('experts.show');
@@ -57,6 +61,7 @@ Route::get('/skills/{skill}', [SkillController::class, 'show'])->name('skills.sh
 Route::patch('/skills/{skill}', [SkillController::class, 'update'])->name('skills.update');
 Route::post('/skills/{skill}/test', [SkillController::class, 'test'])->middleware('throttle:10,1')->name('skills.test');
 Route::delete('/skills/{skill}', [SkillController::class, 'destroy'])->name('skills.destroy');
+Route::post('/skills/{skill}/restore', [SkillController::class, 'restore'])->withTrashed()->name('skills.restore');
 
 Route::get('/automations', [AutomationController::class, 'index'])->name('automations');
 Route::post('/automations', [AutomationController::class, 'store'])->name('automations.store');

@@ -7,8 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Action;
 use App\Models\Integration;
 use App\Models\ToolCall;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,14 +24,22 @@ class ActionController extends Controller
     {
         $since = now()->subDays(7);
 
-        // Per-action outcome counts for the last week, one query.
-        $stats = ToolCall::query()
+        $calls = ToolCall::query()
             ->where('created_at', '>=', $since)
-            ->selectRaw('action_id, status, count(*) as n, percentile_cont(0.95) within group (order by duration_ms) as p95')
-            ->whereNotNull('action_id')
-            ->groupBy('action_id', 'status')
-            ->get()
-            ->groupBy('action_id');
+            ->whereNotNull('action_id');
+        $aggregate = (clone $calls)->selectRaw('action_id, status, count(*) as n')->groupBy('action_id', 'status');
+        $sqlite = $calls->getModel()->getConnection()->getDriverName() === 'sqlite';
+        if (! $sqlite) {
+            $aggregate->selectRaw('percentile_cont(0.95) within group (order by duration_ms) as p95');
+        }
+        $rows = $aggregate->toBase()->get();
+        if ($sqlite) {
+            $percentiles = $this->sqlitePercentiles($calls);
+            foreach ($rows as $row) {
+                $row->p95 = $percentiles->get($row->action_id.':'.$row->status);
+            }
+        }
+        $stats = $rows->groupBy('action_id');
 
         $actions = Action::query()
             ->with('integration:id,label,status')
@@ -60,7 +70,7 @@ class ActionController extends Controller
                     'calls_7d' => $total,
                     'success_rate' => $total ? round($ok / $total * 100) : null,
                     'timeouts_7d' => $rows->firstWhere('status', 'timeout')?->n ?? 0,
-                    'p95_ms' => $rows->max('p95') ? (int) $rows->max('p95') : null,
+                    'p95_ms' => $rows->max('p95') !== null ? (int) $rows->max('p95') : null,
                     // So the edit dialog opens filled in. The auth secret is
                     // never sent back to the browser.
                     'http' => $a->kind === ActionKind::Http ? [
@@ -117,5 +127,24 @@ class ActionController extends Controller
         $action->fill($validated)->save();
 
         return back()->with('success', 'Action saved.');
+    }
+
+    /** Retrieve only the two ranked samples needed for each continuous percentile. */
+    private function sqlitePercentiles(Builder $calls): Collection
+    {
+        $ranked = (clone $calls)->whereNotNull('duration_ms')->selectRaw('action_id, status, duration_ms,
+            row_number() over (partition by action_id, status order by duration_ms) - 1 as sample_index,
+            count(*) over (partition by action_id, status) as sample_count')->toBase();
+        $samples = $calls->getModel()->getConnection()->query()->fromSub($ranked, 'ranked_durations')
+            ->whereRaw('sample_index between cast((sample_count - 1) * 0.95 as integer) and cast((sample_count - 1) * 0.95 as integer) + 1')
+            ->orderBy('action_id')->orderBy('status')->orderBy('sample_index')->get();
+
+        return $samples->groupBy(fn ($sample) => $sample->action_id.':'.$sample->status)->map(function (Collection $group) {
+            $lower = $group->first();
+            $upper = $group->get(1, $lower);
+            $position = ($lower->sample_count - 1) * 0.95;
+
+            return $lower->duration_ms + ($upper->duration_ms - $lower->duration_ms) * ($position - floor($position));
+        });
     }
 }

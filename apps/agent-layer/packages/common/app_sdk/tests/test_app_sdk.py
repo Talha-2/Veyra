@@ -205,14 +205,14 @@ async def test_organization_scoped_routes_need_a_bound_client(sdk: AppSdk):
     assert sdk.organization_id is None, "binding returns a copy; the original stays unbound"
 
 
-async def test_skill_bodies_are_cached_on_version(sdk: AppSdk, app: FakeApp):
+async def test_skill_bodies_reauthorize_each_read_even_at_the_same_version(sdk: AppSdk, app: FakeApp):
     bound = sdk.for_organization(7)
     await bound.skill("reschedule", version=3)
     await bound.skill("reschedule", version=3)
-    assert sum(r.url.path.endswith("/skills/reschedule") for r in app.requests) == 1
+    assert sum(r.url.path.endswith("/skills/reschedule") for r in app.requests) == 2
 
     await bound.skill("reschedule", version=4)  # edited in Studio mid-call
-    assert sum(r.url.path.endswith("/skills/reschedule") for r in app.requests) == 2
+    assert sum(r.url.path.endswith("/skills/reschedule") for r in app.requests) == 3
 
     with pytest.raises(NotFound):
         await bound.skill("missing")

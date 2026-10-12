@@ -1,5 +1,10 @@
 """One way to assemble a worker, for every surface.
 
+Skills-first bundles assemble explicit core roles through ``core_runtime``.
+Optional specialists are delegated through ``delegation`` with separate
+execution contexts; their configuration never selects the default role.
+The persona roster described below is retained only for legacy bundles.
+
 Voice calls, live chat (Studio Talk and the public chat API), Ask, automations
 and the Studio skill test all run the same ``Worker``. Before this module each
 built it differently — a different expert picked, reasoning effort dropped on
@@ -87,6 +92,10 @@ def tool_from_spec(spec: ToolSpec) -> Tool | None:
             return None
         tool = Tool.from_spec(spec, builtin.handler)
         tool.plumbing = builtin.plumbing
+        tool.inject_idempotency_key = builtin.inject_idempotency_key
+        if builtin.name in {"book_appointment", "reschedule_appointment", "cancel_appointment"}:
+            tool.is_durable_write = True
+            tool.is_idempotent = False
         return tool
     if spec.kind == "http":
         return Tool.from_spec(spec, http_handler(spec))
@@ -163,9 +172,11 @@ def build_worker(
     gate = SkillGate()
     models: dict[tuple[str | None, str | None], ChatModel] = {}
     default_ref = context.agent.advanced.get("worker_model") or None
+    if context.architecture == "skills-first" and context.core:
+        default_ref = context.core.worker.model or default_ref
 
-    def model_for(ref: str | None, effort: str | None) -> ChatModel:
-        key = (model_override or ref or default_ref, reasoning_effort(effort))
+    def model_for(ref: str | None, effort: str | None, *, use_override: bool = True) -> ChatModel:
+        key = ((model_override if use_override else None) or ref or default_ref, reasoning_effort(effort))
         if key not in models:
             models[key] = model_factory(key[1], key[0])
         return models[key]
@@ -173,11 +184,18 @@ def build_worker(
     if surface == "automation":
         if automation is None:
             raise ValueError("An automation worker needs its automation spec.")
-        instructions = fill(load("automation"), base=text_instructions(context, None), name=automation.name, system_prompt=automation.system_prompt or "", goal=automation.goal or "")
+        instructions = fill(load("automation"), base=text_instructions(context, context.core.worker if context.core else None), name=automation.name, system_prompt=automation.system_prompt or "", goal=automation.goal or "")
         tools = with_gate(tools_from_specs(automation.tools, can_search_knowledge=automation.can_search_knowledge), gate)
         persona = Persona(slug=f"automation:{automation.id}", name=automation.name, instructions=instructions, tools=tools, model=model_for(None, automation.reasoning))
         executor = ActionExecutor(sdk, scope=ExecutionScope(expert_slug=persona.slug, dry_run=dry_run))
         return Worker(personas=[persona], executor=executor, state=state, gate=gate)
+
+    if context.architecture == "skills-first":
+        from .core_runtime import build_core_runtime
+
+        return build_core_runtime(surface=surface, context=context, sdk=sdk, state=state, model_for=model_for,
+                                  expert_model_for=lambda ref, effort: model_for(ref, effort, use_override=not bool(ref)),
+                                  call=call, caller=caller, skill_slug=skill_slug, dry_run=dry_run)
 
     experts = roster(context, surface)
     if surface == "skill_test" and skill_slug:
@@ -197,7 +215,8 @@ def build_worker(
     if not personas:
         # No expert of this runtime is enabled. A conversation still answers
         # from the built-ins; a call's worker says honestly it cannot act.
-        tools = [] if surface == "voice" else with_gate(list(BUILTINS.values()), gate)
+        fallback = ExpertRecord(slug="fallback", name="Worker", description="Default worker", runtime="worker", tools=[])
+        tools = [] if surface == "voice" else with_gate(tools_for_expert(fallback, context), gate)
         personas.append(Persona(slug=None, name="worker", instructions=instructions_for(surface, context, None, [], call=call, caller=caller, skill_slug=skill_slug), tools=tools, model=model_for(None, None)))
 
     executor = ActionExecutor(sdk, scope=ExecutionScope(call_id=call.call.id if call is not None else None, expert_slug=personas[0].slug, dry_run=dry_run))

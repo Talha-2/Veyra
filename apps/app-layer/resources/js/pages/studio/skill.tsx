@@ -1,6 +1,6 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, CornerDownRight, FileText, GripVertical, ListOrdered, Play, Plus, Trash2 } from 'lucide-react';
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 
 import { ChoiceCard } from '../../components/studio-capability/choice-card';
 import { EditorWell } from '../../components/studio-capability/editor-well';
@@ -10,6 +10,7 @@ import { Callout, CopyButton } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, Mono } from '../../components/ui/primitives';
 import type { SharedProps } from '../../types';
+import StudioLayout from '../../layouts/studio-layout';
 
 interface Step { name: string; instruction: string }
 interface Props {
@@ -17,9 +18,12 @@ interface Props {
         id: number; slug: string; name: string; description: string; body: string | null;
         execution_mode: string; steps: Step[]; enabled: boolean; version: number; rendered: string;
         experts: { id: number; name: string }[];
+        private_expert: { id: number; name: string } | null;
+        test_available: boolean;
     };
     modes: { value: string; label: string; description: string; caution: string | null }[];
     agent_available: boolean;
+    private_experts: { id: number; name: string; enabled: boolean }[];
 }
 
 const MAX_STEPS = 30;
@@ -35,7 +39,7 @@ const modeIcon = (mode: string) =>
  * exact text the model receives sit in a side panel on wide screens and
  * below the editor on narrower ones.
  */
-export default function SkillDetail({ skill, modes, agent_available }: Props) {
+export default function SkillDetail({ skill, modes, agent_available, private_experts }: Props) {
     const { data, setData, patch, processing, errors, isDirty, reset } = useForm({
         name: skill.name,
         description: skill.description,
@@ -43,6 +47,7 @@ export default function SkillDetail({ skill, modes, agent_available }: Props) {
         execution_mode: skill.execution_mode,
         steps: skill.steps,
         enabled: skill.enabled,
+        private_expert_id: (skill.private_expert?.id ?? null) as number | null,
     });
     const fieldErrors = errors as Record<string, string | undefined>;
     const gated = data.execution_mode === 'gated';
@@ -55,7 +60,11 @@ export default function SkillDetail({ skill, modes, agent_available }: Props) {
     const [over, setOver] = useState<number | null>(null);
     const dragFrom = useRef<number | null>(null);
 
-    const submit = (e: FormEvent) => { e.preventDefault(); patch(`/studio/skills/${skill.id}`, { preserveScroll: true }); };
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (skill.private_expert && data.private_expert_id === null && !confirm('Make this skill shared? Its instructions will become available through the main skill library.')) return;
+        patch(`/studio/skills/${skill.id}`, { preserveScroll: true });
+    };
 
     const discard = () => { reset(); setKeys(skill.steps.map(newKey)); };
 
@@ -104,8 +113,10 @@ export default function SkillDetail({ skill, modes, agent_available }: Props) {
                 back={{ href: '/studio/skills', label: 'Skills' }}
                 title={skill.name}
                 description={
-                    skill.experts.length === 0 ? (
-                        'Not granted to any expert yet, so the agent cannot use it. Grant it from an expert’s page.'
+                    skill.private_expert ? (
+                        <>Private instructions owned by <Link href={`/studio/experts/${skill.private_expert.id}`} className="text-accent-text hover:underline">{skill.private_expert.name}</Link>. Kept outside the main skill library.</>
+                    ) : skill.experts.length === 0 ? (
+                        'In the shared library. The current runtime uses expert assignments until the core worker migration is complete.'
                     ) : (
                         <>
                             Used by{' '}
@@ -124,6 +135,7 @@ export default function SkillDetail({ skill, modes, agent_available }: Props) {
                         <Badge tone={skill.enabled ? 'success' : 'muted'} dot>{skill.enabled ? 'On' : 'Off'}</Badge>
                         {savedMode && <Badge tone={skill.execution_mode === 'gated' ? 'info' : 'muted'}>{savedMode.label}</Badge>}
                         <Mono>Version {skill.version}</Mono>
+                        <Badge tone={skill.private_expert ? 'warning' : 'muted'}>{skill.private_expert ? 'Expert-private' : 'Shared library'}</Badge>
                     </>
                 }
             />
@@ -132,14 +144,14 @@ export default function SkillDetail({ skill, modes, agent_available }: Props) {
                 <WithSide
                     side={
                         <>
-                            <TryIt skillId={skill.id} available={agent_available} unsaved={isDirty} />
+                            <TryIt skillId={skill.id} available={skill.test_available} unsaved={isDirty} owner={skill.private_expert?.name} unavailableReason={!agent_available ? 'Connect the agent layer to try skills from here.' : !skill.enabled ? 'Enable and save this skill before testing it.' : skill.private_expert ? 'Enable the owning expert before testing its private skill.' : 'Testing is unavailable for this skill.'} />
                             <AgentReads rendered={skill.rendered} version={skill.version} unsaved={isDirty} />
                             <SideCard title="Status">
                                 <Toggle checked={data.enabled} onChange={(v) => setData('enabled', v)} label="Enabled"
-                                    hint="Off keeps it granted to its experts, but they are not offered it." />
+                                    hint="Disabled skills are kept, but cannot be discovered or tested." />
                                 <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--separator)' }}>
                                     <Fact label="Saved version"><span className="tabular-nums">v{skill.version}</span></Fact>
-                                    <Fact label="Experts">{skill.experts.length === 0 ? <span className="text-warning">None yet</span> : skill.experts.length}</Fact>
+                                    <Fact label="Audience">{skill.private_expert ? skill.private_expert.name : 'Core worker and experts'}</Fact>
                                     <Fact label="Steps">{skill.execution_mode === 'gated' ? skill.steps.length : <span className="text-tertiary">Prose, no steps</span>}</Fact>
                                 </div>
                                 <div className="mt-5 flex items-center justify-between gap-3 border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
@@ -153,6 +165,15 @@ export default function SkillDetail({ skill, modes, agent_available }: Props) {
                         </>
                     }
                 >
+                    <Panel title="Skill audience" description="Shared skills belong to the main library. Private skills are reserved for one company expert.">
+                        <Stacked label="Audience and owner" htmlFor="skill-owner" error={errors.private_expert_id}>
+                            <select id="skill-owner" className="v-field" disabled={processing} value={data.private_expert_id ?? ''} onChange={event => setData('private_expert_id', event.target.value ? Number(event.target.value) : null)}>
+                                <option value="">Shared library</option>{private_experts.map(owner => <option key={owner.id} value={owner.id}>Private · {owner.name}{!owner.enabled ? ' (disabled)' : ''}</option>)}
+                            </select>
+                            {data.private_expert_id !== null && <p className="mt-3 text-sm leading-relaxed text-secondary">Saving removes this skill from the main library and from other experts. Its owner retains exclusive access.</p>}
+                            {skill.private_expert && data.private_expert_id === null && <Callout tone="warning">Saving will make the instructions shared. You will be asked to confirm this change.</Callout>}
+                        </Stacked>
+                    </Panel>
                     <Panel title="What it is for" description="The agent sees these two lines for every skill it has, on every turn. Keep them short.">
                         <Stacked label="Name" htmlFor="skill-name" error={errors.name}>
                             <input id="skill-name" className="v-field max-w-md" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} />
@@ -160,7 +181,7 @@ export default function SkillDetail({ skill, modes, agent_available }: Props) {
                         <Stacked label="When to use it" htmlFor="skill-when" error={errors.description}
                             hint="The agent reads only this line to decide whether to open the skill, so say when, not how."
                             aside={<Mono style={{ color: data.description.length > 180 ? 'var(--warning)' : undefined }}>{data.description.length}/200</Mono>}>
-                            <input id="skill-when" className="v-field" value={data.description} maxLength={200} onChange={(e) => setData('description', e.target.value)} dir="auto" />
+                            <textarea id="skill-when" className="v-field text-base leading-relaxed" rows={3} value={data.description} maxLength={200} onChange={(e) => setData('description', e.target.value)} dir="auto" />
                         </Stacked>
                     </Panel>
 
@@ -299,26 +320,28 @@ function AgentReads({ rendered, version, unsaved }: { rendered: string; version:
  * caller who does not exist. Its own request, outside the editor's form, so
  * trying never submits unsaved edits.
  */
-function TryIt({ skillId, available, unsaved }: { skillId: number; available: boolean; unsaved: boolean }) {
-    const { flash } = usePage<SharedProps>().props;
+function TryIt({ skillId, available, unsaved, owner, unavailableReason }: { skillId: number; available: boolean; unsaved: boolean; owner?: string; unavailableReason: string }) {
+    const { flash, errors } = usePage<SharedProps>().props;
     const [scenario, setScenario] = useState(flash.skill_test?.scenario ?? '');
     const [running, setRunning] = useState(false);
     const result = flash.skill_test;
 
     const run = () => {
-        if (!scenario.trim()) return;
+        if (!available || running || !scenario.trim()) return;
         setRunning(true);
         router.post(`/studio/skills/${skillId}/test`, { scenario }, { preserveScroll: true, onFinish: () => setRunning(false) });
     };
 
     return (
-        <SideCard title="Try it" aside={!available ? <Badge tone="muted" dot>Agent offline</Badge> : undefined}>
+        <SideCard title="Try it" aside={!available ? <Badge tone="muted" dot>Unavailable</Badge> : undefined}>
             <p className="-mt-2 mb-4 text-sm text-secondary">Something a caller might say. Reads are real; writes are simulated.</p>
+            <p className="mb-4 text-sm leading-relaxed text-secondary">{owner ? `Runs in ${owner}’s isolated expert context with its permitted actions.` : 'Runs through the core worker with shared skills and permitted actions.'}</p>
             <textarea className="v-field text-base" rows={4} value={scenario} onChange={(e) => setScenario(e.target.value)} dir="auto" disabled={!available || running}
                 aria-label="Scenario" maxLength={5000}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(); } }}
                 placeholder="“Hi, I need to move my Thursday visit to next week. My reference is 4471.”" />
-            {!available && <p className="mt-2.5 text-sm text-tertiary">Connect the agent layer to try skills from here.</p>}
+            {!available && <p className="mt-2.5 text-sm text-secondary">{unavailableReason}</p>}
+            {errors.scenario && <p className="mt-2.5 text-sm text-danger">{errors.scenario}</p>}
             {available && unsaved && <p className="mt-2.5 text-sm text-warning">This runs the saved version. Save first to try your edits.</p>}
             <button type="button" className="v-btn v-btn--quiet mt-4 w-full" disabled={!available || running || !scenario.trim()} onClick={run}>
                 <Play size={14} strokeWidth={2} />
@@ -350,3 +373,5 @@ function TryIt({ skillId, available, unsaved }: { skillId: number; available: bo
         </SideCard>
     );
 }
+
+SkillDetail.layout = (page: ReactNode) => <StudioLayout width="wide">{page}</StudioLayout>;

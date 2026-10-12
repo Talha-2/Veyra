@@ -1,5 +1,7 @@
 # Architecture Pivot — One Agent Harness, API-First Studio, Optional CRM
 
+Historical decision record. The Expert-as-default-agent decision below is superseded by the approved October 2026 [skills-first architecture](superpowers/specs/2026-10-12-skills-first-agent-design.md): core taker/worker roles are independent, and company Experts are optional isolated specialists.
+
 August 2026 · Decision record + build sequence · Written against a three-way code audit (agent runtimes, Studio↔Desk coupling, model config)
 
 ## Why

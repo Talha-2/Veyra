@@ -64,6 +64,8 @@ class Tool:
     # For the talker's own tools, which are conversation rather than work and
     # are not recorded as tool calls.
     audited: bool = True
+    # Private executor metadata for a transactional booking; never a model argument.
+    inject_idempotency_key: bool = False
 
     def schema(self) -> dict[str, Any]:
         return openai_tool_schema(self.name, self.description, self.input_schema)

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php" colors="false">
+    <testsuites><testsuite name="Scheduling PostgreSQL"><file>tests/Integration/AppointmentConcurrencyTest.php</file></testsuite></testsuites>
+    <php>
+        <env name="HEALTHCARE_PG_TEST" value="1" force="true"/>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" force="true"/>
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_HOST" value="host.docker.internal" force="true"/>
+        <env name="DB_PORT" value="5444" force="true"/>
+        <env name="DB_DATABASE" value="healthcare_test" force="true"/>
+        <env name="DB_USERNAME" value="healthcare_test" force="true"/>
+        <env name="DB_PASSWORD" value="healthcare_test_only" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="ELEVENLABS_API_KEY" value="" force="true"/>
+        <env name="CARTESIA_API_KEY" value="" force="true"/>
+    </php>
+</phpunit>

@@ -1,10 +1,10 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Activity, ChevronRight, CircleAlert, Clock, Play, Plus, Power, Webhook, Workflow, Zap } from 'lucide-react';
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 
 import { useCreateParam } from '../../components/studio-capability/use-create-param';
 import { Stacked } from '../../components/studio/space';
-import Dialog from '../../components/ui/dialog';
+import Sidebar from '../../components/ui/sidebar';
 import { Card, IconTile, List, SearchField, SegmentedControl, StatTile, Switch, Toolbar } from '../../components/ui/kit';
 import { PageHeader } from '../../components/ui/page';
 import { Badge, EmptyState, RelativeTime, StatusDot, type Tone } from '../../components/ui/primitives';
@@ -28,6 +28,7 @@ const isFailing = (a: Row) => (a.recent_failed_runs_count ?? 0) > 0 || a.last_ru
  */
 export default function Automations({ automations }: { automations: Row[] }) {
     const [creating, setCreating] = useCreateParam();
+    const [creatingBusy, setCreatingBusy] = useState(false);
     const [filter, setFilter] = useState<Filter>('all');
     const [query, setQuery] = useState('');
     // The switch answers at once; the server's answer replaces it when the page reloads.
@@ -126,10 +127,10 @@ export default function Automations({ automations }: { automations: Row[] }) {
                 </div>
             )}
 
-            <Dialog open={creating} onClose={() => setCreating(false)} title="New automation" width={600}
+            <Sidebar open={creating} onClose={() => { if (!creatingBusy) setCreating(false); }} title="New automation" width={600}
                 description="It starts with a manual trigger and balanced reasoning. You set the goal, when it runs and what it may use on the next screen.">
-                <CreateForm onDone={() => setCreating(false)} />
-            </Dialog>
+                <CreateForm onDone={() => setCreating(false)} onProcessingChange={setCreatingBusy} />
+            </Sidebar>
         </>
     );
 }
@@ -206,20 +207,24 @@ function AutomationRow({ a, on, onToggle }: { a: Row; on: boolean; onToggle: (v:
     );
 }
 
-function CreateForm({ onDone }: { onDone: () => void }) {
+function CreateForm({ onDone, onProcessingChange }: { onDone: () => void; onProcessingChange: (busy: boolean) => void }) {
     const { data, setData, post, processing, errors } = useForm({ name: '', description: '' });
-    const submit = (e: FormEvent) => { e.preventDefault(); post('/studio/automations'); };
+    useEffect(() => { onProcessingChange(processing); return () => onProcessingChange(false); }, [processing, onProcessingChange]);
+    const close = () => { if (!processing) onDone(); };
+    const submit = (e: FormEvent) => { e.preventDefault(); if (processing) return; post('/studio/automations'); };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-5 pt-1">
-            <Stacked label="Name" htmlFor="automation-name" error={errors.name}>
-                <input id="automation-name" className="v-field" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} placeholder="Morning digest" autoFocus />
-            </Stacked>
-            <Stacked label="What it does" htmlFor="automation-description" error={errors.description} hint="One line, for the list. The goal you brief it with comes next.">
-                <input id="automation-description" className="v-field" value={data.description} maxLength={300} onChange={(e) => setData('description', e.target.value)} placeholder="Summarise overnight calls for the team at 8am." />
-            </Stacked>
-            <div className="mt-2 flex justify-end gap-2 border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
-                <button type="button" className="v-btn v-btn--ghost" onClick={onDone}>Cancel</button>
+        <form onSubmit={submit} aria-busy={processing}>
+            <fieldset disabled={processing} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0 pt-1">
+                <Stacked label="Name" htmlFor="automation-name" error={errors.name}>
+                    <input id="automation-name" className="v-field" value={data.name} maxLength={80} onChange={(e) => setData('name', e.target.value)} placeholder="Morning digest" autoFocus />
+                </Stacked>
+                <Stacked label="What it does" htmlFor="automation-description" error={errors.description} hint="One line, for the list. The goal you brief it with comes next.">
+                    <input id="automation-description" className="v-field" value={data.description} maxLength={300} onChange={(e) => setData('description', e.target.value)} placeholder="Summarise overnight calls for the team at 8am." />
+                </Stacked>
+            </fieldset>
+            <div className="mt-7 flex justify-end gap-2 border-t pt-5" style={{ borderColor: 'var(--separator)' }}>
+                <button type="button" className="v-btn v-btn--ghost" onClick={close} disabled={processing}>Cancel</button>
                 <button type="submit" className="v-btn v-btn--primary" disabled={processing || !data.name.trim()}>{processing ? 'Creating…' : 'Create automation'}</button>
             </div>
         </form>

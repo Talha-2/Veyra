@@ -65,6 +65,7 @@ class SkillTestRequest(BaseModel):
     skill: str
     version: int | None = None
     scenario: str = Field(min_length=1, max_length=20000)
+    expert: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,160}$")
 
 
 class McpToolsRequest(BaseModel):
@@ -85,6 +86,7 @@ class ToolExecuteRequest(BaseModel):
     tool_call_id: int | None = None
     tool: dict[str, Any]
     arguments: dict[str, Any] = Field(default_factory=dict)
+    execution_context: dict[str, Any] = Field(default_factory=dict)
 
 
 class OutboundCallRequest(BaseModel):
@@ -203,7 +205,7 @@ def create_app(*, sdk: AppSdk | None = None, runner: TextRunner | None = None, c
     @app.post("/v1/skills/test")
     async def skills_test(body: SkillTestRequest, _: None = Depends(authenticated)) -> dict[str, Any]:
         try:
-            return await asyncio.wait_for(app.state.runner.test_skill(body.organization_id, body.skill, body.scenario), timeout=120)
+            return await asyncio.wait_for(app.state.runner.test_skill(body.organization_id, body.skill, body.scenario, expert=body.expert), timeout=120)
         except asyncio.TimeoutError:
             raise HTTPException(504, "The skill test did not finish within 120s.")
 
@@ -232,7 +234,7 @@ def create_app(*, sdk: AppSdk | None = None, runner: TextRunner | None = None, c
         except Exception as e:  # noqa: BLE001
             raise HTTPException(422, f"Not a tool spec: {e}"[:300])
         try:
-            return await asyncio.wait_for(app.state.runner.execute_tool(body.organization_id, spec, body.arguments), timeout=max(5.0, spec.timeout_ms / 1000 + 10))
+            return await asyncio.wait_for(app.state.runner.execute_tool(body.organization_id, spec, body.arguments, tool_call_id=body.tool_call_id, execution_context=body.execution_context), timeout=max(5.0, spec.timeout_ms / 1000 + 10))
         except asyncio.TimeoutError:
             return {"ok": False, "status": "timeout", "error": "timeout", "output": "No response in time. The outcome is unknown.", "duration_ms": spec.timeout_ms}
         except AppSdkError as e:
