@@ -12,7 +12,7 @@ type Filters = { date: string; provider_id: string; location_id: string; search:
 type Confirmation = { visit: WorklistVisit; status: 'completed' | 'cancelled' | 'no_show' };
 type Props = {
     clinic_date: string; today_date: string; timezone: string; as_of: string; filters: Filters;
-    providers: { id: number; name: string; active: boolean }[]; locations: { id: number; name: string; timezone: string; active: boolean }[];
+    providers: { id: number; name: string; active: boolean }[]; locations: { id: number; name: string; timezone: string }[];
     counts: Record<VisitStage, number> & { total: number; patients: number; providers: number };
     appointments: { data: WorklistVisit[]; prev_page_url: string | null; next_page_url: string | null; from: number | null; to: number | null; total: number; current_page: number; last_page: number };
     can_access_clinical: boolean; messages_waiting: number;
@@ -36,7 +36,7 @@ export default function Today({ clinic_date, today_date, timezone, as_of, filter
             <fieldset disabled={busy} className="grid items-end gap-4 sm:grid-cols-2 xl:grid-cols-6">
                 <label className="text-base text-secondary">Clinic date<input required type="date" className="v-field mt-2 w-full" value={query.date} onChange={e => setQuery({ ...query, date: e.target.value })} /></label>
                 <label className="text-base text-secondary">Provider<select className="v-field mt-2 w-full" value={query.provider_id} onChange={e => setQuery({ ...query, provider_id: e.target.value })}><option value="">All providers</option>{providers.map(p => <option key={p.id} value={p.id}>{p.name}{!p.active ? ' (inactive)' : ''}</option>)}</select></label>
-                <label className="text-base text-secondary">Location<select className="v-field mt-2 w-full" value={query.location_id} onChange={e => setQuery({ ...query, location_id: e.target.value })}><option value="">All locations</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}{!l.active ? ' (inactive)' : ''}</option>)}</select></label>
+                <label className="text-base text-secondary">Location<select className="v-field mt-2 w-full" value={query.location_id} onChange={e => setQuery({ ...query, location_id: e.target.value })}><option value="">All locations</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
                 <label className="text-base text-secondary">Visit stage<select className="v-field mt-2 w-full" value={query.stage} onChange={e => setQuery({ ...query, stage: e.target.value })}><option value="active">Active visits</option><option value="all">All stages</option>{Object.entries(visitStageLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
                 <label className="text-base text-secondary">Find patient<input type="search" className="v-field mt-2 w-full" placeholder="Name, MRN or phone" value={query.search} onChange={e => setQuery({ ...query, search: e.target.value })} /></label>
                 <button className="v-btn v-btn--primary">Apply filters</button>

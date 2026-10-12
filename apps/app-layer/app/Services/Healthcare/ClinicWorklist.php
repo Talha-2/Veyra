@@ -82,7 +82,7 @@ class ClinicWorklist
         }
 
         return ['visuals' => $visuals, 'clinic_date' => $filters['date'], 'today_date' => $today, 'timezone' => $timezone, 'as_of' => $asOf->toIso8601String(), 'filters' => $filters,
-            'providers' => Provider::orderBy('name')->get(['id', 'name', 'active']), 'locations' => ClinicLocation::orderBy('name')->get(['id', 'name', 'timezone', 'active']),
+            'providers' => Provider::orderBy('name')->get(['id', 'name', 'active']), 'locations' => ClinicLocation::orderBy('name')->get(['id', 'name', 'timezone']),
             'counts' => $counts, 'appointments' => $appointments, 'can_access_clinical' => $clinical, 'messages_waiting' => Conversation::where('status', 'open')->count(), 'attention' => $attention];
     }
 

@@ -16,6 +16,12 @@ use Tests\SchedulingTestCase;
 
 class ClinicWorklistTest extends SchedulingTestCase
 {
+    public function test_location_filter_returns_only_existing_location_fields(): void
+    {
+        $this->get('/desk/dashboard')->assertInertia(fn (Assert $page) => $page
+            ->where('locations.0', ['id' => $this->location->id, 'name' => 'Lahore', 'timezone' => 'Asia/Karachi']));
+    }
+
     public function test_stale_prepare_cannot_start_a_newly_checked_in_consultation(): void
     {
         $this->provider->update(['user_id' => $this->owner->id]);
